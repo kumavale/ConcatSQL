@@ -35,4 +35,29 @@ impl Connection {
                 Err("failed to connect".to_string()),
         }
     }
+
+    pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
+        let query = match CString::new(query.as_ref()) {
+            Ok(string) => string,
+            _ => return Err(format!("invalid query: {}", query.as_ref())),
+        };
+        let mut err_msg = ptr::null_mut();
+
+        unsafe {
+            ffi::sqlite3_exec(
+                self.raw.as_ptr(),
+                query.as_ptr(),
+                None,             // callback fn
+                ptr::null_mut(),  // callback arg
+                &mut err_msg,
+            );
+        }
+
+        if err_msg.is_null() {
+            Ok(())
+        } else {
+            Err("execute error".to_string())
+        }
+    }
 }
+
