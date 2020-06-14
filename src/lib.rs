@@ -1,7 +1,14 @@
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
+
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    #[cfg(feature = "sqlite")]
+    fn sqlite_connect() {
+        let _conn = sqlite::open(":memory:").unwrap();
     }
 }
