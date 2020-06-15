@@ -1,7 +1,8 @@
 use std::path::Path;
 
-mod connection;
+#[macro_use]
 mod parser;
+mod connection;
 
 use self::connection::Connection;
 

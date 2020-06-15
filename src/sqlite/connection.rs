@@ -4,10 +4,14 @@ use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
 
-use super::parser::convert_to_valid_syntax;
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
+
+use super::parser::*;
 
 pub struct Connection {
-    pub raw: NonNull<ffi::sqlite3>,
+    raw: NonNull<ffi::sqlite3>,
+    or:  String,
 }
 
 impl Connection {
@@ -32,7 +36,10 @@ impl Connection {
 
         match open_result {
             ffi::SQLITE_OK =>
-                Ok(Connection { raw: unsafe { NonNull::new_unchecked(conn_ptr)}} ),
+                Ok(Connection {
+                    raw: unsafe { NonNull::new_unchecked(conn_ptr) },
+                    or:  overwrite_new!(),
+                }),
             _ =>
                 Err("failed to connect".to_string()),
         }
