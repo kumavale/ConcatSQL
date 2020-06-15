@@ -1,6 +1,7 @@
 use std::path::Path;
 
 mod connection;
+mod parser;
 
 use self::connection::Connection;
 
@@ -13,36 +14,15 @@ pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection, String> {
 mod tests {
 
     #[test]
-    fn sqlite_connect() {
+    fn sqlite_open() {
         let _conn = crate::sqlite::open(":memory:").unwrap();
+        let _conn = crate::sqlite::open("/tmp/tmp.db").unwrap();
     }
 
     #[test]
-    fn sqlite_execute() {
-        let conn = crate::sqlite::open(":memory:").unwrap();
-        let stmt = r#"
-            CREATE TABLE users (name TEXT, age INTEGER);
-            INSERT INTO users (name, age) VALUES ('Alice', 42);"#;
-        conn.execute(&stmt).unwrap();
-    }
-
-    #[test]
-    fn sqlite_iterate() {
-        let conn = crate::sqlite::open(":memory:").unwrap();
-        let stmt = r#"
-            CREATE TABLE users (name TEXT, age INTEGER);
-            INSERT INTO users (name, age) VALUES ('Alice', 42);"#;
-        let expect = ("name", "Alice");
-
-        conn.execute(&stmt).unwrap();
-
-        let query = "SELECT name FROM users;";
-        conn.iterate(&query, |pairs| {
-            for &(column, value) in pairs.iter() {
-                assert_eq!(column,         expect.0);
-                assert_eq!(value.unwrap(), expect.1);
-            }
-            true
-        }).unwrap();
+    #[should_panic = "failed to connect"]
+    fn sqlite_open_failed() {
+        use std::path::Path;
+        let _conn = crate::sqlite::open(Path::new("/path/to/db")).unwrap();
     }
 }

@@ -1,9 +1,10 @@
 extern crate libsqlite3_sys as ffi;
 
 use std::ffi::{CStr, CString, c_void};
-use std::io::{stderr, Write};
 use std::ptr::{self, NonNull};
 use std::path::Path;
+
+use super::parser::convert_to_valid_syntax;
 
 pub struct Connection {
     pub raw: NonNull<ffi::sqlite3>,
@@ -38,9 +39,10 @@ impl Connection {
     }
 
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
-        let query = match CString::new(query.as_ref()) {
+        let query = convert_to_valid_syntax(query.as_ref());
+        let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(format!("invalid query: {}", query.as_ref())),
+            _ => return Err("invalid query".to_string()),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -97,7 +99,7 @@ impl Drop for Connection {
         let close_result = unsafe { ffi::sqlite3_close(self.raw.as_ptr()) };
         if close_result != ffi::SQLITE_OK {
             if thread::panicking() {
-                write!(stderr(), "error closing SQLite connection").unwrap();
+                eprintln!("error closing SQLite connection");
             } else {
                 panic!("error closing SQLite connection");
             }
