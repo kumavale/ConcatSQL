@@ -3,14 +3,14 @@ use super::define::*;
 
 macro_rules! overwrite_new {
     () => {
-        format!("[{}]",
+        format!("OWSQL{}",
             thread_rng()
             .sample_iter(&Alphanumeric)
             .take(32)
             .collect::<String>())
     };
     ($max: expr) => {
-        format!("[{}]",
+        format!("OWSQL{}",
             thread_rng()
             .sample_iter(&Alphanumeric)
             .take( if 32 < $max {
