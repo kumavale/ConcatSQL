@@ -3,7 +3,6 @@ extern crate sqlite3_sys as ffi;
 use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
-use std::borrow::Cow;
 
 use crate::bidimap::BidiMap;
 
@@ -104,10 +103,9 @@ impl Connection {
     }
 
     ///
-    pub fn ow<'a, S: Into<Cow<'a, str>>>(&mut self, s: S) -> String {
-        let s = s.into().to_string();
+    pub fn ow(&mut self, s: &'static str) -> String {
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
-        format!(" {} ", self.overwrite.get(&s).unwrap())
+        format!(" {} ", self.overwrite.get(&s.to_string()).unwrap())
     }
 }
 
@@ -162,18 +160,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn ow() {
         let mut conn = crate::sqlite::open(":memory:").unwrap();
-        let test0: String       = String::from("test");
-        let test1: &String      = &String::from("test");
-        let test2: &str         = &String::from("test");
+        //let test0: String  = String::from("test");
+        //let test1: &String = &String::from("test");
+        //let test2: &str    = &String::from("test");
         let test3: &'static str = "test";
-        conn.ow(test0);
-        conn.ow(test1);
-        conn.ow(test2);
+        //conn.ow(test0);  // build failed
+        //conn.ow(test1);  // build failed
+        //conn.ow(test2);  // build failed
         conn.ow(test3);
     }
 }

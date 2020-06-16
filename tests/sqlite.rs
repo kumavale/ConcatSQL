@@ -17,15 +17,15 @@ mod sqlite {
 
     #[test]
     fn execute() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = stmt();
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
     }
 
     #[test]
     fn iterate() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = stmt();
+        let stmt = conn.ow(stmt());
         let expects = ["Alice", "Bob", "Carol"];
 
         conn.execute(&stmt).unwrap();
@@ -45,7 +45,7 @@ mod sqlite {
     #[test]
     fn iterate_or() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = stmt();
+        let stmt = conn.ow(stmt());
         let expects = ["Alice", "Bob"];
 
         conn.execute(&stmt).unwrap();
@@ -56,6 +56,7 @@ mod sqlite {
         //let age = "50 or 1=1; --";
         let query = conn.ow("SELECT name FROM users WHERE") +
             &conn.ow("age <") + age + &conn.ow("OR") + age + &conn.ow("< age");
+        //let query = conn.ow(format!("SELECT name FROM users WHERE age < {age} OR {age} < age;", age = age)); // Anti pattern
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -70,7 +71,7 @@ mod sqlite {
     #[should_panic = "invalid syntax"]
     fn iterate_or_failed() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = stmt();
+        let stmt = conn.ow(stmt());
         let expects = ["Alice", "Bob"];
 
         conn.execute(&stmt).unwrap();
