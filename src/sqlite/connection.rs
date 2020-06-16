@@ -10,7 +10,10 @@ use rand::distributions::Alphanumeric;
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
 
-    pub(crate) or: String,
+    pub(crate) ow_or:     String,
+    pub(crate) ow_select: String,
+    pub(crate) ow_from:   String,
+    pub(crate) ow_where:  String,
 }
 
 impl Connection {
@@ -37,7 +40,10 @@ impl Connection {
             ffi::SQLITE_OK =>
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
-                    or:  overwrite_new!(),
+                    ow_or:     overwrite_new!(),
+                    ow_select: overwrite_new!(),
+                    ow_from:   overwrite_new!(),
+                    ow_where:  overwrite_new!(),
                 }),
             _ =>
                 Err("failed to connect".to_string()),

@@ -32,11 +32,18 @@ impl Connection {
                 return Err("invalid syntax".to_string());
             }
 
-            if token == self.or {
+            if token == self.ow_or {
                 query.push_str(OR);
+            } else if token == self.ow_select {
+                query.push_str(SELECT);
+            } else if token == self.ow_from {
+                query.push_str(FROM);
+            } else if token == self.ow_where {
+                query.push_str(WHERE);
             } else {
                 query.push_str(token);
             }
+
             query.push(' ');
         }
 

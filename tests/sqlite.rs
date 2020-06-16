@@ -31,7 +31,8 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = "SELECT name FROM users;";
+        let query = conn.select() + "name" + &conn.from() + "users;";
+
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
@@ -50,7 +51,10 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = "SELECT name FROM users WHERE age < 50".to_string() + &conn.or() + "50 < age;";
+        let query = conn.select() + "name" +
+            &conn.from() + "users" +
+            &conn.r#where() + "age < 50" + &conn.or() + "50 < age;";
+
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
@@ -70,7 +74,10 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = "SELECT name FROM users WHERE age < 50".to_string() + " or " + "50 < age;";
+        let query = conn.select() + "name" +
+            &conn.from() + "users" +
+            &conn.r#where() + "age < 50" + " or " + "50 < age;";
+
         conn.iterate(&query, |pairs| {  // error
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
