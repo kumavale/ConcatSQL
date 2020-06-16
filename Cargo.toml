@@ -8,10 +8,17 @@ edition = "2018"
 
 
 [features]
-sqlite = ["libsqlite3-sys"]
+sqlite = ["sqlite3-sys/linkage"]
 
 
 [dependencies]
 rand = "0.7"
 lazy_static = "1.4"
-libsqlite3-sys = { version = "0.18", optional = true }
+
+[dependencies.sqlite3-sys]
+version = "0.12"
+default-features = false
+optional = true
+
+[dev-dependencies]
+temporary = "0.6"

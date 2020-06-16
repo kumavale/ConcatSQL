@@ -1,4 +1,4 @@
-extern crate libsqlite3_sys as ffi;
+extern crate sqlite3_sys as ffi;
 
 use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
