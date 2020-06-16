@@ -3,6 +3,7 @@ use std::path::Path;
 #[macro_use]
 mod parser;
 mod connection;
+mod token;
 
 use self::connection::Connection;
 

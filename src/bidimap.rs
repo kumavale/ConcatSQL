@@ -36,5 +36,9 @@ where
     pub fn get_reverse(&self, value: &B) -> Option<&A> {
         self.value_key.get(value).map(Deref::deref)
     }
+
+    pub fn contain_reverse(&self, value: &B) -> bool {
+        self.value_key.contains_key(value)
+    }
 }
 

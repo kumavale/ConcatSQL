@@ -1,4 +1,5 @@
 use super::connection::Connection;
+use super::token::TokenType;
 
 macro_rules! overwrite_new {
     () => {
@@ -27,6 +28,7 @@ impl Connection {
         let tokens = self.tokenize(&stmt);
 
         for token in tokens {
+            let token = token.unwrap();
 
             if let Some(original) = self.overwrite.get_reverse(&token) {
                 query.push_str(original);
@@ -40,7 +42,7 @@ impl Connection {
         Ok(query.as_bytes().to_vec())
     }
 
-    fn tokenize(&self, stmt: &str) -> Vec<String> {
+    fn tokenize(&self, stmt: &str) -> Vec<TokenType> {
         let mut parser = Parser::new(&stmt);
         let mut tokens = Vec::new();
 
@@ -48,9 +50,13 @@ impl Connection {
             let _ = parser.skip_whitespace();
 
             if let Ok(string) = parser.consume_string() {
-                tokens.push(string);
+                if self.overwrite.contain_reverse(&string) {
+                    tokens.push(TokenType::Overwrite(string));
+                } else {
+                    tokens.push(TokenType::String(string));
+                }
             } else if parser.next_char_is(';') {
-                tokens.push(";".to_string());
+                tokens.push(TokenType::String(";".to_string()));
                 let _ = parser.consume_char();
             } else {
                 break;
