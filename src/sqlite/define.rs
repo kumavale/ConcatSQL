@@ -174,7 +174,7 @@ pub const BINFLIP: Keyword = "~";
 pub const BINLS:   Keyword = "<<";
 pub const BINRS:   Keyword = ">>";
 // Delimiter
-pub const SEMICOLON: Keyword = ";";
+//pub const SEMICOLON: Keyword = ";";
 pub const COMMA:     Keyword = ",";
 //pub const LPAREN:    Keyword = "(";
 //pub const RPAREN:    Keyword = ")";
@@ -222,7 +222,7 @@ lazy_static! {
         hs.insert(BINLS.to_string());
         hs.insert(BINRS.to_string());
         // Delimiter
-        hs.insert(SEMICOLON.to_string());
+        //hs.insert(SEMICOLON.to_string());
         hs.insert(COMMA.to_string());
         //hs.insert(LPAREN.to_string());
         //hs.insert(RPAREN.to_string());

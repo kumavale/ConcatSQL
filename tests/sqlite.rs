@@ -56,7 +56,6 @@ mod sqlite {
         //let age = "50 or 1=1; --";
         let query = conn.ow("SELECT name FROM users WHERE") +
             &conn.ow("age <") + age + &conn.ow("OR") + age + &conn.ow("< age");
-        //let query = conn.ow(format!("SELECT name FROM users WHERE age < {age} OR {age} < age;", age = age)); // Anti pattern
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -68,6 +67,7 @@ mod sqlite {
     }
 
     #[test]
+    #[ignore]
     #[should_panic = "invalid syntax"]
     fn iterate_or_failed() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
