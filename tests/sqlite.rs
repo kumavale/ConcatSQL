@@ -51,9 +51,11 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = conn.ow("SELECT") + "name" +
-            &conn.ow("FROM") + "users" +
-            &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + &conn.ow("OR") + "50" + &conn.ow("<") + "age;";
+        let age = "50";
+        //let age = "'50'";
+        //let age = "50 or 1=1; --";
+        let query = conn.ow("SELECT name FROM users WHERE") +
+            &conn.ow("age <") + age + &conn.ow("OR") + age + &conn.ow("< age");
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -78,6 +80,7 @@ mod sqlite {
         let query = conn.ow("SELECT") + "name" +
             &conn.ow("FROM") + "users" +
             &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + or + "50" + &conn.ow("<") + "age;";
+        //"SELECT name FROM users WHERE age < '50 or 50' < age;"
 
         conn.iterate(&query, |pairs| {  // error
             for &(_, value) in pairs.iter() {
