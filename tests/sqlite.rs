@@ -67,8 +67,7 @@ mod sqlite {
     }
 
     #[test]
-    #[ignore]
-    #[should_panic = "invalid syntax"]
+    #[should_panic = "exec error"]
     fn iterate_or_failed() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
@@ -81,7 +80,7 @@ mod sqlite {
         let query = conn.ow("SELECT") + "name" +
             &conn.ow("FROM") + "users" +
             &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + or + "50" + &conn.ow("<") + "age;";
-        //"SELECT name FROM users WHERE age < '50 or 50' < age;"
+        // Expect "SELECT name FROM users WHERE age < '50 or 50' < age;"
 
         conn.iterate(&query, |pairs| {  // error
             for &(_, value) in pairs.iter() {

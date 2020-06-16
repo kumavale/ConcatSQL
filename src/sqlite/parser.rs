@@ -1,5 +1,4 @@
 use super::connection::Connection;
-use super::define::*;
 
 macro_rules! overwrite_new {
     () => {
@@ -28,11 +27,8 @@ impl Connection {
         let tokens = self.tokenize(&stmt);
 
         for token in tokens {
-            if is_keyword(&token) {
-                return Err("invalid syntax".to_string());
-            }
 
-            if let Some(original) = self.overwrite.get_reverse(&token.to_string()) {
+            if let Some(original) = self.overwrite.get_reverse(&token) {
                 query.push_str(original);
             } else {
                 query.push_str(&token);

@@ -3,7 +3,6 @@ use std::path::Path;
 #[macro_use]
 mod parser;
 mod connection;
-mod define;
 
 use self::connection::Connection;
 
@@ -23,7 +22,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     #[should_panic = "failed to connect"]
     fn sqlite_open_failed() {
         use std::path::Path;
