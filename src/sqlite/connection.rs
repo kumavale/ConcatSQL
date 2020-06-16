@@ -7,11 +7,10 @@ use std::path::Path;
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 
-use super::parser::*;
-
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
-    or:  String,
+
+    pub(crate) or: String,
 }
 
 impl Connection {
@@ -46,7 +45,7 @@ impl Connection {
     }
 
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
-        let query = convert_to_valid_syntax(query.as_ref());
+        let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
             Ok(string) => string,
             _ => return Err("invalid query".to_string()),
@@ -74,9 +73,10 @@ impl Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        let query = match CString::new(query.as_ref()) {
+        let query = self.convert_to_valid_syntax(query.as_ref())?;
+        let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(format!("invalid query: {}", query.as_ref())),
+            _ => return Err("invalid query".to_string()),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);

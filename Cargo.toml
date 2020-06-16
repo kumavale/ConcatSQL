@@ -13,5 +13,5 @@ sqlite = ["libsqlite3-sys"]
 
 [dependencies]
 rand = "0.7"
-#lazy_static = "1.4"
+lazy_static = "1.4"
 libsqlite3-sys = { version = "0.18", optional = true }
