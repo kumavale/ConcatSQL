@@ -24,14 +24,14 @@ mod sqlite {
 
     #[test]
     fn iterate() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = stmt();
         let expects = ["Alice", "Bob", "Carol"];
 
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = conn.select() + "name" + &conn.from() + "users;";
+        let query = conn.ow("SELECT") + "name" + &conn.ow("FROM") + "users;";
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -44,16 +44,16 @@ mod sqlite {
 
     #[test]
     fn iterate_or() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = stmt();
         let expects = ["Alice", "Bob"];
 
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = conn.select() + "name" +
-            &conn.from() + "users" +
-            &conn.r#where() + "age < 50" + &conn.or() + "50 < age;";
+        let query = conn.ow("SELECT") + "name" +
+            &conn.ow("FROM") + "users" +
+            &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + &conn.ow("OR") + "50" + &conn.ow("<") + "age;";
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -67,16 +67,17 @@ mod sqlite {
     #[test]
     #[should_panic = "invalid syntax"]
     fn iterate_or_failed() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = stmt();
         let expects = ["Alice", "Bob"];
 
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = conn.select() + "name" +
-            &conn.from() + "users" +
-            &conn.r#where() + "age < 50" + " or " + "50 < age;";
+        let or = " or ";
+        let query = conn.ow("SELECT") + "name" +
+            &conn.ow("FROM") + "users" +
+            &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + or + "50" + &conn.ow("<") + "age;";
 
         conn.iterate(&query, |pairs| {  // error
             for &(_, value) in pairs.iter() {

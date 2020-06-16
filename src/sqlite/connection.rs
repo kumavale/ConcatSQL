@@ -3,20 +3,20 @@ extern crate libsqlite3_sys as ffi;
 use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
+use std::borrow::Cow;
+
+use crate::bidimap::BidiMap;
 
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
-
-    pub(crate) ow_or:     String,
-    pub(crate) ow_select: String,
-    pub(crate) ow_from:   String,
-    pub(crate) ow_where:  String,
+    pub(crate) overwrite: BidiMap<String, String>,
 }
 
 impl Connection {
+    ///
     pub fn open<T: AsRef<Path>>(path: T) -> Result<Self, String> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
@@ -40,16 +40,14 @@ impl Connection {
             ffi::SQLITE_OK =>
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
-                    ow_or:     overwrite_new!(),
-                    ow_select: overwrite_new!(),
-                    ow_from:   overwrite_new!(),
-                    ow_where:  overwrite_new!(),
+                    overwrite: BidiMap::new(),
                 }),
             _ =>
                 Err("failed to connect".to_string()),
         }
     }
 
+    ///
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
         let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
@@ -75,6 +73,7 @@ impl Connection {
         }
     }
 
+    ///
     pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<(), String>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
@@ -102,6 +101,12 @@ impl Connection {
         } else {
             Err("exec error".to_string())
         }
+    }
+
+    ///
+    pub fn ow<'a, S: Copy + Into<Cow<'a, str>>>(&mut self, s: S) -> String {
+        self.overwrite.entry_or_insert(s.into().to_string(), overwrite_new!());
+        format!(" {} ", self.overwrite.get(&s.into().to_string()).unwrap())
     }
 }
 

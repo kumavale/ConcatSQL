@@ -7,6 +7,7 @@ mod define;
 
 use self::connection::Connection;
 
+///
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection, String> {
     Connection::open(path)
 }

@@ -1,11 +1,9 @@
-use super::connection::Connection;
-
 use std::collections::HashSet;
 
 use lazy_static::lazy_static;
 
 // Reserved keywords
-type Keyword = &'static str;
+pub type Keyword = &'static str;
 pub const OR:     Keyword = "OR";
 pub const SELECT: Keyword = "SELECT";
 pub const FROM:   Keyword = "FROM";
@@ -24,23 +22,5 @@ lazy_static! {
 
 pub fn is_keyword(token: &str) -> bool {
     RESERVED_WORDS.contains(&token.to_ascii_uppercase())
-}
-
-impl Connection {
-    pub fn or(&self) -> String {
-        format!(" {} ", self.ow_or)
-    }
-
-    pub fn select(&self) -> String {
-        format!(" {} ", self.ow_select)
-    }
-
-    pub fn from(&self) -> String {
-        format!(" {} ", self.ow_from)
-    }
-
-    pub fn r#where(&self) -> String {
-        format!(" {} ", self.ow_where)
-    }
 }
 

@@ -32,14 +32,8 @@ impl Connection {
                 return Err("invalid syntax".to_string());
             }
 
-            if token == self.ow_or {
-                query.push_str(OR);
-            } else if token == self.ow_select {
-                query.push_str(SELECT);
-            } else if token == self.ow_from {
-                query.push_str(FROM);
-            } else if token == self.ow_where {
-                query.push_str(WHERE);
+            if let Some(original) = self.overwrite.get_reverse(&token.to_string()) {
+                query.push_str(original);
             } else {
                 query.push_str(token);
             }
@@ -54,3 +48,4 @@ impl Connection {
 fn tokenize(stmt: &str) -> Vec<&str> {
     stmt.split_whitespace().collect::<_>()
 }
+
