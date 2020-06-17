@@ -60,10 +60,6 @@ impl Connection {
                     }
                     tokens.push(TokenType::String(string));
                 },
-                Ok(';') => {
-                    tokens.push(TokenType::String(";".to_string()));
-                    let _ = parser.consume_char();
-                }
                 Ok(_) => {
                     if let Ok(string) = parser.consume_except_whitespace() {
                         if self.overwrite.contain_reverse(&string) {

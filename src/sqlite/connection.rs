@@ -177,6 +177,7 @@ mod tests {
         conn.ow(test3);
         conn.ow(test4);
         conn.ow(test5);
+        assert_eq!(conn.ow("42"), conn.ow(&42));
     }
 }
 
