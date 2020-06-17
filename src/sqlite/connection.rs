@@ -103,9 +103,10 @@ impl Connection {
     }
 
     ///
-    pub fn ow(&mut self, s: &'static str) -> String {
+    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
+        let s = s.to_string();
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
-        format!(" {} ", self.overwrite.get(&s.to_string()).unwrap())
+        format!(" {} ", self.overwrite.get(&s).unwrap())
     }
 }
 
@@ -167,11 +168,15 @@ mod tests {
         //let test0: String  = String::from("test");
         //let test1: &String = &String::from("test");
         //let test2: &str    = &String::from("test");
-        let test3: &'static str = "test";
+        let test3: &'static str  = "test";
+        let test4: &'static i32  = &42;
+        let test5: &'static char = &'A';
         //conn.ow(test0);  // build failed
         //conn.ow(test1);  // build failed
         //conn.ow(test2);  // build failed
         conn.ow(test3);
+        conn.ow(test4);
+        conn.ow(test5);
     }
 }
 
