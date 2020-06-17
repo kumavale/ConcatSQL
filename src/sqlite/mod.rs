@@ -19,6 +19,7 @@ mod tests {
     #[test]
     fn sqlite_open() {
         let _conn = crate::sqlite::open(":memory:").unwrap();
+        #[cfg(unix)]
         let _conn = crate::sqlite::open("/tmp/tmp.db").unwrap();
     }
 
