@@ -49,17 +49,49 @@ impl Connection {
         while !parser.eof() {
             let _ = parser.skip_whitespace();
 
-            if let Ok(string) = parser.consume_string() {
-                if self.overwrite.contain_reverse(&string) {
-                    tokens.push(TokenType::Overwrite(string));
-                } else {
+            match parser.next_char() {
+                Ok('"') => {
+                    let mut string = String::from("\"");
+                    let _ = parser.consume_char();
+                    if let Ok(content) = parser.consume_string() {
+                        string.push_str(&content);
+                        string.push('"');
+                        let _ = parser.consume_char();
+                    }
                     tokens.push(TokenType::String(string));
+                },
+                Ok(';') => {
+                    tokens.push(TokenType::String(";".to_string()));
+                    let _ = parser.consume_char();
                 }
-            } else if parser.next_char_is(';') {
-                tokens.push(TokenType::String(";".to_string()));
-                let _ = parser.consume_char();
-            } else {
-                break;
+                Ok(_) => {
+                    if let Ok(string) = parser.consume_except_whitespace() {
+                        if self.overwrite.contain_reverse(&string) {
+                            tokens.push(TokenType::Overwrite(string));
+                        } else {
+                            let mut string = format!("'{}", string);
+                            let mut overwrite = String::new();
+                            'untilow: while !parser.eof() {
+                                let whitespace = parser.consume_whitespace().unwrap_or_default();
+                                while let Ok(s) = parser.consume_except_whitespace() {
+                                    if self.overwrite.contain_reverse(&s) {
+                                        overwrite = s;
+                                        break 'untilow;
+                                    } else {
+                                        string.push_str(&whitespace);
+                                        string.push_str(&s);
+                                    }
+                                }
+                            }
+                            string.push('\'');
+                            tokens.push(TokenType::String(string));
+                            if !overwrite.is_empty() {
+                                tokens.push(TokenType::Overwrite(overwrite));
+                            }
+                        }
+                    }
+                }
+                _ => break,
             }
         }
 
@@ -88,16 +120,22 @@ impl<'a> Parser<'a> {
         self.input[self.pos..].chars().next().ok_or(())
     }
 
-    fn next_char_is(&self, c: char) -> bool {
-        self.next_char() == Ok(c)
-    }
-
     fn skip_whitespace(&mut self) -> Result<(), ()> {
         self.consume_while(char::is_whitespace).and(Ok(()))
     }
 
+    fn consume_whitespace(&mut self) -> Result<String, ()> {
+        self.consume_while(char::is_whitespace)
+    }
+
+    fn consume_except_whitespace(&mut self) -> Result<String, ()> {
+        self.consume_while(|c| !c.is_whitespace())
+    }
+
     fn consume_string(&mut self) -> Result<String, ()> {
-        self.consume_while(char::is_alphanumeric) // TODO
+        // TODO
+        //self.consume_while(|_| self.input[self.pos..].starts_with("\\\""))
+        self.consume_while(|c| c != '"')
     }
 
     fn consume_while<F>(&mut self, f: F) -> Result<String, ()>

@@ -31,7 +31,7 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let query = conn.ow("SELECT") + "name" + &conn.ow("FROM") + "users;";
+        let query = conn.ow("SELECT name FROM users;");
 
         conn.iterate(&query, |pairs| {
             for &(_, value) in pairs.iter() {
@@ -66,21 +66,39 @@ mod sqlite {
         }).unwrap();
     }
 
+    //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+    /*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*
+    /* TODO  TODO  TODO  TODO  TODO  TODO  TODO  TODO  TODO  TODO  TODO  TODO */
+    */*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/
+    //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
     #[test]
+    #[ignore]
     #[should_panic = "exec error"]
     fn iterate_or_failed() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
-        let expects = ["Alice", "Bob"];
+        let expects = ["Alice", "Bob", "unreachable"];
+        //let expects = ["Bob", "Carol", "unreachable"];
 
         conn.execute(&stmt).unwrap();
 
         let mut i = 0;
-        let or = " or ";
-        let query = conn.ow("SELECT") + "name" +
-            &conn.ow("FROM") + "users" +
-            &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + or + "50" + &conn.ow("<") + "age;";
-        // Expect "SELECT name FROM users WHERE age < '50 or 50' < age;"
+        let age = "50 or 1=1; --";
+        //let query = conn.ow("SELECT") + "name" +
+        //    &conn.ow("FROM") + "users" +
+        //    &conn.ow("WHERE") + "age" + &conn.ow("<") + "50" + or + "50" + &conn.ow("<") + "age;";
+        let query = conn.ow(r#"SELECT name FROM users WHERE"#) +
+            //&conn.ow("age") + &conn.ow("<") + age + &conn.ow("OR") + age + &conn.ow("<") + &conn.ow("age");
+            &conn.ow("age") + &conn.ow("<") + age + &conn.ow("OR") + &conn.ow("50") + &conn.ow("<") + &conn.ow("age");
+            //&conn.ow("age") + &conn.ow("<") + &conn.int(&age) + &conn.ow("OR") + &conn.ow("50") + &conn.ow("<") + &conn.ow("age");
+        //let query = conn.ow("SELECT name FROM users WHERE age < '50' < age;");
+        //let query = conn.ow("SELECT name FROM users WHERE age < ?");
+        //let query = "select * from users;";
+        //"SELECT name FROM users WHERE age < ? OR 50 < age;"
+        //                                    ^
+        //                            "'50 or 1=1;--'"
+        // "INTEGER < TEXT" <= always TRUE
+        // "INTEGER > TEXT" <= always FALSE
 
         conn.iterate(&query, |pairs| {  // error
             for &(_, value) in pairs.iter() {
@@ -89,5 +107,6 @@ mod sqlite {
             i += 1;
             true
         }).unwrap();
+        assert_eq!(i, 2);
     }
 }
