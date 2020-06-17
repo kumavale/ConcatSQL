@@ -1,3 +1,5 @@
+//! Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
+
 use std::path::Path;
 
 #[macro_use]
@@ -5,9 +7,9 @@ mod parser;
 mod connection;
 mod token;
 
-use self::connection::Connection;
+pub use self::connection::Connection;
 
-///
+/// Open a read-write connection to a new or existing database.
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection, String> {
     Connection::open(path)
 }

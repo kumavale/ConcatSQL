@@ -23,7 +23,7 @@ macro_rules! overwrite_new {
 }
 
 impl Connection {
-    pub fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>, String> {
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>, String> {
         let mut query = String::new();
         let tokens = self.tokenize(&stmt);
 

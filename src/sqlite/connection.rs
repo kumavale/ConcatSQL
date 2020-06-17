@@ -9,13 +9,14 @@ use crate::bidimap::BidiMap;
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 
+/// A database connection
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
     pub(crate) overwrite: BidiMap<String, String>,
 }
 
 impl Connection {
-    ///
+    /// Open a read-write connection to a new or existing database.
     pub fn open<T: AsRef<Path>>(path: T) -> Result<Self, String> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
@@ -46,7 +47,7 @@ impl Connection {
         }
     }
 
-    ///
+    /// Execute a statement without processing the resulting rows if any.
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
         let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
@@ -72,7 +73,10 @@ impl Connection {
         }
     }
 
+    /// Execute a statement and process the resulting rows as plain text.
     ///
+    /// The callback is triggered for each row. If the callback returns `false`,
+    /// no more rows will be processed.
     pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<(), String>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
@@ -102,7 +106,17 @@ impl Connection {
         }
     }
 
+    /// Return the overwrite definition string.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// let sql = conn.ow("SELECT");
+    ///
+    /// assert_eq!(sql, conn.ow("SELECT"));
+    /// assert_ne!(sql, "SELECT");
+    /// ```
     pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
