@@ -4,6 +4,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
 
+use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
 use super::parser::check_valid_literal;
 
@@ -18,15 +19,15 @@ pub struct Connection {
 
 impl Connection {
     /// Open a read-write connection to a new or existing database.
-    pub fn open<T: AsRef<Path>>(path: T) -> Result<Self, String> {
+    pub fn open<T: AsRef<Path>>(path: T) -> Result<Self> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
                 match CString::new(path) {
                     Ok(string) => string,
-                    _ => return Err(format!("invalid path: {}", path)),
+                    _ => return Err(OwsqlError::Message(format!("invalid path: {}", path))),
                 }
             },
-            _ => return Err(format!("failed to open path: {:?}", path.as_ref())),
+            _ => return Err(OwsqlError::Message(format!("failed to open path: {:?}", path.as_ref()))),
         };
         let mut conn_ptr = ptr::null_mut();
 
@@ -44,16 +45,16 @@ impl Connection {
                     overwrite: BidiMap::new(),
                 }),
             _ =>
-                Err("failed to connect".to_string()),
+                Err(OwsqlError::Message("failed to connect".to_string())),
         }
     }
 
     /// Execute a statement without processing the resulting rows if any.
-    pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<(), String> {
+    pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
         let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err("invalid query".to_string()),
+            _ => return Err(OwsqlError::Message("invalid query".to_string())),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -70,7 +71,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err("exec error".to_string())
+            Err(OwsqlError::Message("exec error".to_string()))
         }
     }
 
@@ -78,14 +79,14 @@ impl Connection {
     ///
     /// The callback is triggered for each row. If the callback returns `false`,
     /// no more rows will be processed.
-    pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<(), String>
+    pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
         let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err("invalid query".to_string()),
+            _ => return Err(OwsqlError::Message("invalid query".to_string())),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -103,7 +104,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err("exec error".to_string())
+            Err(OwsqlError::Message("exec error".to_string()))
         }
     }
 
@@ -114,16 +115,16 @@ impl Connection {
     ///
     /// ```
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    /// let sql = conn.ow("SELECT");
+    /// let sql = conn.ow("SELECT").unwrap();
     ///
-    /// assert_eq!(sql, conn.ow("SELECT"));
+    /// assert_eq!(sql, conn.ow("SELECT").unwrap());
     /// assert_ne!(sql, "SELECT");
     /// ```
-    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
+    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> Result<String> {
         let s = s.to_string();
-        check_valid_literal(&s);
+        check_valid_literal(&s)?;
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
-        format!(" {} ", self.overwrite.get(&s).unwrap())
+        Ok(format!(" {} ", self.overwrite.get(&s).unwrap()))
     }
 }
 
@@ -191,10 +192,10 @@ mod tests {
         //conn.ow(test0);  // build failed
         //conn.ow(test1);  // build failed
         //conn.ow(test2);  // build failed
-        conn.ow(test3);
-        conn.ow(test4);
-        conn.ow(test5);
-        assert_eq!(conn.ow("42"), conn.ow(&42));
+        conn.ow(test3).unwrap();
+        conn.ow(test4).unwrap();
+        conn.ow(test5).unwrap();
+        assert_eq!(conn.ow("42").unwrap(), conn.ow(&42).unwrap());
     }
 }
 

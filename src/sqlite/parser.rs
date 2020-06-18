@@ -1,3 +1,4 @@
+use crate::{OwsqlError, Result};
 use super::connection::Connection;
 use super::token::TokenType;
 
@@ -22,23 +23,34 @@ macro_rules! overwrite_new {
     };
 }
 
-pub(crate) fn check_valid_literal(s: &str) {
+pub(crate) fn check_valid_literal(s: &str) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s);
     while !parser.eof() {
-        parser.consume_while(|c| c != '"' && c != '\'').expect(err_msg);
+        if parser.consume_while(|c| c != '"' && c != '\'').is_err() {
+            return Err(OwsqlError::Message(err_msg.to_string()));
+        }
         match parser.next_char() {
-            Ok('"')  => { parser.consume_string('"').expect(err_msg);  },
-            Ok('\'') => { parser.consume_string('\'').expect(err_msg); },
+            Ok('"')  => {
+                if parser.consume_string('"').is_err() {
+                    return Err(OwsqlError::Message(err_msg.to_string()));
+                }
+            },
+            Ok('\'')  => {
+                if parser.consume_string('\'').is_err() {
+                    return Err(OwsqlError::Message(err_msg.to_string()));
+                }
+            },
             _ => (),
         }
     }
+    Ok(())
 }
 
 impl Connection {
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>, String> {
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>> {
         let mut query = String::new();
-        let tokens = self.tokenize(&stmt);
+        let tokens = self.tokenize(&stmt)?;
 
         for token in tokens {
             let token = token.unwrap();
@@ -55,7 +67,7 @@ impl Connection {
         Ok(query.as_bytes().to_vec())
     }
 
-    fn tokenize(&self, stmt: &str) -> Vec<TokenType> {
+    fn tokenize(&self, stmt: &str) -> Result<Vec<TokenType>> {
         let mut parser = Parser::new(&stmt);
         let mut tokens = Vec::new();
 
@@ -63,12 +75,8 @@ impl Connection {
             let _ = parser.skip_whitespace();
 
             match parser.next_char() {
-                Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"').expect("endless")  )),
-                Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'').expect("endless") )),
-                //Ok('`') => {
-                //}
-                //Ok('[') => {
-                //}
+                Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"')?  )),
+                Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
                 Ok(_) => {
                     if let Ok(string) = parser.consume_except_whitespace_with_escape() {
                         if self.overwrite.contain_reverse(&string) {
@@ -100,7 +108,7 @@ impl Connection {
             }
         }
 
-        tokens
+        Ok(tokens)
     }
 }
 
@@ -147,7 +155,7 @@ impl<'a> Parser<'a> {
         if s.is_empty() { Err(()) } else { Ok(s) }
     }
 
-    fn consume_string(&mut self, quote: char) -> Result<String, ()> {
+    fn consume_string(&mut self, quote: char) -> Result<String> {
         let mut s = quote.to_string();
         self.consume_char()?;
 
@@ -161,7 +169,7 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
 
-        Err(())
+        Err(OwsqlError::Message("endless".to_string()))
     }
 
     fn consume_while<F>(&mut self, f: F) -> Result<String, ()>
