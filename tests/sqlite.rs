@@ -65,19 +65,6 @@ mod sqlite {
     }
 
     #[test]
-    #[should_panic = "exec error"]
-    fn literal() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
-
-        conn.execute(&stmt).unwrap();
-
-        let sql = "select * from users;";
-
-        conn.iterate(&sql, |_| { true }).unwrap();
-    }
-
-    #[test]
     fn double_quotaion_inside_double_quote() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
@@ -126,16 +113,74 @@ mod sqlite {
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 
-    //#[test]
-    //fn () {
-    //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    //    let stmt = conn.ow(stmt());
-    //    conn.execute(&stmt).unwrap();
+    #[test]
+    fn whitespace() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
 
-    //    let name = "Alice' or '1'='1";
-    //    let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
-    //    "select age from users where name = '"
+        let sql = conn.ow("select\n*\rfrom\nusers;");
 
-    //    conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
-    //}
+        conn.iterate(&sql, |_| { true }).unwrap();
+    }
+
+    #[test]
+    fn sqli_eq_nonquote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "Alice' or '1'='1";
+        let sql = conn.ow("select age from users where name =") + name + &conn.ow(";");
+        // "select age from users where name = 'Alice'' or ''1''=''1';"
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    mod should_panic {
+        use super::stmt;
+
+        #[test]
+        #[should_panic = "exec error"]
+        fn literal() {
+            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.ow(stmt());
+
+            conn.execute(&stmt).unwrap();
+
+            let sql = "select * from users;";
+
+            conn.iterate(&sql, |_| { true }).unwrap();
+        }
+
+        #[test]
+        #[should_panic = "exec error"]
+        fn endless_string() {
+            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.ow(stmt());
+            conn.execute(&stmt).unwrap();
+
+            let name = "'endless";
+            let sql = conn.ow("select age from users where name =") + name + &conn.ow(";");
+
+            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        }
+
+        //#[test]
+        //#[should_panic = "definition failed"]
+        //fn sqli_eq_quote() {
+        //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        //    let stmt = conn.ow(stmt());
+        //    conn.execute(&stmt).unwrap();
+
+        //    let name = "Alice' or '1'='1";
+        //    let name = "OR TRUE --; DROP TABLE ...";
+        //    let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
+        //    // "select age from users where name = ' 'Alice'' or ''1''=''1' ';"
+        //    //                                        ####################
+        //    //                                         Enable injection!
+
+        //    conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        //}
+    }
 }

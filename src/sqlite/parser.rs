@@ -135,12 +135,10 @@ impl<'a> Parser<'a> {
             if c.is_whitespace() {
                 break;
             } else if c == '\'' {
-                s.push_str("''");
-            } else {
-                s.push(self.consume_char()?);
+                s.push('\'');
             }
+            s.push(self.consume_char()?);
         }
-        //s.is_empty().then_some(s).ok_or(())
         if s.is_empty() { Err(()) } else { Ok(s) }
     }
 
