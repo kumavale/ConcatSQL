@@ -6,10 +6,10 @@
 //! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
-//! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#).unwrap();
+//! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let id_input = "42 OR 1=1; --";
-//! let sql = conn.ow("SELECT name FROM users WHERE id = ").unwrap() + id_input;
+//! let sql = conn.ow("SELECT name FROM users WHERE id = ") + id_input;
 //! // At runtime it will be transformed into a query like
 //! // "SELECT name FROM users WHERE id = '42 OR 1=1; --';".
 //! # conn.iterate(sql, |_| { true }).unwrap();
@@ -23,7 +23,7 @@
 //! let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
-//!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#).unwrap();
+//!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! conn.execute(stmt).unwrap();
 //! ```
 //!
@@ -33,10 +33,10 @@
 //! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
-//! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#).unwrap();
+//! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
-//! let sql = conn.ow("SELECT * FROM users WHERE age > ").unwrap() + age;
+//! let sql = conn.ow("SELECT * FROM users WHERE age > ") + age;
 //! conn.iterate(sql, |pairs| {
 //!     for &(column, value) in pairs.iter() {
 //!         println!("{} = {}", column, value.unwrap());

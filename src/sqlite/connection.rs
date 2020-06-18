@@ -115,16 +115,16 @@ impl Connection {
     ///
     /// ```
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    /// let sql = conn.ow("SELECT").unwrap();
+    /// let sql = conn.ow("SELECT");
     ///
-    /// assert_eq!(sql, conn.ow("SELECT").unwrap());
+    /// assert_eq!(sql, conn.ow("SELECT"));
     /// assert_ne!(sql, "SELECT");
     /// ```
-    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> Result<String> {
+    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
-        check_valid_literal(&s)?;
+        check_valid_literal(&s).unwrap(); // TODO match
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
-        Ok(format!(" {} ", self.overwrite.get(&s).unwrap()))
+        format!(" {} ", self.overwrite.get(&s).unwrap())
     }
 }
 
@@ -192,10 +192,10 @@ mod tests {
         //conn.ow(test0);  // build failed
         //conn.ow(test1);  // build failed
         //conn.ow(test2);  // build failed
-        conn.ow(test3).unwrap();
-        conn.ow(test4).unwrap();
-        conn.ow(test5).unwrap();
-        assert_eq!(conn.ow("42").unwrap(), conn.ow(&42).unwrap());
+        conn.ow(test3);
+        conn.ow(test4);
+        conn.ow(test5);
+        assert_eq!(conn.ow("42"), conn.ow(&42));
     }
 }
 
