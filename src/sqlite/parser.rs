@@ -55,7 +55,9 @@ impl Connection {
         for token in tokens {
             let token = token.unwrap();
 
-            if let Some(original) = self.overwrite.get_reverse(&token) {
+            if let Some(e) = self.error_msg.get_reverse(&token) {
+                return Err(OwsqlError::Message(e.to_string()));
+            } else if let Some(original) = self.overwrite.get_reverse(&token) {
                 query.push_str(original);
             } else {
                 query.push_str(&token);
@@ -79,7 +81,7 @@ impl Connection {
                 Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
                 Ok(_) => {
                     if let Ok(string) = parser.consume_except_whitespace_with_escape() {
-                        if self.overwrite.contain_reverse(&string) {
+                        if self.overwrite.contain_reverse(&string) || self.error_msg.contain_reverse(&string) {
                             tokens.push(TokenType::Overwrite(string));
                         } else {
                             let mut string = format!("'{}", string);
@@ -87,7 +89,7 @@ impl Connection {
                             'untilow: while !parser.eof() {
                                 let whitespace = parser.consume_whitespace().unwrap_or_default();
                                 while let Ok(s) = parser.consume_except_whitespace_with_escape() {
-                                    if self.overwrite.contain_reverse(&s) {
+                                    if self.overwrite.contain_reverse(&s) || self.error_msg.contain_reverse(&s) {
                                         overwrite = s;
                                         break 'untilow;
                                     } else {

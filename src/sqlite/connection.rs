@@ -15,6 +15,7 @@ use rand::distributions::Alphanumeric;
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
     pub(crate) overwrite: BidiMap<String, String>,
+    pub(crate) error_msg: BidiMap<String, String>,
 }
 
 impl Connection {
@@ -43,6 +44,7 @@ impl Connection {
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     overwrite: BidiMap::new(),
+                    error_msg: BidiMap::new(),
                 }),
             _ =>
                 Err(OwsqlError::Message("failed to connect".to_string())),
@@ -122,9 +124,18 @@ impl Connection {
     /// ```
     pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
-        check_valid_literal(&s).unwrap(); // TODO match
-        self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
-        format!(" {} ", self.overwrite.get(&s).unwrap())
+        let result = check_valid_literal(&s);
+        match result {
+            Ok(_) => {
+                self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
+                format!(" {} ", self.overwrite.get(&s).unwrap())
+            },
+            Err(e) => {
+                let e = e.to_string();
+                self.error_msg.entry_or_insert(e.to_string(), overwrite_new!());
+                format!(" {} ", self.error_msg.get(&e).unwrap())
+            },
+        }
     }
 }
 

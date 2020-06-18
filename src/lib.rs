@@ -62,6 +62,16 @@ pub enum OwsqlError {
     Err(()),
 }
 
+impl std::string::ToString for OwsqlError {
+    fn to_string(&self) -> String {
+        match self {
+            OwsqlError::Code(i) =>    i.to_string(),
+            OwsqlError::Message(s) => s.to_string(),
+            OwsqlError::Err(()) =>    String::new(),
+        }
+    }
+}
+
 impl From::<()> for OwsqlError {
     fn from(_: ()) -> Self {
         OwsqlError::Err(())
