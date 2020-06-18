@@ -107,6 +107,7 @@ impl Connection {
     }
 
     /// Return the overwrite definition string.
+    /// All strings assembled without using this method are escaped.
     ///
     /// # Examples
     ///

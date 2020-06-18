@@ -1,4 +1,4 @@
-//! Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
+//! `feature = "sqlite"` Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
 
 use std::path::Path;
 

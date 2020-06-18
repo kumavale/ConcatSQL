@@ -1,5 +1,19 @@
 //! # OverwriteSQL
-//! `owsql` is a secure library for PostgreSQL, MySQL and SQLite.
+//! `owsql` is a secure library for PostgreSQL, MySQL and SQLite.  
+//! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
+//!
+//! ```
+//! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+//! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+//! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+//! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+//! # conn.execute(stmt).unwrap();
+//! let id_input = "42 OR 1=1; --";
+//! let sql = conn.ow("SELECT name FROM users WHERE id = ") + id_input;
+//! // At runtime it will be transformed into a query like
+//! // "SELECT name FROM users WHERE id = '42 OR 1=1; --';".
+//! # conn.iterate(sql, |_| { true }).unwrap();
+//! ```
 //!
 //! ## Example
 //!
