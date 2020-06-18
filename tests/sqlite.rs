@@ -52,8 +52,6 @@ mod sqlite {
 
         let mut i = 0;
         let age = "50";
-        //let age = "'50'";
-        //let age = "50 or 1=1; --";
         let sql = conn.ow("SELECT name FROM users WHERE") +
             &conn.ow("age <") + age + &conn.ow("OR") + age + &conn.ow("< age");
 
@@ -78,4 +76,66 @@ mod sqlite {
 
         conn.iterate(&sql, |_| { true }).unwrap();
     }
+
+    #[test]
+    fn double_quotaion_inside_double_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+
+        let name = r#"".ow(""inside str"") -> String""#;
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
+    fn double_quotaion_inside_sigle_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = r#""I'm Alice""#;
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
+    fn single_quotaion_inside_double_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = r#"'.ow("inside str") -> String'"#;
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
+    fn single_quotaion_inside_sigle_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "'I''m Alice'";
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    //#[test]
+    //fn () {
+    //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    //    let stmt = conn.ow(stmt());
+    //    conn.execute(&stmt).unwrap();
+
+    //    let name = "Alice' or '1'='1";
+    //    let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
+    //    "select age from users where name = '"
+
+    //    conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    //}
 }

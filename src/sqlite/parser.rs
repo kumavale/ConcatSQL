@@ -51,15 +51,19 @@ impl Connection {
 
             match parser.next_char() {
                 Ok('"') => {
-                    let mut string = String::from("\"");
-                    let _ = parser.consume_char();
-                    if let Ok(content) = parser.consume_string() {
-                        string.push_str(&content);
-                        string.push('"');
-                        let _ = parser.consume_char();
+                    if let Ok(string) = parser.consume_string('"') {
+                        tokens.push(TokenType::String(string));
                     }
-                    tokens.push(TokenType::String(string));
                 },
+                Ok('\'') => {
+                    if let Ok(string) = parser.consume_string('\'') {
+                        tokens.push(TokenType::String(string));
+                    }
+                }
+                //Ok('`') => {
+                //}
+                //Ok('[') => {
+                //}
                 Ok(_) => {
                     if let Ok(string) = parser.consume_except_whitespace() {
                         if self.overwrite.contain_reverse(&string) {
@@ -128,10 +132,21 @@ impl<'a> Parser<'a> {
         self.consume_while(|c| !c.is_whitespace())
     }
 
-    fn consume_string(&mut self) -> Result<String, ()> {
-        // TODO
-        //self.consume_while(|_| self.input[self.pos..].starts_with("\\\""))
-        self.consume_while(|c| c != '"')
+    fn consume_string(&mut self, quote: char) -> Result<String, ()> {
+        let mut s = quote.to_string();
+        self.consume_char()?;
+
+        while !self.eof() {
+            if self.next_char()? == quote {
+                s.push(self.consume_char()?);
+                if self.eof() || self.next_char()? != quote {
+                    return Ok(s);
+                }
+            }
+            s.push(self.consume_char()?);
+        }
+
+        Ok(s)
     }
 
     fn consume_while<F>(&mut self, f: F) -> Result<String, ()>
