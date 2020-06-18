@@ -65,7 +65,7 @@ impl Connection {
                 //Ok('[') => {
                 //}
                 Ok(_) => {
-                    if let Ok(string) = parser.consume_except_whitespace() {
+                    if let Ok(string) = parser.consume_except_whitespace_with_escape() {
                         if self.overwrite.contain_reverse(&string) {
                             tokens.push(TokenType::Overwrite(string));
                         } else {
@@ -73,7 +73,7 @@ impl Connection {
                             let mut overwrite = String::new();
                             'untilow: while !parser.eof() {
                                 let whitespace = parser.consume_whitespace().unwrap_or_default();
-                                while let Ok(s) = parser.consume_except_whitespace() {
+                                while let Ok(s) = parser.consume_except_whitespace_with_escape() {
                                     if self.overwrite.contain_reverse(&s) {
                                         overwrite = s;
                                         break 'untilow;
@@ -128,8 +128,20 @@ impl<'a> Parser<'a> {
         self.consume_while(char::is_whitespace)
     }
 
-    fn consume_except_whitespace(&mut self) -> Result<String, ()> {
-        self.consume_while(|c| !c.is_whitespace())
+    fn consume_except_whitespace_with_escape(&mut self) -> Result<String, ()> {
+        let mut s = String::new();
+        while !self.eof() {
+            let c = self.next_char()?;
+            if c.is_whitespace() {
+                break;
+            } else if c == '\'' {
+                s.push_str("''");
+            } else {
+                s.push(self.consume_char()?);
+            }
+        }
+        //s.is_empty().then_some(s).ok_or(())
+        if s.is_empty() { Err(()) } else { Ok(s) }
     }
 
     fn consume_string(&mut self, quote: char) -> Result<String, ()> {
