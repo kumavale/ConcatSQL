@@ -22,6 +22,19 @@ macro_rules! overwrite_new {
     };
 }
 
+pub(crate) fn check_valid_literal(s: &str) {
+    let err_msg = "invalid literal";
+    let mut parser = Parser::new(&s);
+    while !parser.eof() {
+        parser.consume_while(|c| c != '"' && c != '\'').expect(err_msg);
+        match parser.next_char() {
+            Ok('"')  => { parser.consume_string('"').expect(err_msg);  },
+            Ok('\'') => { parser.consume_string('\'').expect(err_msg); },
+            _ => (),
+        }
+    }
+}
+
 impl Connection {
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>, String> {
         let mut query = String::new();
@@ -50,16 +63,8 @@ impl Connection {
             let _ = parser.skip_whitespace();
 
             match parser.next_char() {
-                Ok('"') => {
-                    if let Ok(string) = parser.consume_string('"') {
-                        tokens.push(TokenType::String(string));
-                    }
-                },
-                Ok('\'') => {
-                    if let Ok(string) = parser.consume_string('\'') {
-                        tokens.push(TokenType::String(string));
-                    }
-                }
+                Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"').expect("endless")  )),
+                Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'').expect("endless") )),
                 //Ok('`') => {
                 //}
                 //Ok('[') => {
@@ -156,7 +161,7 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
 
-        Ok(s)
+        Err(())
     }
 
     fn consume_while<F>(&mut self, f: F) -> Result<String, ()>

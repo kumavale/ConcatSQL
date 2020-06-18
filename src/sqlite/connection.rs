@@ -5,6 +5,7 @@ use std::ptr::{self, NonNull};
 use std::path::Path;
 
 use crate::bidimap::BidiMap;
+use super::parser::check_valid_literal;
 
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
@@ -120,6 +121,7 @@ impl Connection {
     /// ```
     pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
+        check_valid_literal(&s);
         self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
         format!(" {} ", self.overwrite.get(&s).unwrap())
     }

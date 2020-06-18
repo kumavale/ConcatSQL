@@ -154,7 +154,7 @@ mod sqlite {
         }
 
         #[test]
-        #[should_panic = "exec error"]
+        #[should_panic = "endless"]
         fn endless_string() {
             let mut conn = owsql::sqlite::open(":memory:").unwrap();
             let stmt = conn.ow(stmt());
@@ -166,21 +166,17 @@ mod sqlite {
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }
 
-        //#[test]
-        //#[should_panic = "definition failed"]
-        //fn sqli_eq_quote() {
-        //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        //    let stmt = conn.ow(stmt());
-        //    conn.execute(&stmt).unwrap();
+        #[test]
+        #[should_panic = "invalid literal"]
+        fn sqli_eq_quote() {
+            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.ow(stmt());
+            conn.execute(&stmt).unwrap();
 
-        //    let name = "Alice' or '1'='1";
-        //    let name = "OR TRUE --; DROP TABLE ...";
-        //    let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
-        //    // "select age from users where name = ' 'Alice'' or ''1''=''1' ';"
-        //    //                                        ####################
-        //    //                                         Enable injection!
+            let name = "OR TRUE; DROP TABLE users; --";
+            let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
 
-        //    conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
-        //}
+            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        }
     }
 }
