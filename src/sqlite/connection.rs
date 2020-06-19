@@ -15,7 +15,7 @@ use rand::distributions::Alphanumeric;
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
     pub(crate) overwrite: BidiMap<String, String>,
-    pub(crate) error_msg: BidiMap<String, String>,
+    pub(crate) error_msg: BidiMap<OwsqlError, String>,
 }
 
 impl Connection {
@@ -131,12 +131,14 @@ impl Connection {
                 format!(" {} ", self.overwrite.get(&s).unwrap())
             },
             Err(e) => {
-                let e = e.to_string();
-                self.error_msg.entry_or_insert(e.to_string(), overwrite_new!());
+                self.error_msg.entry_or_insert(e.clone(), overwrite_new!());
                 format!(" {} ", self.error_msg.get(&e).unwrap())
             },
         }
     }
+
+    //pub fn valid(&mut self, fmt, params![]) -> String {
+    //}
 }
 
 impl Drop for Connection {

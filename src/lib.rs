@@ -52,7 +52,7 @@ mod bidimap;
 pub mod sqlite;
 
 /// Enum listing possible errors from owsql.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum OwsqlError {
     /// The error code.
     Code(isize),

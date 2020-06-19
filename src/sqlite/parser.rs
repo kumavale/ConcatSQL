@@ -56,7 +56,7 @@ impl Connection {
             let token = token.unwrap();
 
             if let Some(e) = self.error_msg.get_reverse(&token) {
-                return Err(OwsqlError::Message(e.to_string()));
+                return Err(e.clone());
             } else if let Some(original) = self.overwrite.get_reverse(&token) {
                 query.push_str(original);
             } else {
