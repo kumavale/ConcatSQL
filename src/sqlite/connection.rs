@@ -3,6 +3,7 @@ extern crate sqlite3_sys as ffi;
 use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
+use std::collections::HashSet;
 
 use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
@@ -17,6 +18,7 @@ pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
     pub(crate) overwrite: BidiMap<String, String>,
     pub(crate) error_msg: BidiMap<OwsqlError, String>,
+    allowlist: HashSet<String>,
 }
 
 impl Connection {
@@ -46,6 +48,7 @@ impl Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     overwrite: BidiMap::new(),
                     error_msg: BidiMap::new(),
+                    allowlist: HashSet::new(),
                 }),
             _ =>
                 Err(OwsqlError::Message("failed to connect".to_string())),
@@ -139,9 +142,38 @@ impl Connection {
     }
 
     /// TODO
-    //pub fn valid(&mut self, _fmt: &'static str, _params: Params) -> String {
-    pub fn valid<T>(&mut self, _fmt: &'static str, _param: T) -> String {
-        todo!();
+    pub fn allowlist<T: Clone + ToString>(&mut self, value: T) -> String {
+        if self.is_allowlist(value.clone()) {
+            format!(" {} ", self.overwrite.get(&value.to_string()).unwrap())
+        } else {
+            let msg = OwsqlError::Message("deny value".to_string());
+            self.error_msg.entry_or_insert(msg.clone(), overwrite_new!());
+            format!(" {} ", self.error_msg.get(&msg).unwrap())
+        }
+    }
+
+    ///// TODO
+    //pub fn allowlist_literal<T: Clone + ToString>(&mut self, value: T) -> String {
+    //    if self.is_allowlist(value.clone()) {
+    //        format!(" '{}' ", self.overwrite.get(&value.to_string()).unwrap())
+    //    } else {
+    //        let msg = OwsqlError::Message("deny value".to_string());
+    //        self.error_msg.entry_or_insert(msg.clone(), overwrite_new!());
+    //        format!(" {} ", self.error_msg.get(&msg).unwrap())
+    //    }
+    //}
+
+    /// TODO
+    pub fn is_allowlist<T: ToString>(&mut self, value: T) -> bool {
+        self.allowlist.contains(&value.to_string())
+    }
+
+    /// TODO
+    pub fn add_allowlist(&mut self, params: Params) {
+        params.iter().for_each(|value| {
+            self.overwrite.entry_or_insert(value.to_string(), overwrite_new!());
+            self.allowlist.insert(value.to_string());
+        });
     }
 }
 
@@ -196,6 +228,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::params;
 
     #[test]
     fn ow() {
@@ -213,6 +246,18 @@ mod tests {
         conn.ow(test4);
         conn.ow(test5);
         assert_eq!(conn.ow("42"), conn.ow(&42));
+    }
+
+    #[test]
+    fn allowlist() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        conn.add_allowlist(params!["Alice", "Bob", 42]);
+        assert!(conn.is_allowlist("Alice"));
+        assert!(conn.is_allowlist(&"Alice"));
+        assert!(conn.is_allowlist(42));
+        assert!(conn.is_allowlist(&42));
+        assert!(!conn.is_allowlist("Alice OR 1=1; --"));
+        assert_eq!(conn.allowlist("Bob"), conn.ow("Bob"));
     }
 }
 

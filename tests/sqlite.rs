@@ -1,7 +1,7 @@
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    extern crate owsql;
+    use owsql::params;
 
     fn stmt() -> &'static str {
         r#"CREATE TABLE users (name TEXT, age INTEGER);
@@ -137,7 +137,21 @@ mod sqlite {
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 
+    #[test]
+    fn allowlist() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        conn.add_allowlist(params![ 30 ]);
+        let age = 30;
+        let sql = conn.ow("select age from users where age <") + &conn.allowlist(age) + &conn.ow(";");
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
     mod should_panic {
+        use owsql::params;
         use super::stmt;
 
         #[test]
@@ -175,6 +189,20 @@ mod sqlite {
 
             let name = "OR TRUE; DROP TABLE users; --";
             let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
+
+            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        }
+
+        #[test]
+        #[should_panic = "deny value"]
+        fn allowlist_deny_value() {
+            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.ow(stmt());
+            conn.execute(&stmt).unwrap();
+
+            conn.add_allowlist(params!["Alice", "Bob"]);
+            let name = "Alice OR 1=1; --";
+            let sql = conn.ow("select age from users where name =") + &conn.allowlist(name) + &conn.ow(";");
 
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }

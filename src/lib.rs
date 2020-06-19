@@ -81,3 +81,25 @@ impl From::<()> for OwsqlError {
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = OwsqlError> = std::result::Result<T, E>;
 
+/// This macro is a convenient way to pass named parameters to a statement.
+///
+/// ```
+/// # use owsql::params;
+/// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+/// let alice = "Alice";
+/// let sql = conn.add_allowlist( params![ alice, "Bob" ] );
+/// ```
+#[macro_export]
+macro_rules! params {
+    ( $( $param:expr ),* ) => {
+        {
+            let mut temp_vec = Vec::new();
+            $(
+                #[cfg(feature = "sqlite")]
+                temp_vec.push($crate::sqlite::value::Value::from($param));
+            )*
+            temp_vec
+        }
+    };
+}
+
