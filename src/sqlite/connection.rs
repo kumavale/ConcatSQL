@@ -7,6 +7,7 @@ use std::path::Path;
 use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
 use super::parser::check_valid_literal;
+use super::Params;
 
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
@@ -137,8 +138,11 @@ impl Connection {
         }
     }
 
-    //pub fn valid(&mut self, fmt, params![]) -> String {
-    //}
+    /// TODO
+    //pub fn valid(&mut self, _fmt: &'static str, _params: Params) -> String {
+    pub fn valid<T>(&mut self, _fmt: &'static str, _param: T) -> String {
+        todo!();
+    }
 }
 
 impl Drop for Connection {
