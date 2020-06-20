@@ -56,6 +56,18 @@ impl Connection {
     }
 
     /// Execute a statement without processing the resulting rows if any.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.execute(&sql).unwrap();
+    /// ```
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
         let query = self.convert_to_valid_syntax(query.as_ref())?;
         let query = match CString::new(query) {
@@ -85,6 +97,23 @@ impl Connection {
     ///
     /// The callback is triggered for each row. If the callback returns `false`,
     /// no more rows will be processed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.iterate(&sql, |pairs| {
+    ///     for &(column, value) in pairs.iter() {
+    ///         println!("{} = {}", column, value.unwrap());
+    ///     }
+    ///     true
+    /// }).unwrap();
+    /// ```
     pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
@@ -114,8 +143,8 @@ impl Connection {
         }
     }
 
-    /// Return the overwrite definition string.
-    /// All strings assembled without using this method are escaped.
+    /// Return the overwrite definition string.  
+    /// All strings assembled without using this method are escaped.  
     ///
     /// # Examples
     ///
@@ -141,7 +170,24 @@ impl Connection {
         }
     }
 
-    /// TODO
+    /// Return the overwrite definition string in allowlist.  
+    /// Returns the escaped string.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob"]);
+    /// let input = "Alice OR 1=1; --";
+    /// let sql = conn.ow("SELECT * FROM users WHERE name = ") + &conn.allowlist(input);
+    ///
+    /// assert!(conn.execute(sql).is_err());
+    /// ```
     pub fn allowlist<T: Clone + ToString>(&mut self, value: T) -> String {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
@@ -152,14 +198,35 @@ impl Connection {
         }
     }
 
-    /// TODO
+    /// Checks if the value is within the allowlist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
+    /// assert!(conn.is_allowlist("Alice"));
+    /// assert!(!conn.is_allowlist("'Alice'"));
+    /// assert!(conn.is_allowlist(42));
+    /// assert!(conn.is_allowlist("42"));
+    /// assert!(!conn.is_allowlist("'42'"));
+    /// ```
     pub fn is_allowlist<T: ToString>(&mut self, value: T) -> bool {
         self.allowlist.contains(&value.to_string())
     }
 
-    /// TODO
     /// Register it in self.overwrite after performing character string escape processing with
-    /// single quotation added to both sides.
+    /// single quotation added to both sides.  
+    /// Use [params macro](../macro.params.html).  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
+    /// ```
     pub fn add_allowlist(&mut self, params: Params) {
         for value in params {
             self.allowlist.insert(value.to_string());
