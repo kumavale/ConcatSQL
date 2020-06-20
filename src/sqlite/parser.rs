@@ -54,7 +54,7 @@ pub(crate) fn escape_for_allowlist(value: &str) -> String {
 }
 
 impl Connection {
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>> {
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
         let mut query = String::new();
         let tokens = self.tokenize(&stmt)?;
 
@@ -72,7 +72,7 @@ impl Connection {
             query.push(' ');
         }
 
-        Ok(query.as_bytes().to_vec())
+        Ok(query)
     }
 
     fn tokenize(&self, stmt: &str) -> Result<Vec<TokenType>> {

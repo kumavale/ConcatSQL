@@ -107,7 +107,7 @@ impl Connection {
     /// conn.execute(&sql).unwrap();
     /// ```
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
-        let query = self.convert_to_valid_syntax(query.as_ref())?;
+        let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
             _ => return Err(OwsqlError::Message("invalid query".to_string())),
@@ -156,7 +156,7 @@ impl Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        let query = self.convert_to_valid_syntax(query.as_ref())?;
+        let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
             _ => return Err(OwsqlError::Message("invalid query".to_string())),
@@ -210,6 +210,24 @@ impl Connection {
         })?;
 
         Ok(rows)
+    }
+
+    /// Return the actual SQL statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::OwsqlError;
+    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// let select = conn.ow("SELECT");
+    /// let oreilly = conn.ow("O'Reilly");
+    /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
+    /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
+    /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
+    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
+    /// ```
+    pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
+        self.convert_to_valid_syntax(query.as_ref())
     }
 
     /// Return the overwrite definition string.  
@@ -435,6 +453,25 @@ mod tests {
         assert!(!conn.is_allowlist("Alice OR 1=1; --"));
         assert_ne!(conn.allowlist(42), conn.ow(&42));  // "'42'", "42"
         assert_ne!(conn.allowlist("Bob"), conn.ow("Bob"));  // "'Bob'", "Bob"
+    }
+
+    #[test]
+    fn actual_sql() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        let select = conn.ow("SELECT");
+        let oreilly = conn.ow("O'Reilly");
+        let allow = conn.allowlist("Alice");
+        assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
+        assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
+        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".to_string())));
+        let oreilly = conn.ow("O''Reilly");
+        assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
+        conn.add_allowlist(params!["Alice"]);
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".to_string())));
+        let allow = conn.allowlist("Alice");
+        assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
     }
 }
 
