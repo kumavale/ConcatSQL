@@ -145,6 +145,11 @@ impl Connection {
 
     /// Return the overwrite definition string.  
     /// All strings assembled without using this method are escaped.  
+    /// A string containing incomplete quotes like the one below will result in an error.  
+    /// ```text
+    /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");  
+    ///                                       ^                      ^
+    /// ```
     ///
     /// # Examples
     ///

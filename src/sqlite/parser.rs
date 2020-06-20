@@ -27,9 +27,7 @@ pub(crate) fn check_valid_literal(s: &str) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s);
     while !parser.eof() {
-        if parser.consume_while(|c| c != '"' && c != '\'').is_err() {
-            return Err(OwsqlError::Message(err_msg.to_string()));
-        }
+        let _ = parser.consume_while(|c| c != '"' && c != '\'');
         match parser.next_char() {
             Ok('"')  => {
                 if parser.consume_string('"').is_err() {
@@ -85,33 +83,31 @@ impl Connection {
             match parser.next_char() {
                 Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"')?  )),
                 Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
-                Ok(_) => {
-                    if let Ok(string) = parser.consume_except_whitespace_with_escape() {
-                        if self.overwrite.contain_reverse(&string) || self.error_msg.contain_reverse(&string) {
-                            tokens.push(TokenType::Overwrite(string));
-                        } else {
-                            let mut string = format!("'{}", string);
-                            let mut overwrite = String::new();
-                            'untilow: while !parser.eof() {
-                                let whitespace = parser.consume_whitespace().unwrap_or_default();
-                                while let Ok(s) = parser.consume_except_whitespace_with_escape() {
-                                    if self.overwrite.contain_reverse(&s) || self.error_msg.contain_reverse(&s) {
-                                        overwrite = s;
-                                        break 'untilow;
-                                    } else {
-                                        string.push_str(&whitespace);
-                                        string.push_str(&s);
-                                    }
+                Ok(_other) => {
+                    let string = parser.consume_except_whitespace().expect("invalid character found");
+                    if self.overwrite.contain_reverse(&string) || self.error_msg.contain_reverse(&string) {
+                        tokens.push(TokenType::Overwrite(string));
+                    } else {
+                        let mut string = single_quotaion_escape(&string)?;
+                        let mut overwrite = String::new();
+                        'untilow: while !parser.eof() {
+                            let whitespace = parser.consume_whitespace().unwrap_or_default();
+                            while let Ok(s) = parser.consume_except_whitespace() {
+                                if self.overwrite.contain_reverse(&s) || self.error_msg.contain_reverse(&s) {
+                                    overwrite = s;
+                                    break 'untilow;
+                                } else {
+                                    string.push_str(&whitespace);
+                                    string.push_str(&single_quotaion_escape(&s)?);
                                 }
                             }
-                            string.push('\'');
-                            tokens.push(TokenType::String(string));
-                            if !overwrite.is_empty() {
-                                tokens.push(TokenType::Overwrite(overwrite));
-                            }
+                        }
+                        tokens.push(TokenType::String(format!("'{}'", string)));
+                        if !overwrite.is_empty() {
+                            tokens.push(TokenType::Overwrite(overwrite));
                         }
                     }
-                }
+                },
                 _ => break,
             }
         }
@@ -149,14 +145,12 @@ impl<'a> Parser<'a> {
         self.consume_while(char::is_whitespace)
     }
 
-    fn consume_except_whitespace_with_escape(&mut self) -> Result<String, ()> {
+    fn consume_except_whitespace(&mut self) -> Result<String, ()> {
         let mut s = String::new();
         while !self.eof() {
             let c = self.next_char()?;
             if c.is_whitespace() {
                 break;
-            } else if c == '\'' {
-                s.push('\'');
             }
             s.push(self.consume_char()?);
         }
@@ -204,3 +198,30 @@ impl<'a> Parser<'a> {
     }
 }
 
+fn single_quotaion_escape(s: &str) -> Result<String, ()> {
+    let mut escaped = String::new();
+    for c in s.chars() {
+        if c == '\'' {
+            escaped.push('\'');
+        }
+        escaped.push(c);
+    }
+    if escaped.is_empty() { Err(()) } else { Ok(escaped) }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_valid_literals() {
+        assert_eq!(check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(check_valid_literal("'O\"Reilly'"),    Ok(()));
+        assert_eq!(check_valid_literal("'O''Reilly'"),    Ok(()));
+        assert_eq!(check_valid_literal("\"O'Reilly\""),   Ok(()));
+        assert_eq!(check_valid_literal("'Alice', 'Bob'"), Ok(()));
+    }
+}

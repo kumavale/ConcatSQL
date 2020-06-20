@@ -103,3 +103,15 @@ macro_rules! params {
     };
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owsql_error() {
+        assert_eq!(OwsqlError::Code(0).to_string(), "0");
+        assert_eq!(OwsqlError::Message("test".to_string()).to_string(), "test");
+        assert_eq!(OwsqlError::Err(()).to_string(), "");
+        assert_eq!(OwsqlError::from(()), OwsqlError::Err(()));
+    }
+}

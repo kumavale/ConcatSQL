@@ -114,6 +114,42 @@ mod sqlite {
     }
 
     #[test]
+    fn non_quotaion_inside_sigle_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "foo'bar'foo";
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
+    fn non_quotaion_inside_double_quote() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "foo\"bar\"foo";
+        let sql = conn.ow("select age from users where name = ") + name;
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
+    fn non_quotaion_inside_double_quote_after_owstring() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "foo\"bar\"foo";
+        let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
+
+        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+    }
+
+    #[test]
     fn whitespace() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
