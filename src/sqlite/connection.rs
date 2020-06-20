@@ -6,8 +6,9 @@ use std::path::Path;
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::{OwsqlError, Result};
+use crate::Result;
 use crate::bidimap::BidiMap;
+use crate::error::OwsqlError;
 use super::parser::{escape_for_allowlist, check_valid_literal};
 use super::row::Row;
 
@@ -217,7 +218,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::OwsqlError;
+    /// # use owsql::error::OwsqlError;
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// let select = conn.ow("SELECT");
     /// let oreilly = conn.ow("O'Reilly");
@@ -382,6 +383,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use crate::error::*;
 
     #[test]
     fn open() {

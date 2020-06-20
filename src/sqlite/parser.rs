@@ -1,4 +1,5 @@
-use crate::{OwsqlError, Result};
+use crate::Result;
+use crate::error::OwsqlError;
 use super::connection::Connection;
 use super::token::TokenType;
 
@@ -215,6 +216,7 @@ fn single_quotaion_escape(s: &str) -> Result<String, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::*;
 
     #[test]
     fn check_valid_literals() {
