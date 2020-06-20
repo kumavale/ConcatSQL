@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
-use super::parser::check_valid_literal;
+use super::parser::{escape_for_allowlist, check_valid_literal};
 use super::Params;
 
 use rand::{Rng, thread_rng};
@@ -144,7 +144,7 @@ impl Connection {
     /// TODO
     pub fn allowlist<T: Clone + ToString>(&mut self, value: T) -> String {
         if self.is_allowlist(value.clone()) {
-            format!(" {} ", self.overwrite.get(&value.to_string()).unwrap())
+            format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
             let msg = OwsqlError::Message("deny value".to_string());
             self.error_msg.entry_or_insert(msg.clone(), overwrite_new!());
@@ -152,28 +152,21 @@ impl Connection {
         }
     }
 
-    ///// TODO
-    //pub fn allowlist_literal<T: Clone + ToString>(&mut self, value: T) -> String {
-    //    if self.is_allowlist(value.clone()) {
-    //        format!(" '{}' ", self.overwrite.get(&value.to_string()).unwrap())
-    //    } else {
-    //        let msg = OwsqlError::Message("deny value".to_string());
-    //        self.error_msg.entry_or_insert(msg.clone(), overwrite_new!());
-    //        format!(" {} ", self.error_msg.get(&msg).unwrap())
-    //    }
-    //}
-
     /// TODO
     pub fn is_allowlist<T: ToString>(&mut self, value: T) -> bool {
         self.allowlist.contains(&value.to_string())
     }
 
     /// TODO
+    /// Register it in self.overwrite after performing character string escape processing with
+    /// single quotation added to both sides.
     pub fn add_allowlist(&mut self, params: Params) {
-        params.iter().for_each(|value| {
-            self.overwrite.entry_or_insert(value.to_string(), overwrite_new!());
+        for value in params {
             self.allowlist.insert(value.to_string());
-        });
+            self.overwrite.entry_or_insert(
+                escape_for_allowlist(&value.to_string()), overwrite_new!()
+            );
+        }
     }
 }
 
@@ -252,12 +245,16 @@ mod tests {
     fn allowlist() {
         let mut conn = crate::sqlite::open(":memory:").unwrap();
         conn.add_allowlist(params!["Alice", "Bob", 42]);
+        conn.add_allowlist(params!["O'Reilly", "\""]);
         assert!(conn.is_allowlist("Alice"));
         assert!(conn.is_allowlist(&"Alice"));
         assert!(conn.is_allowlist(42));
         assert!(conn.is_allowlist(&42));
+        assert!(conn.is_allowlist("O'Reilly"));
+        assert!(conn.is_allowlist('"'));
         assert!(!conn.is_allowlist("Alice OR 1=1; --"));
-        assert_eq!(conn.allowlist("Bob"), conn.ow("Bob"));
+        assert_ne!(conn.allowlist(42), conn.ow(&42));  // "'42'", "42"
+        assert_ne!(conn.allowlist("Bob"), conn.ow("Bob"));  // "'Bob'", "Bob"
     }
 }
 

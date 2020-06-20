@@ -47,6 +47,12 @@ pub(crate) fn check_valid_literal(s: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn escape_for_allowlist(value: &str) -> String {
+    let value = format!("'{}'", value);
+    let mut parser = Parser::new(&value);
+    parser.consume_string('\'').expect("failed escape")
+}
+
 impl Connection {
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<Vec<u8>> {
         let mut query = String::new();
