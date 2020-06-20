@@ -17,6 +17,7 @@ use rand::distributions::Alphanumeric;
 /// A database connection
 pub struct Connection {
     raw: NonNull<ffi::sqlite3>,
+    serial_number: SerialNumber,
     pub(crate) overwrite: BidiMap<String, String>,
     pub(crate) error_msg: BidiMap<OwsqlError, String>,
     allowlist: HashSet<String>,
@@ -33,6 +34,15 @@ impl fmt::Debug for Connection {
         f.debug_struct("Connection")
             .field("raw", &self.raw)
             .finish()
+    }
+}
+
+struct SerialNumber(usize);
+impl SerialNumber {
+    fn new() -> Self { Self(0usize) }
+    fn get(&mut self) -> usize {
+        self.0 += 1;
+        self.0
     }
 }
 
@@ -73,6 +83,7 @@ impl Connection {
             ffi::SQLITE_OK =>
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
+                    serial_number: SerialNumber::new(),
                     overwrite: BidiMap::new(),
                     error_msg: BidiMap::new(),
                     allowlist: HashSet::new(),
@@ -221,13 +232,14 @@ impl Connection {
     pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
         let result = check_valid_literal(&s);
+        let overwrite = overwrite_new!(self.serial_number.get());
         match result {
             Ok(_) => {
-                self.overwrite.entry_or_insert(s.to_string(), overwrite_new!());
+                self.overwrite.entry_or_insert(s.to_string(), overwrite);
                 format!(" {} ", self.overwrite.get(&s).unwrap())
             },
             Err(e) => {
-                self.error_msg.entry_or_insert(e.clone(), overwrite_new!());
+                self.error_msg.entry_or_insert(e.clone(), overwrite);
                 format!(" {} ", self.error_msg.get(&e).unwrap())
             },
         }
@@ -256,7 +268,7 @@ impl Connection {
             format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
             let msg = OwsqlError::Message("deny value".to_string());
-            self.error_msg.entry_or_insert(msg.clone(), overwrite_new!());
+            self.error_msg.entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.get()));
             format!(" {} ", self.error_msg.get(&msg).unwrap())
         }
     }
@@ -294,7 +306,7 @@ impl Connection {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.entry_or_insert(
-                escape_for_allowlist(&value.to_string()), overwrite_new!()
+                escape_for_allowlist(&value.to_string()), overwrite_new!(self.serial_number.get())
             );
         }
     }

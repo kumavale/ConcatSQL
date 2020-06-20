@@ -3,14 +3,15 @@ use super::connection::Connection;
 use super::token::TokenType;
 
 macro_rules! overwrite_new {
-    () => {
-        format!("OWSQL{}",
+    ($serial: expr) => {
+        format!("OWSQL{}{}",
             thread_rng()
             .sample_iter(&Alphanumeric)
             .take(32)
-            .collect::<String>())
+            .collect::<String>(),
+            $serial.to_string())
     };
-    ($max: expr) => {
+    ($serial: expr, $max: expr) => {
         format!("OWSQL{}",
             thread_rng()
             .sample_iter(&Alphanumeric)
@@ -19,7 +20,8 @@ macro_rules! overwrite_new {
             } else {
                 32
             })
-            .collect::<String>())
+            .collect::<String>(),
+            $serial.to_string())
     };
 }
 
