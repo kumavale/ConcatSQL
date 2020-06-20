@@ -4,6 +4,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
 use std::collections::HashSet;
+use std::fmt;
 
 use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
@@ -19,6 +20,20 @@ pub struct Connection {
     pub(crate) overwrite: BidiMap<String, String>,
     pub(crate) error_msg: BidiMap<OwsqlError, String>,
     allowlist: HashSet<String>,
+}
+
+impl PartialEq for Connection {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+
+impl fmt::Debug for Connection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Connection")
+            .field("raw", &self.raw)
+            .finish()
+    }
 }
 
 impl Connection {
@@ -293,7 +308,45 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::params;
+    use crate::*;
+
+    #[test]
+    fn open() {
+        assert_ne!(crate::sqlite::open(""), crate::sqlite::open(""));
+        assert_ne!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
+        #[cfg(unix)]
+        assert_ne!(crate::sqlite::open("/tmp/tmp.db"), crate::sqlite::open("/tmp/tmp.db"));
+        assert_eq!(
+            crate::sqlite::open("foo\0bar"),
+            Err(OwsqlError::Message("invalid path: foo\u{0}bar".to_string()))
+        );
+    }
+
+    #[test]
+    fn execute() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(
+            conn.execute("\0"),
+            Err(OwsqlError::Message("invalid query".to_string())),
+        );
+        assert_eq!(
+            conn.execute("invalid query"),
+            Err(OwsqlError::Message("exec error".to_string())),
+        );
+    }
+
+    #[test]
+    fn iterate() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(
+            conn.iterate("\0", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("invalid query".to_string())),
+        );
+        assert_eq!(
+            conn.iterate("invalid query", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("exec error".to_string())),
+        );
+    }
 
     #[test]
     fn ow() {
