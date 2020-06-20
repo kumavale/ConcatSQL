@@ -9,7 +9,7 @@ use std::fmt;
 use crate::{OwsqlError, Result};
 use crate::bidimap::BidiMap;
 use super::parser::{escape_for_allowlist, check_valid_literal};
-use super::Params;
+use super::row::Row;
 
 use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
@@ -146,7 +146,7 @@ impl Connection {
                 self.raw.as_ptr(),
                 query.as_ptr(),
                 Some(process_callback::<F>),
-                &*callback as *const F as *mut F as *mut _,
+                &*callback as *const F as *mut F as *mut c_void,
                 &mut err_msg,
             );
         }
@@ -156,6 +156,22 @@ impl Connection {
         } else {
             Err(OwsqlError::Message("exec error".to_string()))
         }
+    }
+
+    /// TODO
+    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
+        let mut rows: Vec<Row> = Vec::new();
+
+        self.iterate(query, |pairs| {
+            let mut row = Row::new();
+            for &(column, value) in pairs.iter() {
+                row.insert(column.to_string(), value.map(|v| v.to_string()));
+            }
+            rows.push(row);
+            true
+        })?;
+
+        Ok(rows)
     }
 
     /// Return the overwrite definition string.  
@@ -247,7 +263,7 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
     /// ```
-    pub fn add_allowlist(&mut self, params: Params) {
+    pub fn add_allowlist(&mut self, params: Vec<super::value::Value>) {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.entry_or_insert(

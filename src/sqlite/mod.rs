@@ -9,9 +9,7 @@ mod connection;
 mod token;
 #[doc(hidden)]
 pub mod value;
-
-/// Output type of params macro.
-type Params = Vec<value::Value>;
+pub mod row;
 
 pub use self::connection::Connection;
 

@@ -65,6 +65,23 @@ mod sqlite {
     }
 
     #[test]
+    fn rows() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
+
+        conn.execute(&stmt).unwrap();
+
+        let sql = conn.ow("SELECT * FROM users;");
+
+        let rows = conn.rows(&sql).unwrap();
+        for (i, row) in rows.iter().enumerate() {
+            assert_eq!(row.get("name").unwrap(), expects[i].0);
+            assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
+        }
+    }
+
+    #[test]
     fn double_quotaion_inside_double_quote() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
