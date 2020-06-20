@@ -7,10 +7,11 @@ use crate::Result;
 mod parser;
 mod connection;
 mod token;
+mod row;
 #[doc(hidden)]
 pub mod value;
-pub mod row;
 
+pub use self::row::Row;
 pub use self::connection::Connection;
 
 /// Open a read-write connection to a new or existing database.

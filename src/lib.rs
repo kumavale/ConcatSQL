@@ -12,7 +12,7 @@
 //! let sql = conn.ow("SELECT name FROM users WHERE id = ") + id_input;
 //! // At runtime it will be transformed into a query like
 //! // "SELECT name FROM users WHERE id = '42 OR 1=1; --';".
-//! # conn.iterate(sql, |_| { true }).unwrap();
+//! # conn.iterate(&sql, |_| { true }).unwrap();
 //! ```
 //!
 //! ## Example
@@ -24,7 +24,7 @@
 //! let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
-//! conn.execute(stmt).unwrap();
+//! conn.execute(&stmt).unwrap();
 //! ```
 //!
 //! Select some rows and process them one by one as plain text:
@@ -37,12 +37,28 @@
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
 //! let sql = conn.ow("SELECT * FROM users WHERE age > ") + age;
-//! conn.iterate(sql, |pairs| {
+//! conn.iterate(&sql, |pairs| {
 //!     for &(column, value) in pairs.iter() {
 //!         println!("{} = {}", column, value.unwrap());
 //!     }
 //!     true
 //! }).unwrap();
+//! ```
+//!
+//! It can be executed after getting all the rows of the query:
+//!
+//! ```
+//! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+//! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
+//! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
+//! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
+//! # conn.execute(stmt).unwrap();
+//! let age = "50";
+//! let sql = conn.ow("SELECT * FROM users WHERE age > ") + age;
+//! let rows = conn.rows(&sql).unwrap();
+//! for row in rows.iter() {
+//!     println!("name = {}", row.get("name").unwrap_or("NULL"));
+//! }
 //! ```
 
 

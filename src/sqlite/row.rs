@@ -1,8 +1,6 @@
-//! TODO
-
 use std::collections::HashMap;
 
-/// TODO
+/// A single result row of a query.
 pub struct Row {
     value: HashMap<String, Option<String>>,
 }
@@ -16,9 +14,9 @@ impl Row {
         self.value.insert(key, value);
     }
 
-    /// TODO
-    pub fn get(&self, key: &str) -> Option<String> {
-        self.value.get(key)?.as_ref().map(|v| v.to_string())
+    /// Get the value of a column of the result row.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.value.get(key)?.as_deref()
     }
 }
 
@@ -31,7 +29,7 @@ mod tests {
         let mut row = Row::new();
         row.insert("key1".to_string(), Some("value".to_string()));
         row.insert("key2".to_string(), None);
-        assert_eq!(row.get("key1"), Some("value".to_string()));
+        assert_eq!(row.get("key1"), Some("value"));
         assert_eq!(row.get("key1").unwrap(), "value");
         assert_eq!(row.get("key2"), None);
         assert_eq!(row.get("key3"), None);

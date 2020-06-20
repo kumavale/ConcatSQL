@@ -38,6 +38,18 @@ impl fmt::Debug for Connection {
 
 impl Connection {
     /// Open a read-write connection to a new or existing database.
+    ///
+    /// # Examples
+    ///
+    /// ```should_panic
+    /// // Open a new connection to an in-memory.
+    /// let conn = owsql::sqlite::open(":memory:").unwrap();
+    /// // Open a new connection from path of literal.
+    /// let conn = owsql::sqlite::open("/path/to/db").unwrap();
+    /// // Open a new connection from std::path::Path.
+    /// let path = std::path::Path::new("/path/to/db");
+    /// let conn = owsql::sqlite::open(path).unwrap();
+    /// ```
     pub fn open<T: AsRef<Path>>(path: T) -> Result<Self> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
@@ -75,7 +87,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
@@ -116,7 +128,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
@@ -158,7 +170,22 @@ impl Connection {
         }
     }
 
-    /// TODO
+    /// Execute a statement and returns the rows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT name FROM users;"#);
+    /// let rows = conn.rows(&sql).unwrap();
+    /// for row in rows.iter() {
+    ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
+    /// }
+    /// ```
     pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
         let mut rows: Vec<Row> = Vec::new();
 
@@ -185,7 +212,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// let sql = conn.ow("SELECT");
     ///
     /// assert_eq!(sql, conn.ow("SELECT"));
