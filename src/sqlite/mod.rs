@@ -7,6 +7,7 @@ use crate::Result;
 mod parser;
 mod connection;
 mod token;
+#[doc(hidden)]
 pub mod value;
 
 /// Output type of params macro.
@@ -17,6 +18,14 @@ pub use self::connection::Connection;
 /// Open a read-write connection to a new or existing database.
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
     Connection::open(path)
+}
+
+/// Return the version number of SQLite.
+///
+/// For instance, the version `3.32.2` corresponds to the integer `3032002`.
+#[inline]
+pub fn version() -> usize {
+    unsafe { sqlite3_sys::sqlite3_libversion_number() as usize }
 }
 
 
@@ -53,5 +62,10 @@ mod tests {
             vec![Value::Int(42), Value::String(String::from("bar")),],
             params![ foo, bar ]
         );
+    }
+
+    #[test]
+    fn version() {
+        crate::sqlite::version();
     }
 }
