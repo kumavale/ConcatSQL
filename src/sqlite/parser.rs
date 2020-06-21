@@ -65,9 +65,9 @@ impl Connection {
         for token in tokens {
             let token = token.unwrap();
 
-            if let Some(e) = self.error_msg.get_reverse(&token) {
+            if let Some(e) = self.error_msg.borrow().get_reverse(&token) {
                 return Err(e.clone());
-            } else if let Some(original) = self.overwrite.get_reverse(&token) {
+            } else if let Some(original) = self.overwrite.borrow().get_reverse(&token) {
                 query.push_str(original);
             } else {
                 query.push_str(&token);
@@ -91,7 +91,7 @@ impl Connection {
                 Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
                 Ok(_other) => {
                     let string = parser.consume_except_whitespace()?;
-                    if self.overwrite.contain_reverse(&string) || self.error_msg.contain_reverse(&string) {
+                    if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
                         tokens.push(TokenType::Overwrite(string));
                     } else {
                         let mut string = single_quotaion_escape(&string)?;
@@ -99,7 +99,7 @@ impl Connection {
                         'untilow: while !parser.eof() {
                             let whitespace = parser.consume_whitespace().unwrap_or_default();
                             while let Ok(s) = parser.consume_except_whitespace() {
-                                if self.overwrite.contain_reverse(&s) || self.error_msg.contain_reverse(&s) {
+                                if self.overwrite.borrow().contain_reverse(&s) || self.error_msg.borrow().contain_reverse(&s) {
                                     overwrite = s;
                                     break 'untilow;
                                 } else {

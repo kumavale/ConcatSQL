@@ -18,18 +18,16 @@ mod sqlite {
 
     #[test]
     fn execute() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
     }
 
     #[test]
     fn iterate() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let expects = ["Alice", "Bob", "Carol"];
-
-        conn.execute(&stmt).unwrap();
+        conn.execute(&conn.ow(stmt())).unwrap();
 
         let mut i = 0;
         let sql = conn.ow("SELECT name FROM users;");
@@ -45,11 +43,9 @@ mod sqlite {
 
     #[test]
     fn iterate_or() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let expects = ["Alice", "Bob"];
-
-        conn.execute(&stmt).unwrap();
+        conn.execute(&conn.ow(stmt())).unwrap();
 
         let mut i = 0;
         let age = "50";
@@ -67,11 +63,9 @@ mod sqlite {
 
     #[test]
     fn rows() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
-
-        conn.execute(&stmt).unwrap();
+        conn.execute(&conn.ow(stmt())).unwrap();
 
         let sql = conn.ow("SELECT * FROM users;");
 
@@ -83,8 +77,20 @@ mod sqlite {
     }
 
     #[test]
+    fn rows_foreach() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
+        conn.execute(&conn.ow(stmt())).unwrap();
+
+        conn.rows(&conn.ow("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+            assert_eq!(row.get("name").unwrap(), expects[i].0);
+            assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
+        });
+    }
+
+    #[test]
     fn double_quotaion_inside_double_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -97,7 +103,7 @@ mod sqlite {
 
     #[test]
     fn double_quotaion_inside_sigle_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -109,7 +115,7 @@ mod sqlite {
 
     #[test]
     fn single_quotaion_inside_double_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -121,7 +127,7 @@ mod sqlite {
 
     #[test]
     fn single_quotaion_inside_sigle_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -133,7 +139,7 @@ mod sqlite {
 
     #[test]
     fn non_quotaion_inside_sigle_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -145,7 +151,7 @@ mod sqlite {
 
     #[test]
     fn non_quotaion_inside_double_quote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -157,7 +163,7 @@ mod sqlite {
 
     #[test]
     fn non_quotaion_inside_double_quote_after_owstring() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -169,7 +175,7 @@ mod sqlite {
 
     #[test]
     fn whitespace() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -180,7 +186,7 @@ mod sqlite {
 
     #[test]
     fn sqli_eq_nonquote() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -264,7 +270,7 @@ mod sqlite {
 
     #[test]
     fn integer() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
@@ -275,6 +281,40 @@ mod sqlite {
         }
     }
 
+    #[test]
+    fn ow_into_execute() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.execute(conn.ow("SELECT") + &conn.int(1)).unwrap();
+    }
+
+    #[test]
+    fn ow_into_iterate() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.iterate(conn.ow("SELECT") + &conn.int(1), |_| true ).unwrap();
+    }
+
+    #[test]
+    fn ow_into_rows() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        for row in conn.rows(conn.ow("SELECT") + &conn.int(1)).unwrap().iter() {
+            assert_eq!(row.get("1").unwrap(), "1");
+        }
+    }
+
+    //#[test]
+    //fn multi_thiread() {
+    //    use std::thread;
+
+    //    let conn = owsql::sqlite::open(":memory:").unwrap();
+    //    let stmt = conn.ow(stmt());
+    //    conn.execute(&stmt).unwrap();
+
+    //    let handle = thread::spawn(move || {
+    //        conn.execute("").unwrap();
+    //    });
+    //    handle.join().unwrap();
+    //}
+
     mod should_panic {
         use owsql::params;
         use super::stmt;
@@ -282,7 +322,7 @@ mod sqlite {
         #[test]
         #[should_panic = "exec error"]
         fn literal() {
-            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let conn = owsql::sqlite::open(":memory:").unwrap();
             let stmt = conn.ow(stmt());
 
             conn.execute(&stmt).unwrap();
@@ -295,7 +335,7 @@ mod sqlite {
         #[test]
         #[should_panic = "endless"]
         fn endless_string() {
-            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let conn = owsql::sqlite::open(":memory:").unwrap();
             let stmt = conn.ow(stmt());
             conn.execute(&stmt).unwrap();
 
@@ -308,7 +348,7 @@ mod sqlite {
         #[test]
         #[should_panic = "invalid literal"]
         fn sqli_eq_quote() {
-            let mut conn = owsql::sqlite::open(":memory:").unwrap();
+            let conn = owsql::sqlite::open(":memory:").unwrap();
             let stmt = conn.ow(stmt());
             conn.execute(&stmt).unwrap();
 

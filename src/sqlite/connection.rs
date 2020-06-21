@@ -5,6 +5,7 @@ use std::ptr::{self, NonNull};
 use std::path::Path;
 use std::collections::HashSet;
 use std::fmt;
+use std::cell::RefCell;
 
 use crate::Result;
 use crate::bidimap::BidiMap;
@@ -18,10 +19,10 @@ use rand::distributions::Alphanumeric;
 /// A database connection
 pub struct Connection {
     raw:                    NonNull<ffi::sqlite3>,
-    serial_number:          SerialNumber,
     allowlist:              HashSet<String>,
-    pub(crate) overwrite:   BidiMap<String, String>,
-    pub(crate) error_msg:   BidiMap<OwsqlError, String>,
+    serial_number:          RefCell<SerialNumber>,
+    pub(crate) overwrite:   RefCell<BidiMap<String, String>>,
+    pub(crate) error_msg:   RefCell<BidiMap<OwsqlError, String>>,
     pub(crate) error_level: OwsqlErrorLevel,
 }
 
@@ -86,10 +87,10 @@ impl Connection {
             ffi::SQLITE_OK =>
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
-                    serial_number: SerialNumber::new(),
                     allowlist:     HashSet::new(),
-                    overwrite:     BidiMap::new(),
-                    error_msg:     BidiMap::new(),
+                    serial_number: RefCell::new(SerialNumber::new()),
+                    overwrite:     RefCell::new(BidiMap::new()),
+                    error_msg:     RefCell::new(BidiMap::new()),
                     error_level:   OwsqlErrorLevel::default(),
                 }),
             _ => Err(OwsqlError::new("failed to connect")),
@@ -250,18 +251,18 @@ impl Connection {
     /// assert_eq!(sql, conn.ow("SELECT"));
     /// assert_ne!(sql, "SELECT");
     /// ```
-    pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
+    pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new!(self.serial_number.get());
+        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
         match result {
             Ok(_) => {
-                self.overwrite.entry_or_insert(s.to_string(), overwrite);
-                format!(" {} ", self.overwrite.get(&s).unwrap())
+                self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
             },
             Err(e) => {
-                self.error_msg.entry_or_insert(e.clone(), overwrite);
-                format!(" {} ", self.error_msg.get(&e).unwrap())
+                self.error_msg.borrow_mut().entry_or_insert(e.clone(), overwrite);
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
             },
         }
     }
@@ -284,13 +285,13 @@ impl Connection {
     ///
     /// assert!(conn.execute(sql).is_err());
     /// ```
-    pub fn allowlist<T: Clone + ToString>(&mut self, value: T) -> String {
+    pub fn allowlist<T: Clone + ToString>(&self, value: T) -> String {
         if self.is_allowlist(value.clone()) {
-            format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
+            format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
             let msg = self.err("deny value", &value.to_string());
-            self.error_msg.entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.get()));
-            format!(" {} ", self.error_msg.get(&msg).unwrap())
+            self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.borrow_mut().get()));
+            format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
     }
 
@@ -308,7 +309,7 @@ impl Connection {
     /// assert!(conn.is_allowlist("42"));
     /// assert!(!conn.is_allowlist("'42'"));
     /// ```
-    pub fn is_allowlist<T: ToString>(&mut self, value: T) -> bool {
+    pub fn is_allowlist<T: ToString>(&self, value: T) -> bool {
         self.allowlist.contains(&value.to_string())
     }
 
@@ -326,8 +327,8 @@ impl Connection {
     pub fn add_allowlist(&mut self, params: Vec<super::value::Value>) {
         for value in params {
             self.allowlist.insert(value.to_string());
-            self.overwrite.entry_or_insert(
-                escape_for_allowlist(&value.to_string()), overwrite_new!(self.serial_number.get())
+            self.overwrite.borrow_mut().entry_or_insert(
+                escape_for_allowlist(&value.to_string()), overwrite_new!(self.serial_number.borrow_mut().get())
             );
         }
     }
@@ -341,16 +342,16 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.int(42);
     /// ```
-    pub fn int<T: Clone + ToString>(&mut self, value: T) -> String {
+    pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
-        let overwrite = overwrite_new!(self.serial_number.get());
+        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
         if value.parse::<i64>().is_ok() {
-            self.overwrite.entry_or_insert(value.to_string(), overwrite);
-            format!(" {} ", self.overwrite.get(&value).unwrap())
+            self.overwrite.borrow_mut().entry_or_insert(value.to_string(), overwrite);
+            format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
             let msg = self.err("non integer", &value);
-            self.error_msg.entry_or_insert(msg.clone(), overwrite);
-            format!(" {} ", self.error_msg.get(&msg).unwrap())
+            self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite);
+            format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
     }
 
@@ -475,7 +476,7 @@ mod tests {
 
     #[test]
     fn ow() {
-        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        let conn = crate::sqlite::open(":memory:").unwrap();
         //let test0: String  = String::from("test");
         //let test1: &String = &String::from("test");
         //let test2: &str    = &String::from("test");
