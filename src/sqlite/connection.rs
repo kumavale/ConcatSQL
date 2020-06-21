@@ -321,7 +321,7 @@ impl Connection {
     /// ```
     /// # use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
+    /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
     pub fn add_allowlist(&mut self, params: Vec<super::value::Value>) {
         for value in params {
@@ -496,6 +496,7 @@ mod tests {
         let mut conn = crate::sqlite::open(":memory:").unwrap();
         conn.add_allowlist(params!["Alice", "Bob", 42]);
         conn.add_allowlist(params!["O'Reilly", "\""]);
+        conn.add_allowlist(params!['A', 0.123, 456.]);
         assert!(conn.is_allowlist("Alice"));
         assert!(conn.is_allowlist(&"Alice"));
         assert!(conn.is_allowlist(42));
@@ -505,6 +506,15 @@ mod tests {
         assert!(!conn.is_allowlist("Alice OR 1=1; --"));
         assert_ne!(conn.allowlist(42), conn.ow(&42));  // "'42'", "42"
         assert_ne!(conn.allowlist("Bob"), conn.ow("Bob"));  // "'Bob'", "Bob"
+        assert!(conn.is_allowlist('A'));
+        assert!(conn.is_allowlist("A"));
+        assert!(conn.is_allowlist("0.123"));
+        assert!(conn.is_allowlist("456"));
+        assert!(!conn.is_allowlist("456."));
+        assert!(conn.is_allowlist(0.123));
+        assert!(conn.is_allowlist(456.));
+        assert!(conn.is_allowlist(456.0));
+        assert!(conn.is_allowlist(0.1230));
     }
 
     #[test]
