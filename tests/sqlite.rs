@@ -2,6 +2,7 @@
 #[cfg(feature = "sqlite")]
 mod sqlite {
     use owsql::params;
+    use owsql::error::*;
 
     fn stmt() -> &'static str {
         r#"CREATE TABLE users (name TEXT, age INTEGER);
@@ -215,8 +216,6 @@ mod sqlite {
 
     #[test]
     fn error_level_release() {
-        use owsql::error::*;
-
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Release);
         let single_quote = conn.ow("'");
@@ -231,8 +230,6 @@ mod sqlite {
 
     #[test]
     fn error_level_develop() {
-        use owsql::error::*;
-
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Develop);
         let single_quote = conn.ow("'");
@@ -245,21 +242,19 @@ mod sqlite {
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
     }
 
-    //#[test] TODO
-    //fn error_level_debug() {
-    //    use owsql::error::*;
+    #[test]
+    fn error_level_debug() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Debug);
+        let single_quote = conn.ow("'");
+        conn.add_allowlist(params!["Alice"]);
+        let name = conn.allowlist("Bob");
 
-    //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    //    conn.error_level(OwsqlErrorLevel::Debug);
-    //    let single_quote = conn.ow("'");
-    //    conn.add_allowlist(params!["Alice"]);
-    //    let name = conn.allowlist("Bob");
-
-    //    assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
-    //    assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless".to_string())));
-    //    assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
-    //    assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
-    //}
+        assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
+        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
+        assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
+    }
 
     mod should_panic {
         use owsql::params;

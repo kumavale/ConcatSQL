@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::error::OwsqlError;
+use crate::error::{OwsqlError, OwsqlErrorLevel};
 use super::connection::Connection;
 use super::token::TokenType;
 
@@ -27,28 +27,29 @@ macro_rules! overwrite_new {
 }
 
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
+    let error_level = OwsqlErrorLevel::default();
     debug_assert!({
         let value = format!("'{}'", &value);
-        let mut parser = Parser::new(&value);
+        let mut parser = Parser::new(&value, &error_level);
         parser.consume_string('\'').is_ok()
     });
     let value = format!("'{}'", value);
-    let mut parser = Parser::new(&value);
+    let mut parser = Parser::new(&value, &error_level);
     parser.consume_string('\'').unwrap_or_default()
 }
 
 impl Connection {
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
         let err_msg = "invalid literal";
-        let mut parser = Parser::new(&s);
+        let mut parser = Parser::new(&s, &self.error_level);
         while !parser.eof() {
             parser.consume_while(|c| c != '"' && c != '\'').ok();
             match parser.next_char() {
                 Ok('"')  => if parser.consume_string('"').is_err() {
-                    return Err(self.err(err_msg));
+                    return Err(self.err(err_msg, &s));
                 },
                 Ok('\'')  => if parser.consume_string('\'').is_err() {
-                    return Err(self.err(err_msg));
+                    return Err(self.err(err_msg, &s));
                 },
                 _ => (),
             }
@@ -59,7 +60,7 @@ impl Connection {
 
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
         let mut query = String::new();
-        let tokens = self.tokenize(&stmt).or_else(|e| Err(self.err(&e.to_string())))?;
+        let tokens = self.tokenize(&stmt)?;
 
         for token in tokens {
             let token = token.unwrap();
@@ -79,7 +80,7 @@ impl Connection {
     }
 
     fn tokenize(&self, stmt: &str) -> Result<Vec<TokenType>> {
-        let mut parser = Parser::new(&stmt);
+        let mut parser = Parser::new(&stmt, &self.error_level);
         let mut tokens = Vec::new();
 
         while !parser.eof() {
@@ -122,15 +123,17 @@ impl Connection {
 }
 
 struct Parser<'a> {
-    input: &'a str,
-    pos:   usize,
+    input:       &'a str,
+    pos:         usize,
+    error_level: &'a OwsqlErrorLevel,
 }
 
 impl<'a> Parser<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, error_level: &'a OwsqlErrorLevel) -> Self {
         Self {
             input,
             pos: 0,
+            error_level,
         }
     }
 
@@ -139,7 +142,11 @@ impl<'a> Parser<'a> {
     }
 
     fn next_char(&self) -> Result<char> {
-        self.input[self.pos..].chars().next().ok_or_else(|| OwsqlError::new("next_char: None"))
+        self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
+            OwsqlErrorLevel::Release => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop => OwsqlError::new("error: next_char()"),
+            OwsqlErrorLevel::Debug   => OwsqlError::new("error: next_char(): None"),
+        })
     }
 
     fn skip_whitespace(&mut self) -> Result<()> {
@@ -160,7 +167,11 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
         if s.is_empty() {
-            Err(OwsqlError::new("consume_except_whitespace: empty"))
+            Err( match self.error_level {
+                OwsqlErrorLevel::Release => OwsqlError::AnyError,
+                OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_except_whitespace()"),
+                OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_except_whitespace(): empty"),
+            })
         } else {
             Ok(s)
         }
@@ -180,7 +191,11 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
 
-        Err(OwsqlError::Message("endless".to_string()))
+        Err( match self.error_level {
+            OwsqlErrorLevel::Release => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop => OwsqlError::new("endless"),
+            OwsqlErrorLevel::Debug   => OwsqlError::new(format!("endless: {}", s)),
+        })
     }
 
     fn consume_while<F>(&mut self, f: F) -> Result<String>
@@ -192,7 +207,11 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
         if s.is_empty() {
-            Err(OwsqlError::new("consume_while: empty"))
+            Err( match self.error_level {
+                OwsqlErrorLevel::Release => OwsqlError::AnyError,
+                OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_while()"),
+                OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_while(): empty"),
+            })
         } else {
             Ok(s)
         }
@@ -200,7 +219,11 @@ impl<'a> Parser<'a> {
 
     fn consume_char(&mut self) -> Result<char> {
         let mut iter = self.input[self.pos..].char_indices();
-        let (_, cur_char) = iter.next().ok_or_else(|| OwsqlError::new("consume_char: None"))?;
+        let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
+            OwsqlErrorLevel::Release => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_char()"),
+            OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_char(): None"),
+        })?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
         Ok(cur_char)

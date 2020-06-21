@@ -17,12 +17,12 @@ use rand::distributions::Alphanumeric;
 
 /// A database connection
 pub struct Connection {
-    raw: NonNull<ffi::sqlite3>,
-    serial_number: SerialNumber,
-    pub(crate) overwrite: BidiMap<String, String>,
-    pub(crate) error_msg: BidiMap<OwsqlError, String>,
-    allowlist: HashSet<String>,
-    error_level: OwsqlErrorLevel,
+    raw:                    NonNull<ffi::sqlite3>,
+    serial_number:          SerialNumber,
+    allowlist:              HashSet<String>,
+    pub(crate) overwrite:   BidiMap<String, String>,
+    pub(crate) error_msg:   BidiMap<OwsqlError, String>,
+    pub(crate) error_level: OwsqlErrorLevel,
 }
 
 impl PartialEq for Connection {
@@ -87,9 +87,9 @@ impl Connection {
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     serial_number: SerialNumber::new(),
+                    allowlist:     HashSet::new(),
                     overwrite:     BidiMap::new(),
                     error_msg:     BidiMap::new(),
-                    allowlist:     HashSet::new(),
                     error_level:   OwsqlErrorLevel::default(),
                 }),
             _ => Err(OwsqlError::new("failed to connect")),
@@ -111,9 +111,9 @@ impl Connection {
     /// ```
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
-        let query = match CString::new(query) {
+        let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return Err(self.err("invalid query")),
+            _ => return Err(self.err("invalid query", &String::from_utf8(query).unwrap_or_default())),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -130,7 +130,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(self.err("exec error"))
+            Err(self.err("exec error", &format!("error code: {}", unsafe{ *err_msg })))
         }
     }
 
@@ -160,9 +160,9 @@ impl Connection {
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
-        let query = match CString::new(query) {
+        let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return Err(self.err("invalid query")),
+            _ => return Err(self.err("invalid query", &String::from_utf8(query).unwrap_or_default())),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -180,7 +180,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(self.err("exec error"))
+            Err(self.err("exec error", &format!("error code: {}", unsafe{ *err_msg })))
         }
     }
 
@@ -288,7 +288,7 @@ impl Connection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let msg = self.err("deny value");
+            let msg = self.err("deny value", &value.to_string());
             self.error_msg.entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.get()));
             format!(" {} ", self.error_msg.get(&msg).unwrap())
         }
@@ -350,11 +350,11 @@ impl Connection {
         }
     }
 
-    pub(crate) fn err(&self, msg: &str) -> OwsqlError {
+    pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> OwsqlError {
         match self.error_level {
             OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::new(&msg),
-            OwsqlErrorLevel::Debug   => todo!(),
+            OwsqlErrorLevel::Develop => OwsqlError::new(&err_msg),
+            OwsqlErrorLevel::Debug   => OwsqlError::new(&format!("{}: {}", err_msg, detail_msg)),
         }
     }
 }
