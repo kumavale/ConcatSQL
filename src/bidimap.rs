@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::rc::Rc;
 use std::ops::Deref;
+use std::sync::Arc;
 
 pub struct BidiMap<A, B> {
-    key_value: HashMap<Rc<A>, Rc<B>>,
-    value_key: HashMap<Rc<B>, Rc<A>>,
+    key_value: HashMap<Arc<A>, Arc<B>>,
+    value_key: HashMap<Arc<B>, Arc<A>>,
 }
 
 impl<A, B> BidiMap<A, B>
@@ -22,8 +22,8 @@ where
 
     pub fn entry_or_insert(&mut self, a: A, b: B) {
         if !self.key_value.contains_key(&a) {
-            let a = Rc::new(a);
-            let b = Rc::new(b);
+            let a = Arc::new(a);
+            let b = Arc::new(b);
             self.key_value.insert(a.clone(), b.clone());
             self.value_key.insert(b, a);
         }
