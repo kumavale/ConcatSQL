@@ -11,6 +11,7 @@ pub enum OwsqlError {
 }
 
 /// Change the output error message.
+#[derive(Debug)]
 pub enum OwsqlErrorLevel {
     /// This is the level that should be set at release.
     Release,
@@ -21,7 +22,13 @@ pub enum OwsqlErrorLevel {
 }
 
 impl Default for OwsqlErrorLevel {
-    fn default() -> Self { OwsqlErrorLevel::Release }
+    fn default() -> Self {
+        if cfg!(debug_assertions) {
+            OwsqlErrorLevel::Develop
+        } else {
+            OwsqlErrorLevel::Release
+        }
+    }
 }
 
 impl OwsqlError {

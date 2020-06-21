@@ -26,28 +26,6 @@ macro_rules! overwrite_new {
     };
 }
 
-pub(crate) fn check_valid_literal(s: &str) -> Result<()> {
-    let err_msg = "invalid literal";
-    let mut parser = Parser::new(&s);
-    while !parser.eof() {
-        parser.consume_while(|c| c != '"' && c != '\'').ok();
-        match parser.next_char() {
-            Ok('"')  => {
-                if parser.consume_string('"').is_err() {
-                    return Err(OwsqlError::new(err_msg));
-                }
-            },
-            Ok('\'')  => {
-                if parser.consume_string('\'').is_err() {
-                    return Err(OwsqlError::new(err_msg));
-                }
-            },
-            _ => (),
-        }
-    }
-    Ok(())
-}
-
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
     let value = format!("'{}'", value);
     let mut parser = Parser::new(&value);
@@ -55,9 +33,28 @@ pub(crate) fn escape_for_allowlist(value: &str) -> String {
 }
 
 impl Connection {
+    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
+        let err_msg = "invalid literal";
+        let mut parser = Parser::new(&s);
+        while !parser.eof() {
+            parser.consume_while(|c| c != '"' && c != '\'').ok();
+            match parser.next_char() {
+                Ok('"')  => if parser.consume_string('"').is_err() {
+                    return Err(self.err(err_msg));
+                },
+                Ok('\'')  => if parser.consume_string('\'').is_err() {
+                    return Err(self.err(err_msg));
+                },
+                _ => (),
+            }
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
         let mut query = String::new();
-        let tokens = self.tokenize(&stmt)?;
+        let tokens = self.tokenize(&stmt).or_else(|e| Err(self.err(&e.to_string())))?;
 
         for token in tokens {
             let token = token.unwrap();
@@ -220,17 +217,17 @@ fn single_quotaion_escape(s: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::error::*;
 
     #[test]
     fn check_valid_literals() {
-        assert_eq!(check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(check_valid_literal("'O\"Reilly'"),    Ok(()));
-        assert_eq!(check_valid_literal("'O''Reilly'"),    Ok(()));
-        assert_eq!(check_valid_literal("\"O'Reilly\""),   Ok(()));
-        assert_eq!(check_valid_literal("'Alice', 'Bob'"), Ok(()));
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(conn.check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("'O\"Reilly'"),    Ok(()));
+        assert_eq!(conn.check_valid_literal("'O''Reilly'"),    Ok(()));
+        assert_eq!(conn.check_valid_literal("\"O'Reilly\""),   Ok(()));
+        assert_eq!(conn.check_valid_literal("'Alice', 'Bob'"), Ok(()));
     }
 }

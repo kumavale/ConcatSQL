@@ -213,6 +213,54 @@ mod sqlite {
         conn.error_level(OwsqlErrorLevel::Debug);
     }
 
+    #[test]
+    fn error_level_release() {
+        use owsql::error::*;
+
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Release);
+        let single_quote = conn.ow("'");
+        conn.add_allowlist(params!["Alice"]);
+        let name = conn.allowlist("Bob");
+
+        assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::AnyError));
+        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::AnyError));
+        assert_eq!(conn.execute(&single_quote), Err(OwsqlError::AnyError));
+        assert_eq!(conn.execute(&name),         Err(OwsqlError::AnyError));
+    }
+
+    #[test]
+    fn error_level_develop() {
+        use owsql::error::*;
+
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Develop);
+        let single_quote = conn.ow("'");
+        conn.add_allowlist(params!["Alice"]);
+        let name = conn.allowlist("Bob");
+
+        assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
+        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
+    }
+
+    //#[test] TODO
+    //fn error_level_debug() {
+    //    use owsql::error::*;
+
+    //    let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    //    conn.error_level(OwsqlErrorLevel::Debug);
+    //    let single_quote = conn.ow("'");
+    //    conn.add_allowlist(params!["Alice"]);
+    //    let name = conn.allowlist("Bob");
+
+    //    assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
+    //    assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless".to_string())));
+    //    assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
+    //    assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
+    //}
+
     mod should_panic {
         use owsql::params;
         use super::stmt;

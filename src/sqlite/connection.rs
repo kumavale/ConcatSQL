@@ -9,7 +9,7 @@ use std::fmt;
 use crate::Result;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
-use super::parser::{escape_for_allowlist, check_valid_literal};
+use super::parser::escape_for_allowlist;
 use super::row::Row;
 
 use rand::{Rng, thread_rng};
@@ -35,6 +35,7 @@ impl fmt::Debug for Connection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("raw", &self.raw)
+            .field("error_level", &self.error_level)
             .finish()
     }
 }
@@ -112,7 +113,7 @@ impl Connection {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(OwsqlError::new("invalid query")),
+            _ => return Err(self.err("invalid query")),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -129,7 +130,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(OwsqlError::new("exec error"))
+            Err(self.err("exec error"))
         }
     }
 
@@ -161,7 +162,7 @@ impl Connection {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(OwsqlError::new("invalid query")),
+            _ => return Err(self.err("invalid query")),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -179,7 +180,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(OwsqlError::new("exec error"))
+            Err(self.err("exec error"))
         }
     }
 
@@ -251,7 +252,7 @@ impl Connection {
     /// ```
     pub fn ow<T: ?Sized + std::string::ToString>(&mut self, s: &'static T) -> String {
         let s = s.to_string();
-        let result = check_valid_literal(&s);
+        let result = self.check_valid_literal(&s);
         let overwrite = overwrite_new!(self.serial_number.get());
         match result {
             Ok(_) => {
@@ -287,7 +288,7 @@ impl Connection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let msg = OwsqlError::new("deny value");
+            let msg = self.err("deny value");
             self.error_msg.entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.get()));
             format!(" {} ", self.error_msg.get(&msg).unwrap())
         }
@@ -332,7 +333,7 @@ impl Connection {
     }
 
     /// Sets the error level.  
-    /// Default is OwsqlErrorLevel::Release.  
+    /// Default is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release.  
     /// Values can be changed only during debug build.
     ///
     /// # Examples
@@ -346,6 +347,14 @@ impl Connection {
         // Values can be changed only during debug build
         if cfg!(debug_assertions) {
             self.error_level = level;
+        }
+    }
+
+    pub(crate) fn err(&self, msg: &str) -> OwsqlError {
+        match self.error_level {
+            OwsqlErrorLevel::Release => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop => OwsqlError::new(&msg),
+            OwsqlErrorLevel::Debug   => todo!(),
         }
     }
 }
@@ -493,6 +502,12 @@ mod tests {
         assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let allow = conn.allowlist("Alice");
         assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
+    }
+
+    #[test]
+    fn debug_display() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
     }
 }
 
