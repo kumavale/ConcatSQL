@@ -8,7 +8,7 @@ use std::fmt;
 
 use crate::Result;
 use crate::bidimap::BidiMap;
-use crate::error::OwsqlError;
+use crate::error::{OwsqlError, OwsqlErrorLevel};
 use super::parser::{escape_for_allowlist, check_valid_literal};
 use super::row::Row;
 
@@ -22,6 +22,7 @@ pub struct Connection {
     pub(crate) overwrite: BidiMap<String, String>,
     pub(crate) error_msg: BidiMap<OwsqlError, String>,
     allowlist: HashSet<String>,
+    error_level: OwsqlErrorLevel,
 }
 
 impl PartialEq for Connection {
@@ -85,12 +86,12 @@ impl Connection {
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     serial_number: SerialNumber::new(),
-                    overwrite: BidiMap::new(),
-                    error_msg: BidiMap::new(),
-                    allowlist: HashSet::new(),
+                    overwrite:     BidiMap::new(),
+                    error_msg:     BidiMap::new(),
+                    allowlist:     HashSet::new(),
+                    error_level:   OwsqlErrorLevel::default(),
                 }),
-            _ =>
-                Err(OwsqlError::new("failed to connect")),
+            _ => Err(OwsqlError::new("failed to connect")),
         }
     }
 
@@ -327,6 +328,24 @@ impl Connection {
             self.overwrite.entry_or_insert(
                 escape_for_allowlist(&value.to_string()), overwrite_new!(self.serial_number.get())
             );
+        }
+    }
+
+    /// Sets the error level.  
+    /// Default is OwsqlErrorLevel::Release.  
+    /// Values can be changed only during debug build.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::error::OwsqlErrorLevel;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.error_level(OwsqlErrorLevel::Develop);
+    /// ```
+    pub fn error_level(&mut self, level: OwsqlErrorLevel) {
+        // Values can be changed only during debug build
+        if cfg!(debug_assertions) {
+            self.error_level = level;
         }
     }
 }

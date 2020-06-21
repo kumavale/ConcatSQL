@@ -203,6 +203,16 @@ mod sqlite {
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 
+    #[test]
+    fn error_level() {
+        use owsql::error::OwsqlErrorLevel;
+
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Release);
+        conn.error_level(OwsqlErrorLevel::Develop);
+        conn.error_level(OwsqlErrorLevel::Debug);
+    }
+
     mod should_panic {
         use owsql::params;
         use super::stmt;

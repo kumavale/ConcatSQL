@@ -10,6 +10,20 @@ pub enum OwsqlError {
     AnyError,
 }
 
+/// Change the output error message.
+pub enum OwsqlErrorLevel {
+    /// This is the level that should be set at release.
+    Release,
+    /// This is the level that should be set during development.
+    Develop,
+    /// Output more detailed messages during development.
+    Debug,
+}
+
+impl Default for OwsqlErrorLevel {
+    fn default() -> Self { OwsqlErrorLevel::Release }
+}
+
 impl OwsqlError {
     pub(crate) fn new<T: Clone + ToString>(msg: T) -> Self {
         OwsqlError::Message(msg.to_string())

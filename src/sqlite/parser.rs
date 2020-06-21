@@ -81,7 +81,7 @@ impl Connection {
         let mut tokens = Vec::new();
 
         while !parser.eof() {
-            let _ = parser.skip_whitespace();
+            parser.skip_whitespace().ok();
 
             match parser.next_char() {
                 Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"')?  )),
@@ -213,6 +213,7 @@ fn single_quotaion_escape(s: &str) -> Result<String> {
         }
         escaped.push(c);
     }
+    debug_assert!(!escaped.is_empty());
     Ok(escaped)
 }
 
