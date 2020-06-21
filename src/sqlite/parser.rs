@@ -13,7 +13,7 @@ macro_rules! overwrite_new {
             $serial.to_string())
     };
     ($serial: expr, $max: expr) => {
-        format!("OWSQL{}",
+        format!("OWSQL{}{}",
             thread_rng()
             .sample_iter(&Alphanumeric)
             .take( if 32 < $max {
