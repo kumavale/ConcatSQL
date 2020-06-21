@@ -332,6 +332,28 @@ impl Connection {
         }
     }
 
+    /// It is guaranteed to be a signed 64-bit integer without quotation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.int(42);
+    /// ```
+    pub fn int<T: Clone + ToString>(&mut self, value: T) -> String {
+        let value = value.to_string();
+        let overwrite = overwrite_new!(self.serial_number.get());
+        if value.parse::<i64>().is_ok() {
+            self.overwrite.entry_or_insert(value.to_string(), overwrite);
+            format!(" {} ", self.overwrite.get(&value).unwrap())
+        } else {
+            let msg = self.err("non integer", &value);
+            self.error_msg.entry_or_insert(msg.clone(), overwrite);
+            format!(" {} ", self.error_msg.get(&msg).unwrap())
+        }
+    }
+
     /// Sets the error level.  
     /// Default is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release.  
     /// Values can be changed only during debug build.

@@ -221,11 +221,13 @@ mod sqlite {
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
+        let integer = conn.int("50 or 1=1; --");
 
         assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::AnyError));
         assert_eq!(conn.execute("'endless"),    Err(OwsqlError::AnyError));
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::AnyError));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::AnyError));
+        assert_eq!(conn.execute(&integer),      Err(OwsqlError::AnyError));
     }
 
     #[test]
@@ -235,11 +237,13 @@ mod sqlite {
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
+        let integer = conn.int("50 or 1=1; --");
 
         assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
         assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless".to_string())));
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
+        assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer".to_string())));
     }
 
     #[test]
@@ -249,11 +253,26 @@ mod sqlite {
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
+        let integer = conn.int("50 or 1=1; --");
 
         assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
         assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless: 'endless".to_string())));
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
+        assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
+    }
+
+    #[test]
+    fn integer() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let age = 50;
+        let sql = conn.ow("select name from users where age <") + &conn.int(age);
+        for row in conn.rows(&sql).unwrap().iter() {
+            assert_eq!(row.get("name").unwrap(), "Alice");
+        }
     }
 
     mod should_panic {
