@@ -6,8 +6,14 @@ pub enum OwsqlError {
     Code(isize),
     /// The error message.
     Message(String),
-    /// The empty tuple like error.
-    Err(()),
+    /// An any errors.
+    AnyError,
+}
+
+impl OwsqlError {
+    pub(crate) fn new<T: Clone + ToString>(msg: T) -> Self {
+        OwsqlError::Message(msg.to_string())
+    }
 }
 
 impl std::string::ToString for OwsqlError {
@@ -15,14 +21,8 @@ impl std::string::ToString for OwsqlError {
         match self {
             OwsqlError::Code(i) =>    i.to_string(),
             OwsqlError::Message(s) => s.to_string(),
-            OwsqlError::Err(()) =>    String::new(),
+            OwsqlError::AnyError =>   String::from("AnyError"),
         }
-    }
-}
-
-impl From::<()> for OwsqlError {
-    fn from(_: ()) -> Self {
-        OwsqlError::Err(())
     }
 }
 
@@ -34,8 +34,9 @@ mod tests {
     fn owsql_error() {
         assert_eq!(OwsqlError::Code(0).to_string(), "0");
         assert_eq!(OwsqlError::Message("test".to_string()).to_string(), "test");
-        assert_eq!(OwsqlError::Err(()).to_string(), "");
-        assert_eq!(OwsqlError::from(()), OwsqlError::Err(()));
+        assert_eq!(OwsqlError::new("test").to_string(), "test");
+        assert_eq!(OwsqlError::new("test".to_string()).to_string(), "test");
+        assert_eq!(OwsqlError::new(42).to_string(), "42");
     }
 }
 

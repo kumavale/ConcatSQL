@@ -66,10 +66,10 @@ impl Connection {
             Some(path) => {
                 match CString::new(path) {
                     Ok(string) => string,
-                    _ => return Err(OwsqlError::Message(format!("invalid path: {}", path))),
+                    _ => return Err(OwsqlError::new(format!("invalid path: {}", path))),
                 }
             },
-            _ => return Err(OwsqlError::Message(format!("failed to open path: {:?}", path.as_ref()))),
+            _ => return Err(OwsqlError::new(format!("failed to open path: {:?}", path.as_ref()))),
         };
         let mut conn_ptr = ptr::null_mut();
 
@@ -90,7 +90,7 @@ impl Connection {
                     allowlist: HashSet::new(),
                 }),
             _ =>
-                Err(OwsqlError::Message("failed to connect".to_string())),
+                Err(OwsqlError::new("failed to connect")),
         }
     }
 
@@ -111,7 +111,7 @@ impl Connection {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(OwsqlError::Message("invalid query".to_string())),
+            _ => return Err(OwsqlError::new("invalid query")),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -128,7 +128,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(OwsqlError::Message("exec error".to_string()))
+            Err(OwsqlError::new("exec error"))
         }
     }
 
@@ -160,7 +160,7 @@ impl Connection {
         let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
         let query = match CString::new(query) {
             Ok(string) => string,
-            _ => return Err(OwsqlError::Message("invalid query".to_string())),
+            _ => return Err(OwsqlError::new("invalid query")),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -178,7 +178,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(OwsqlError::Message("exec error".to_string()))
+            Err(OwsqlError::new("exec error"))
         }
     }
 
@@ -286,7 +286,7 @@ impl Connection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let msg = OwsqlError::Message("deny value".to_string());
+            let msg = OwsqlError::new("deny value");
             self.error_msg.entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.get()));
             format!(" {} ", self.error_msg.get(&msg).unwrap())
         }
@@ -393,7 +393,7 @@ mod tests {
         assert_ne!(crate::sqlite::open("/tmp/tmp.db"), crate::sqlite::open("/tmp/tmp.db"));
         assert_eq!(
             crate::sqlite::open("foo\0bar"),
-            Err(OwsqlError::Message("invalid path: foo\u{0}bar".to_string()))
+            Err(OwsqlError::new("invalid path: foo\u{0}bar"))
         );
     }
 
@@ -402,11 +402,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.execute("\0"),
-            Err(OwsqlError::Message("invalid query".to_string())),
+            Err(OwsqlError::new("invalid query")),
         );
         assert_eq!(
             conn.execute("invalid query"),
-            Err(OwsqlError::Message("exec error".to_string())),
+            Err(OwsqlError::new("exec error")),
         );
     }
 
@@ -415,11 +415,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.iterate("\0", |_| { unreachable!(); }),
-            Err(OwsqlError::Message("invalid query".to_string())),
+            Err(OwsqlError::new("invalid query")),
         );
         assert_eq!(
             conn.iterate("invalid query", |_| { unreachable!(); }),
-            Err(OwsqlError::Message("exec error".to_string())),
+            Err(OwsqlError::new("exec error")),
         );
     }
 
@@ -465,13 +465,13 @@ mod tests {
         let allow = conn.allowlist("Alice");
         assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
         assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
-        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::new("invalid literal")));
         assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
-        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".to_string())));
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let oreilly = conn.ow("O''Reilly");
         assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
         conn.add_allowlist(params!["Alice"]);
-        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".to_string())));
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let allow = conn.allowlist("Alice");
         assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
     }

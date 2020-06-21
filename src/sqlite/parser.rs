@@ -30,16 +30,16 @@ pub(crate) fn check_valid_literal(s: &str) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s);
     while !parser.eof() {
-        let _ = parser.consume_while(|c| c != '"' && c != '\'');
+        parser.consume_while(|c| c != '"' && c != '\'').ok();
         match parser.next_char() {
             Ok('"')  => {
                 if parser.consume_string('"').is_err() {
-                    return Err(OwsqlError::Message(err_msg.to_string()));
+                    return Err(OwsqlError::new(err_msg));
                 }
             },
             Ok('\'')  => {
                 if parser.consume_string('\'').is_err() {
-                    return Err(OwsqlError::Message(err_msg.to_string()));
+                    return Err(OwsqlError::new(err_msg));
                 }
             },
             _ => (),
@@ -136,19 +136,19 @@ impl<'a> Parser<'a> {
         self.input.len() <= self.pos
     }
 
-    fn next_char(&self) -> Result<char, ()> {
-        self.input[self.pos..].chars().next().ok_or(())
+    fn next_char(&self) -> Result<char> {
+        self.input[self.pos..].chars().next().ok_or_else(|| OwsqlError::new("next_char: None"))
     }
 
-    fn skip_whitespace(&mut self) -> Result<(), ()> {
+    fn skip_whitespace(&mut self) -> Result<()> {
         self.consume_while(char::is_whitespace).and(Ok(()))
     }
 
-    fn consume_whitespace(&mut self) -> Result<String, ()> {
+    fn consume_whitespace(&mut self) -> Result<String> {
         self.consume_while(char::is_whitespace)
     }
 
-    fn consume_except_whitespace(&mut self) -> Result<String, ()> {
+    fn consume_except_whitespace(&mut self) -> Result<String> {
         let mut s = String::new();
         while !self.eof() {
             let c = self.next_char()?;
@@ -157,7 +157,11 @@ impl<'a> Parser<'a> {
             }
             s.push(self.consume_char()?);
         }
-        if s.is_empty() { Err(()) } else { Ok(s) }
+        if s.is_empty() {
+            Err(OwsqlError::new("consume_except_whitespace: empty"))
+        } else {
+            Ok(s)
+        }
     }
 
     fn consume_string(&mut self, quote: char) -> Result<String> {
@@ -177,7 +181,7 @@ impl<'a> Parser<'a> {
         Err(OwsqlError::Message("endless".to_string()))
     }
 
-    fn consume_while<F>(&mut self, f: F) -> Result<String, ()>
+    fn consume_while<F>(&mut self, f: F) -> Result<String>
         where
             F: Fn(char) -> bool,
     {
@@ -186,22 +190,22 @@ impl<'a> Parser<'a> {
             s.push(self.consume_char()?);
         }
         if s.is_empty() {
-            Err(())
+            Err(OwsqlError::new("consume_while: empty"))
         } else {
             Ok(s)
         }
     }
 
-    fn consume_char(&mut self) -> Result<char, ()> {
+    fn consume_char(&mut self) -> Result<char> {
         let mut iter = self.input[self.pos..].char_indices();
-        let (_, cur_char) = iter.next().ok_or(())?;
+        let (_, cur_char) = iter.next().ok_or_else(|| OwsqlError::new("consume_char: None"))?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
         Ok(cur_char)
     }
 }
 
-fn single_quotaion_escape(s: &str) -> Result<String, ()> {
+fn single_quotaion_escape(s: &str) -> Result<String> {
     let mut escaped = String::new();
     for c in s.chars() {
         if c == '\'' {
@@ -209,7 +213,7 @@ fn single_quotaion_escape(s: &str) -> Result<String, ()> {
         }
         escaped.push(c);
     }
-    if escaped.is_empty() { Err(()) } else { Ok(escaped) }
+    Ok(escaped)
 }
 
 
