@@ -27,9 +27,14 @@ macro_rules! overwrite_new {
 }
 
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
+    debug_assert!({
+        let value = format!("'{}'", &value);
+        let mut parser = Parser::new(&value);
+        parser.consume_string('\'').is_ok()
+    });
     let value = format!("'{}'", value);
     let mut parser = Parser::new(&value);
-    parser.consume_string('\'').expect("failed escape")
+    parser.consume_string('\'').unwrap_or_default()
 }
 
 impl Connection {
@@ -84,7 +89,7 @@ impl Connection {
                 Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"')?  )),
                 Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
                 Ok(_other) => {
-                    let string = parser.consume_except_whitespace().expect("invalid character found");
+                    let string = parser.consume_except_whitespace()?;
                     if self.overwrite.contain_reverse(&string) || self.error_msg.contain_reverse(&string) {
                         tokens.push(TokenType::Overwrite(string));
                     } else {
