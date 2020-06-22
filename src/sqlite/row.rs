@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 /// A single result row of a query.
+#[derive(Debug, PartialEq)]
 pub struct Row {
     value: HashMap<String, Option<String>>,
 }

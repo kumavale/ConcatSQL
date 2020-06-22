@@ -11,8 +11,10 @@ pub enum OwsqlError {
 }
 
 /// Change the output error message.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OwsqlErrorLevel {
+    /// No error message returned, always return Result::Ok(T).
+    AlwaysOk,
     /// This is the level that should be set at release.
     Release,
     /// This is the level that should be set during development.

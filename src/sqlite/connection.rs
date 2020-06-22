@@ -114,10 +114,17 @@ impl Connection {
     /// conn.execute(&sql).unwrap();
     /// ```
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
-        let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
+        let query = match self.convert_to_valid_syntax(query.as_ref()) {
+            Ok(query) => query,
+            Err(e) => if self.error_level == OwsqlErrorLevel::AlwaysOk {
+                return Ok(());
+            } else {
+                return Err(e);
+            },
+        }.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return Err(self.err("invalid query", &String::from_utf8(query).unwrap_or_default())),
+            _ => return self.err("invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -134,7 +141,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(self.err("exec error", &format!("error code: {}", unsafe{ *err_msg })))
+            self.err("exec error", &format!("error code: {}", unsafe{ *err_msg }))
         }
     }
 
@@ -163,10 +170,17 @@ impl Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        let query = self.convert_to_valid_syntax(query.as_ref())?.as_bytes().to_vec();
+        let query = match self.convert_to_valid_syntax(query.as_ref()) {
+            Ok(query) => query,
+            Err(e) => if self.error_level == OwsqlErrorLevel::AlwaysOk {
+                return Ok(());
+            } else {
+                return Err(e);
+            },
+        }.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return Err(self.err("invalid query", &String::from_utf8(query).unwrap_or_default())),
+            _ => return self.err("invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -184,7 +198,7 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            Err(self.err("exec error", &format!("error code: {}", unsafe{ *err_msg })))
+            self.err("exec error", &format!("error code: {}", unsafe { *err_msg }))
         }
     }
 
@@ -292,7 +306,7 @@ impl Connection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let msg = self.err("deny value", &value.to_string());
+            let msg = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
             self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.borrow_mut().get()));
             format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
@@ -352,7 +366,7 @@ impl Connection {
             self.overwrite.borrow_mut().entry_or_insert(value.to_string(), overwrite);
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
-            let msg = self.err("non integer", &value);
+            let msg = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
             self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite);
             format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
@@ -376,11 +390,12 @@ impl Connection {
         }
     }
 
-    pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> OwsqlError {
+    pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
         match self.error_level {
-            OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::new(&err_msg),
-            OwsqlErrorLevel::Debug   => OwsqlError::new(&format!("{}: {}", err_msg, detail_msg)),
+            OwsqlErrorLevel::AlwaysOk => Ok(()),
+            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
+            OwsqlErrorLevel::Develop  => Err(OwsqlError::new(&err_msg)),
+            OwsqlErrorLevel::Debug    => Err(OwsqlError::new(&format!("{}: {}", err_msg, detail_msg))),
         }
     }
 }

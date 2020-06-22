@@ -46,10 +46,10 @@ impl Connection {
             parser.consume_while(|c| c != '"' && c != '\'').ok();
             match parser.next_char() {
                 Ok('"')  => if parser.consume_string('"').is_err() {
-                    return Err(self.err(err_msg, &s));
+                    return self.err(err_msg, &s);
                 },
                 Ok('\'')  => if parser.consume_string('\'').is_err() {
-                    return Err(self.err(err_msg, &s));
+                    return self.err(err_msg, &s);
                 },
                 _ => (),
             }
@@ -143,9 +143,10 @@ impl<'a> Parser<'a> {
 
     fn next_char(&self) -> Result<char> {
         self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
-            OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::new("error: next_char()"),
-            OwsqlErrorLevel::Debug   => OwsqlError::new("error: next_char(): None"),
+            OwsqlErrorLevel::AlwaysOk |
+            OwsqlErrorLevel::Release  => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop  => OwsqlError::new("error: next_char()"),
+            OwsqlErrorLevel::Debug    => OwsqlError::new("error: next_char(): None"),
         })
     }
 
@@ -168,9 +169,10 @@ impl<'a> Parser<'a> {
         }
         if s.is_empty() {
             Err( match self.error_level {
-                OwsqlErrorLevel::Release => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_except_whitespace()"),
-                OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_except_whitespace(): empty"),
+                OwsqlErrorLevel::AlwaysOk |
+                OwsqlErrorLevel::Release  => OwsqlError::AnyError,
+                OwsqlErrorLevel::Develop  => OwsqlError::new("error: consume_except_whitespace()"),
+                OwsqlErrorLevel::Debug    => OwsqlError::new("error: consume_except_whitespace(): empty"),
             })
         } else {
             Ok(s)
@@ -192,9 +194,10 @@ impl<'a> Parser<'a> {
         }
 
         Err( match self.error_level {
-            OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::new("endless"),
-            OwsqlErrorLevel::Debug   => OwsqlError::new(format!("endless: {}", s)),
+            OwsqlErrorLevel::AlwaysOk |
+            OwsqlErrorLevel::Release  => OwsqlError::AnyError,
+            OwsqlErrorLevel::Develop  => OwsqlError::new("endless"),
+            OwsqlErrorLevel::Debug    => OwsqlError::new(format!("endless: {}", s)),
         })
     }
 
@@ -208,9 +211,10 @@ impl<'a> Parser<'a> {
         }
         if s.is_empty() {
             Err( match self.error_level {
-                OwsqlErrorLevel::Release => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_while()"),
-                OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_while(): empty"),
+                OwsqlErrorLevel::AlwaysOk |
+                OwsqlErrorLevel::Release  => OwsqlError::AnyError,
+                OwsqlErrorLevel::Develop  => OwsqlError::new("error: consume_while()"),
+                OwsqlErrorLevel::Debug    => OwsqlError::new("error: consume_while(): empty"),
             })
         } else {
             Ok(s)
@@ -220,6 +224,7 @@ impl<'a> Parser<'a> {
     fn consume_char(&mut self) -> Result<char> {
         let mut iter = self.input[self.pos..].char_indices();
         let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
+            OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release => OwsqlError::AnyError,
             OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_char()"),
             OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_char(): None"),

@@ -221,6 +221,33 @@ mod sqlite {
     }
 
     #[test]
+    #[allow(non_snake_case)]
+    fn error_level_AlwaysOk() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::AlwaysOk);
+        let single_quote = conn.ow("'");
+        conn.add_allowlist(params!["Alice"]);
+        let name = conn.allowlist("Bob");
+        let integer = conn.int("50 or 1=1; --");
+
+        assert_eq!(conn.execute("INVALID SQL"), Ok(()));
+        assert_eq!(conn.execute("'endless"),    Ok(()));
+        assert_eq!(conn.execute(&single_quote), Ok(()));
+        assert_eq!(conn.execute(&name),         Ok(()));
+        assert_eq!(conn.execute(&integer),      Ok(()));
+        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Ok(()));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Ok(()));
+        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Ok(()));
+        assert_eq!(conn.iterate(&name,         |_| unreachable!()), Ok(()));
+        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), Ok(()));
+        assert_eq!(conn.rows("INVALID SQL"), Ok(vec![]));
+        assert_eq!(conn.rows("'endless"),    Ok(vec![]));
+        assert_eq!(conn.rows(&single_quote), Ok(vec![]));
+        assert_eq!(conn.rows(&name),         Ok(vec![]));
+        assert_eq!(conn.rows(&integer),      Ok(vec![]));
+    }
+
+    #[test]
     fn error_level_release() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Release);
@@ -234,6 +261,16 @@ mod sqlite {
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::AnyError));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::AnyError));
         assert_eq!(conn.execute(&integer),      Err(OwsqlError::AnyError));
+        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Err(OwsqlError::AnyError));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::AnyError));
+        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Err(OwsqlError::AnyError));
+        assert_eq!(conn.iterate(&name,         |_| unreachable!()), Err(OwsqlError::AnyError));
+        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), Err(OwsqlError::AnyError));
+        assert_eq!(conn.rows("INVALID SQL"), Err(OwsqlError::AnyError));
+        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::AnyError));
+        assert_eq!(conn.rows(&single_quote), Err(OwsqlError::AnyError));
+        assert_eq!(conn.rows(&name),         Err(OwsqlError::AnyError));
+        assert_eq!(conn.rows(&integer),      Err(OwsqlError::AnyError));
     }
 
     #[test]
@@ -250,6 +287,16 @@ mod sqlite {
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
         assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer".to_string())));
+        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Err(OwsqlError::Message("exec error".to_string())));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.iterate(&name,         |_| unreachable!()), Err(OwsqlError::Message("deny value".to_string())));
+        assert_eq!(conn.iterate(&integer,      |_| unreachable!()),  Err(OwsqlError::Message("non integer".to_string())));
+        assert_eq!(conn.rows("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
+        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.rows(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.rows(&name),         Err(OwsqlError::Message("deny value".to_string())));
+        assert_eq!(conn.rows(&integer),      Err(OwsqlError::Message("non integer".to_string())));
     }
 
     #[test]
@@ -266,6 +313,16 @@ mod sqlite {
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
         assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
+        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Err(OwsqlError::Message("invalid literal: '".to_string())));
+        assert_eq!(conn.iterate(&name,         |_| unreachable!()), Err(OwsqlError::Message("deny value: Bob".to_string())));
+        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
+        assert_eq!(conn.rows("INVALID SQL"), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
+        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.rows(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
+        assert_eq!(conn.rows(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
+        assert_eq!(conn.rows(&integer),      Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
     }
 
     #[test]
