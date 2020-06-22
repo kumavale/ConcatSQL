@@ -211,6 +211,23 @@ mod sqlite {
     }
 
     #[test]
+    fn int() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let invalid = conn.int("invalid");
+
+        assert_ne!(&invalid, &conn.int(42));
+        assert_ne!(&invalid, &conn.int("42"));
+        assert_ne!(&invalid, &conn.int("42".to_string()));
+        assert_ne!(&invalid, &conn.int(&"42".to_string()));
+        assert_eq!(&invalid, &conn.int(3.14));
+        assert_eq!(&invalid, &conn.int('A'));
+        assert_eq!(&invalid, &conn.int("str"));
+    }
+
+    #[test]
     fn error_level() {
         use owsql::error::OwsqlErrorLevel;
 
