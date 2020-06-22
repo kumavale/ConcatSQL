@@ -26,6 +26,9 @@ pub struct Connection {
     pub(crate) error_level: OwsqlErrorLevel,
 }
 
+unsafe impl Send for Connection {}
+unsafe impl Sync for Connection {}
+
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw

@@ -301,19 +301,36 @@ mod sqlite {
         }
     }
 
-    //#[test]
-    //fn multi_thiread() {
-    //    use std::thread;
+    #[test]
+    fn multi_thread() {
+        use std::thread;
+        use std::sync::{Arc, Mutex};
 
-    //    let conn = owsql::sqlite::open(":memory:").unwrap();
-    //    let stmt = conn.ow(stmt());
-    //    conn.execute(&stmt).unwrap();
+        let conn = Arc::new(Mutex::new(owsql::sqlite::open(":memory:").unwrap()));
+        let stmt = conn.lock().unwrap().ow(stmt());
+        conn.lock().unwrap().execute(&stmt).unwrap();
 
-    //    let handle = thread::spawn(move || {
-    //        conn.execute("").unwrap();
-    //    });
-    //    handle.join().unwrap();
-    //}
+        let mut handles = vec![];
+
+        for i in 0..10 {
+            let conn_clone = conn.clone();
+            let handle = thread::spawn(move || {
+                let conn = &*conn_clone.lock().unwrap();
+                let sql = conn.ow("INSERT INTO users VALUES ('Thread', ") + &conn.int(i) + &conn.ow(");");
+                conn.execute(&sql).unwrap();
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles { handle.join().unwrap(); }
+
+        let conn = &*conn.lock().unwrap();
+        assert_eq!(90, (0..10).map(|mut i| {
+            conn.iterate(conn.ow("SELECT age FROM users WHERE age = ") + &conn.int(i), |pairs| {
+                pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i=i*2; }); true
+            }).unwrap(); i
+        }).sum::<usize>());
+    }
 
     mod should_panic {
         use owsql::params;
