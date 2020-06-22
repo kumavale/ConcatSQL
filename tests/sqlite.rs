@@ -327,7 +327,7 @@ mod sqlite {
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
             conn.iterate(conn.ow("SELECT age FROM users WHERE age = ") + &conn.int(i), |pairs| {
-                pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i=i*2; }); true
+                pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());
     }
