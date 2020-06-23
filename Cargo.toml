@@ -9,11 +9,11 @@ edition = "2018"
 
 [features]
 sqlite = ["sqlite3-sys/linkage"]
+mysql = []
 
 
 [dependencies]
 rand = "0.7"
-lazy_static = "1.4"
 
 [dependencies.sqlite3-sys]
 version = "0.12"

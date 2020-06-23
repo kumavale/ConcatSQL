@@ -374,7 +374,7 @@ impl Connection {
     /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
     #[inline]
-    pub fn add_allowlist(&mut self, params: Vec<super::value::Value>) {
+    pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.borrow_mut().entry_or_insert(

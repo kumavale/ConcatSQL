@@ -64,9 +64,13 @@
 
 mod bidimap;
 pub mod error;
+#[doc(hidden)]
+pub mod value;
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
+#[cfg(feature = "mysql")]
+pub mod mysql;
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
@@ -85,8 +89,7 @@ macro_rules! params {
         {
             let mut temp_vec = Vec::new();
             $(
-                #[cfg(feature = "sqlite")]
-                temp_vec.push($crate::sqlite::value::Value::from($param));
+                temp_vec.push($crate::value::Value::from($param));
             )*
             temp_vec
         }

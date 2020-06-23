@@ -29,14 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Build
-        run: cargo build --all-features --all-targets
+      - name: Build sqlite
+        run: cargo build --features sqlite --all-targets
 
-      - name: Run tests
-        run: cargo test --all-features --all-targets
+      - name: Run tests sqlite
+        run: cargo test --features sqlite --all-targets
 
-      - name: Document tests
-        run: cargo test --all-features --doc
+      - name: Document tests sqlite
+        run: cargo test --features sqlite --doc
 
   clippy:
     name: Clippy
@@ -52,6 +52,6 @@ jobs:
       - name: prepare
         run: rustup component add clippy
 
-      - name: clippy
-        run: cargo clippy --all-targets --all-features -- -D clippy::dbg_macro -D warnings
+      - name: clippy sqlite
+        run: cargo clippy --all-targets --features sqlite -- -D clippy::dbg_macro -D warnings
 

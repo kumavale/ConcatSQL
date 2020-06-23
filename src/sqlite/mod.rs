@@ -8,8 +8,6 @@ mod parser;
 mod connection;
 mod token;
 mod row;
-#[doc(hidden)]
-pub mod value;
 
 pub use self::row::Row;
 pub use self::connection::Connection;
@@ -32,7 +30,7 @@ pub fn version() -> usize {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use crate::sqlite::value::Value;
+    use crate::value::Value;
 
     #[test]
     fn sqlite_open() {
