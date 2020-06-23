@@ -585,6 +585,8 @@ mod tests {
         assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let oreilly = conn.ow("O''Reilly");
         assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
+        let oreilly = conn.ow("\"O'Reilly\"");
+        assert_eq!(conn.actual_sql(&oreilly), Ok("\"O'Reilly\" ".to_string()));
         conn.add_allowlist(params!["Alice"]);
         assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let allow = conn.allowlist("Alice");

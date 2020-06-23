@@ -29,11 +29,6 @@ macro_rules! overwrite_new {
 #[inline]
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
     let error_level = OwsqlErrorLevel::default();
-    debug_assert!({
-        let value = format!("'{}'", &value);
-        let mut parser = Parser::new(&value, &error_level);
-        parser.consume_string('\'').is_ok()
-    });
     let value = format!("'{}'", value);
     let mut parser = Parser::new(&value, &error_level);
     parser.consume_string('\'').unwrap_or_default()
@@ -51,7 +46,6 @@ fn sanitize(s: &str) -> String {
              c  => sanitized.push(c),
         }
     }
-    //debug_assert!(!sanitized.is_empty());
     sanitized
 }
 
@@ -118,35 +112,30 @@ impl Connection {
         while !parser.eof() {
             parser.skip_whitespace().ok();
 
-            match parser.next_char() {
-                Ok('"')  => tokens.push(TokenType::String( parser.consume_string('"')?  )),
-                Ok('\'') => tokens.push(TokenType::String( parser.consume_string('\'')? )),
-                Ok(_other) => {
-                    let string = parser.consume_except_whitespace()?;
-                    if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
-                        tokens.push(TokenType::Overwrite(string));
-                    } else {
-                        let mut string = single_quotaion_escape(&string);
-                        let mut overwrite = String::new();
-                        'untilow: while !parser.eof() {
-                            let whitespace = parser.consume_whitespace().unwrap_or_default();
-                            while let Ok(s) = parser.consume_except_whitespace() {
-                                if self.overwrite.borrow().contain_reverse(&s) || self.error_msg.borrow().contain_reverse(&s) {
-                                    overwrite = s;
-                                    break 'untilow;
-                                } else {
-                                    string.push_str(&whitespace);
-                                    string.push_str(&single_quotaion_escape(&s));
-                                }
+            if parser.next_char().is_ok() {
+                let string = parser.consume_except_whitespace()?;
+                if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
+                    tokens.push(TokenType::Overwrite(string));
+                } else {
+                    let mut string = single_quotaion_escape(&string);
+                    let mut overwrite = String::new();
+                    'untilow: while !parser.eof() {
+                        let whitespace = parser.consume_whitespace().unwrap_or_default();
+                        while let Ok(s) = parser.consume_except_whitespace() {
+                            if self.overwrite.borrow().contain_reverse(&s) || self.error_msg.borrow().contain_reverse(&s) {
+                                overwrite = s;
+                                break 'untilow;
+                            } else {
+                                string.push_str(&whitespace);
+                                string.push_str(&single_quotaion_escape(&s));
                             }
                         }
-                        tokens.push(TokenType::String(format!("'{}'", string)));
-                        if !overwrite.is_empty() {
-                            tokens.push(TokenType::Overwrite(overwrite));
-                        }
                     }
-                },
-                _ => break,
+                    tokens.push(TokenType::String(format!("'{}'", string)));
+                    if !overwrite.is_empty() {
+                        tokens.push(TokenType::Overwrite(overwrite));
+                    }
+                }
             }
         }
 

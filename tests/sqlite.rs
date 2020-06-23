@@ -94,11 +94,13 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-
-        let name = r#"".ow(""inside str"") -> String""#;
+        let name = r#"".ow(""inside str"") -> String""#;  // expect: '".ow(""inside str"") -> String"'
         let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        conn.execute(&sql).unwrap();
 
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        let name = r#"".ow("inside str") -> String""#;  // expect: '".ow("inside str") -> String"'
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -107,10 +109,12 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = r#""I'm Alice""#;
+        let name = r#""I'm Alice""#; // expect: '"I''m Alice"'
         let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.execute(&sql).unwrap();
+        let name = r#""I''m Alice""#; // expect: '"I''''m Alice"'
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -119,10 +123,9 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = r#"'.ow("inside str") -> String'"#;
+        let name = r#"'.ow("inside str") -> String'"#; // expect: '''.ow("inside str") -> String'''
         let sql = conn.ow("select age from users where name = ") + name;
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -131,10 +134,9 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = "'I''m Alice'";
+        let name = "'I''m Alice'"; // expect: '''I''''m Alice'''
         let sql = conn.ow("select age from users where name = ") + name;
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -143,10 +145,9 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = "foo'bar'foo";
+        let name = "foo'bar'foo"; // expect: 'foo''bar''foo'
         let sql = conn.ow("select age from users where name = ") + name;
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -155,10 +156,9 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = "foo\"bar\"foo";
+        let name = "foo\"bar\"foo"; // expect: 'foo\"bar\"foo'
         let sql = conn.ow("select age from users where name = ") + name;
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.execute(&sql).unwrap();
     }
 
     #[test]
@@ -167,7 +167,18 @@ mod sqlite {
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
 
-        let name = "foo\"bar\"foo";
+        let name = "foo\"bar\"foo"; // expect: 'foo\"bar\"foo'
+        let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
+        conn.execute(&sql).unwrap();
+    }
+
+    #[test]
+    fn start_with_quotation_and_end_with_anything_else() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = "'Alice'; DROP TABLE users; --"; // expect: '''Alice''); DROP TABLE users; --'
         let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -242,7 +253,10 @@ mod sqlite {
             assert_eq!(row.get("name").unwrap(), "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;");
             true
         });
-        assert_eq!(Ok(format!("'{}' ", name)), conn.actual_sql( unsafe { conn.ow_without_sanitizing(&name) }));
+        assert_eq!(
+            conn.actual_sql( unsafe { conn.ow_without_sanitizing(&name) }),
+            Ok(format!("'{}' ", name))
+        );
     }
 
     #[test]
@@ -319,17 +333,17 @@ mod sqlite {
         let integer = conn.int("50 or 1=1; --");
 
         assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
-        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("exec error".to_string())));
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value".to_string())));
         assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer".to_string())));
         assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Err(OwsqlError::Message("exec error".to_string())));
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("exec error".to_string())));
         assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.iterate(&name,         |_| unreachable!()), Err(OwsqlError::Message("deny value".to_string())));
         assert_eq!(conn.iterate(&integer,      |_| unreachable!()),  Err(OwsqlError::Message("non integer".to_string())));
         assert_eq!(conn.rows("INVALID SQL"), Err(OwsqlError::Message("exec error".to_string())));
-        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("endless".to_string())));
+        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("exec error".to_string())));
         assert_eq!(conn.rows(&single_quote), Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.rows(&name),         Err(OwsqlError::Message("deny value".to_string())));
         assert_eq!(conn.rows(&integer),      Err(OwsqlError::Message("non integer".to_string())));
@@ -345,17 +359,17 @@ mod sqlite {
         let integer = conn.int("50 or 1=1; --");
 
         assert_eq!(conn.execute("INVALID SQL"), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
-        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.execute("'endless"),    Err(OwsqlError::Message("exec error: error code: 110".to_string())));
         assert_eq!(conn.execute(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
         assert_eq!(conn.execute(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
         assert_eq!(conn.execute(&integer),      Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
         assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
         assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Err(OwsqlError::Message("invalid literal: '".to_string())));
         assert_eq!(conn.iterate(&name,         |_| unreachable!()), Err(OwsqlError::Message("deny value: Bob".to_string())));
         assert_eq!(conn.iterate(&integer,      |_| unreachable!()), Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
         assert_eq!(conn.rows("INVALID SQL"), Err(OwsqlError::Message("exec error: error code: 110".to_string())));
-        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("endless: 'endless".to_string())));
+        assert_eq!(conn.rows("'endless"),    Err(OwsqlError::Message("exec error: error code: 110".to_string())));
         assert_eq!(conn.rows(&single_quote), Err(OwsqlError::Message("invalid literal: '".to_string())));
         assert_eq!(conn.rows(&name),         Err(OwsqlError::Message("deny value: Bob".to_string())));
         assert_eq!(conn.rows(&integer),      Err(OwsqlError::Message("non integer: 50 or 1=1; --".to_string())));
@@ -441,19 +455,6 @@ mod sqlite {
             let sql = "select * from users;";
 
             conn.iterate(&sql, |_| { true }).unwrap();
-        }
-
-        #[test]
-        #[should_panic = "endless"]
-        fn endless_string() {
-            let conn = owsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.ow(stmt());
-            conn.execute(&stmt).unwrap();
-
-            let name = "'endless";
-            let sql = conn.ow("select age from users where name =") + name + &conn.ow(";");
-
-            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }
 
         #[test]
