@@ -7,32 +7,38 @@ pub struct Row {
 }
 
 impl Row {
+    #[inline]
     pub(crate) fn new() -> Self {
         Self { value: HashMap::new() }
     }
 
+    #[inline]
     pub(crate) fn insert(&mut self, key: String, value: Option<String>) {
         self.value.insert(key, value);
     }
 
     /// Get the value of a column of the result row.
+    #[inline]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.value.get(key)?.as_deref()
     }
 
     /// Return the number of columns.
+    #[inline]
     pub fn column_count(&self) -> usize {
         self.value.len()
     }
 
     /// Get all the column names.  
     /// Column order is not guaranteed.
+    #[inline]
     pub fn column_names(&self) -> Vec<&str> {
         self.value.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
     }
 
     /// Return the name of the column.  
     /// Column order is not guaranteed.
+    #[inline]
     pub fn column_name(&self, col: usize) -> Option<&str> {
         self.column_names().get(col).copied()
     }

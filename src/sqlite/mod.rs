@@ -15,6 +15,7 @@ pub use self::row::Row;
 pub use self::connection::Connection;
 
 /// Open a read-write connection to a new or existing database.
+#[inline]
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
     Connection::open(path)
 }

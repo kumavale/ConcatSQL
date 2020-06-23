@@ -26,6 +26,7 @@ macro_rules! overwrite_new {
     };
 }
 
+#[inline]
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
     let error_level = OwsqlErrorLevel::default();
     debug_assert!({
@@ -39,6 +40,7 @@ pub(crate) fn escape_for_allowlist(value: &str) -> String {
 }
 
 impl Connection {
+    #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
         let err_msg = "invalid literal";
         let mut parser = Parser::new(&s, &self.error_level);
@@ -58,6 +60,7 @@ impl Connection {
         Ok(())
     }
 
+    #[inline]
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
         let mut query = String::new();
         let tokens = self.tokenize(&stmt)?;

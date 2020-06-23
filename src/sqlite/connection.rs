@@ -67,6 +67,7 @@ impl Connection {
     /// let path = std::path::Path::new("/path/to/db");
     /// let conn = owsql::sqlite::open(path).unwrap();
     /// ```
+    #[inline]
     pub fn open<T: AsRef<Path>>(path: T) -> Result<Self> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
@@ -113,6 +114,7 @@ impl Connection {
     /// let sql = conn.ow(r#"SELECT * FROM users;"#);
     /// conn.execute(&sql).unwrap();
     /// ```
+    #[inline]
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
         let query = match self.convert_to_valid_syntax(query.as_ref()) {
             Ok(query) => query,
@@ -166,6 +168,7 @@ impl Connection {
     ///     true
     /// }).unwrap();
     /// ```
+    #[inline]
     pub fn iterate<T: AsRef<str>, F>(&self, query: T, callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
@@ -218,6 +221,7 @@ impl Connection {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
+    #[inline]
     pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
         let mut rows: Vec<Row> = Vec::new();
 
@@ -247,6 +251,7 @@ impl Connection {
     /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
     /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
     /// ```
+    #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
         self.convert_to_valid_syntax(query.as_ref())
     }
@@ -268,6 +273,7 @@ impl Connection {
     /// assert_eq!(sql, conn.ow("SELECT"));
     /// assert_ne!(sql, "SELECT");
     /// ```
+    #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
@@ -302,6 +308,7 @@ impl Connection {
     ///
     /// assert!(conn.execute(sql).is_err());
     /// ```
+    #[inline]
     pub fn allowlist<T: Clone + ToString>(&self, value: T) -> String {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
@@ -326,6 +333,7 @@ impl Connection {
     /// assert!(conn.is_allowlist("42"));
     /// assert!(!conn.is_allowlist("'42'"));
     /// ```
+    #[inline]
     pub fn is_allowlist<T: ToString>(&self, value: T) -> bool {
         self.allowlist.contains(&value.to_string())
     }
@@ -341,6 +349,7 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
+    #[inline]
     pub fn add_allowlist(&mut self, params: Vec<super::value::Value>) {
         for value in params {
             self.allowlist.insert(value.to_string());
@@ -359,6 +368,7 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.int(42);
     /// ```
+    #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
         let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
@@ -383,6 +393,7 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.error_level(OwsqlErrorLevel::Develop);
     /// ```
+    #[inline]
     pub fn error_level(&mut self, level: OwsqlErrorLevel) {
         // Values can be changed only during debug build
         if cfg!(debug_assertions) {
@@ -390,6 +401,7 @@ impl Connection {
         }
     }
 
+    #[inline]
     pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
         match self.error_level {
             OwsqlErrorLevel::AlwaysOk => Ok(()),

@@ -222,7 +222,7 @@ mod sqlite {
         assert_ne!(&invalid, &conn.int("42"));
         assert_ne!(&invalid, &conn.int("42".to_string()));
         assert_ne!(&invalid, &conn.int(&"42".to_string()));
-        assert_eq!(&invalid, &conn.int(3.14));
+        assert_eq!(&invalid, &conn.int(std::f64::consts::PI));
         assert_eq!(&invalid, &conn.int('A'));
         assert_eq!(&invalid, &conn.int("str"));
     }
