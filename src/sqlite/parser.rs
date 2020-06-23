@@ -39,6 +39,35 @@ pub(crate) fn escape_for_allowlist(value: &str) -> String {
     parser.consume_string('\'').unwrap_or_default()
 }
 
+#[inline]
+fn sanitize(s: &str) -> String {
+    let mut sanitized = String::new();
+    for c in s.chars() {
+        match c {
+            '"' => sanitized.push_str("&quot;"),
+            '&' => sanitized.push_str("&amp;"),
+            '<' => sanitized.push_str("&lt;"),
+            '>' => sanitized.push_str("&gt;"),
+             c  => sanitized.push(c),
+        }
+    }
+    //debug_assert!(!sanitized.is_empty());
+    sanitized
+}
+
+#[inline]
+pub(crate) fn single_quotaion_escape(s: &str) -> String {
+    let mut escaped = String::new();
+    for c in s.chars() {
+        if c == '\'' {
+            escaped.push('\'');
+        }
+        escaped.push(c);
+    }
+    debug_assert!(!escaped.is_empty());
+    escaped
+}
+
 impl Connection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
@@ -73,7 +102,7 @@ impl Connection {
             } else if let Some(original) = self.overwrite.borrow().get_reverse(&token) {
                 query.push_str(original);
             } else {
-                query.push_str(&token);
+                query.push_str(&sanitize(&token));
             }
 
             query.push(' ');
@@ -97,7 +126,7 @@ impl Connection {
                     if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
                         tokens.push(TokenType::Overwrite(string));
                     } else {
-                        let mut string = single_quotaion_escape(&string)?;
+                        let mut string = single_quotaion_escape(&string);
                         let mut overwrite = String::new();
                         'untilow: while !parser.eof() {
                             let whitespace = parser.consume_whitespace().unwrap_or_default();
@@ -107,7 +136,7 @@ impl Connection {
                                     break 'untilow;
                                 } else {
                                     string.push_str(&whitespace);
-                                    string.push_str(&single_quotaion_escape(&s)?);
+                                    string.push_str(&single_quotaion_escape(&s));
                                 }
                             }
                         }
@@ -236,18 +265,6 @@ impl<'a> Parser<'a> {
         self.pos += next_pos;
         Ok(cur_char)
     }
-}
-
-fn single_quotaion_escape(s: &str) -> Result<String> {
-    let mut escaped = String::new();
-    for c in s.chars() {
-        if c == '\'' {
-            escaped.push('\'');
-        }
-        escaped.push(c);
-    }
-    debug_assert!(!escaped.is_empty());
-    Ok(escaped)
 }
 
 

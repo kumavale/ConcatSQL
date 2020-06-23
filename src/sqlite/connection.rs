@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use crate::Result;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
-use super::parser::escape_for_allowlist;
+use super::parser::{escape_for_allowlist, single_quotaion_escape};
 use super::row::Row;
 
 use rand::{Rng, thread_rng};
@@ -258,6 +258,7 @@ impl Connection {
 
     /// Return the overwrite definition string.  
     /// All strings assembled without using this method are escaped.  
+    /// This method does not sanitize.  
     /// A string containing incomplete quotes like the one below will result in an error.  
     /// ```text
     /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");  
@@ -276,6 +277,29 @@ impl Connection {
     #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
+        let result = self.check_valid_literal(&s);
+        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
+        match result {
+            Ok(_) => {
+                self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
+            },
+            Err(e) => {
+                self.error_msg.borrow_mut().entry_or_insert(e.clone(), overwrite);
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+            },
+        }
+    }
+
+    /// Return the overwrite definition string without sanitizing.  
+    ///
+    /// # Safety
+    ///
+    /// This is an unsafe method!! => I am considering whether to use the unsafe keyword :(  
+    /// Note that this can be XSS.
+    #[inline]
+    pub unsafe fn ow_without_sanitizing<T: Clone + ToString>(&self, value: T) -> String {
+        let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
         let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
         match result {

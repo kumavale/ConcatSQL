@@ -96,7 +96,7 @@ mod sqlite {
 
 
         let name = r#"".ow(""inside str"") -> String""#;
-        let sql = conn.ow("select age from users where name = ") + name;
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -108,7 +108,7 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let name = r#""I'm Alice""#;
-        let sql = conn.ow("select age from users where name = ") + name;
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -228,10 +228,29 @@ mod sqlite {
     }
 
     #[test]
+    fn sanitizing() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+
+        let name = r#"<script>alert("&1");</script>"#;
+        let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
+
+        conn.execute(&sql).unwrap();
+
+        conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+            assert_eq!(row.get("name").unwrap(), "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;");
+            true
+        });
+        assert_eq!(Ok(format!("'{}' ", name)), conn.actual_sql( unsafe { conn.ow_without_sanitizing(&name) }));
+    }
+
+    #[test]
     fn error_level() {
         use owsql::error::OwsqlErrorLevel;
 
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::AlwaysOk);
         conn.error_level(OwsqlErrorLevel::Release);
         conn.error_level(OwsqlErrorLevel::Develop);
         conn.error_level(OwsqlErrorLevel::Debug);
@@ -350,6 +369,7 @@ mod sqlite {
 
         let age = 50;
         let sql = conn.ow("select name from users where age <") + &conn.int(age);
+
         for row in conn.rows(&sql).unwrap().iter() {
             assert_eq!(row.get("name").unwrap(), "Alice");
         }
