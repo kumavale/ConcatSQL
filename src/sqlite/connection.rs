@@ -246,12 +246,12 @@ impl Connection {
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// let select = conn.ow("SELECT");
     /// let oreilly = conn.ow("O'Reilly");
-    /// let oreilly_unescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
+    /// let oreilly_unhtmlescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
     /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
     /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
     /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
     /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
-    /// assert_eq!(conn.actual_sql(&oreilly_unescape).unwrap(), "'O''Reilly' ");
+    /// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
     /// ```
     #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
@@ -262,8 +262,11 @@ impl Connection {
     /// All strings assembled without using this method are escaped.  
     /// This method does not sanitize.  
     /// A string containing incomplete quotes like the one below will result in an error.  
-    /// ```text
-    /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");  
+    ///
+    /// # Errors
+    ///
+    /// ```rust,ignore
+    /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");
     ///                                       ^                      ^
     /// ```
     ///
@@ -392,7 +395,9 @@ impl Connection {
     /// ```
     /// # use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-    /// conn.int(42);
+    /// conn.int(42);              // ok
+    /// conn.int("42");            // ok
+    /// conn.int("42 or 1=1; --"); // error
     /// ```
     #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {

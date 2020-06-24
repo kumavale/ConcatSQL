@@ -410,6 +410,12 @@ mod sqlite {
     }
 
     #[test]
+    fn empty_string() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        assert_eq!(conn.actual_sql(""), Ok("".to_string()));
+    }
+
+    #[test]
     fn multi_thread() {
         use std::thread;
         use std::sync::{Arc, Mutex};
