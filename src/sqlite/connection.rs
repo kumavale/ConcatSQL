@@ -55,18 +55,6 @@ impl SerialNumber {
 
 impl Connection {
     /// Open a read-write connection to a new or existing database.
-    ///
-    /// # Examples
-    ///
-    /// ```should_panic
-    /// // Open a new connection to an in-memory.
-    /// let conn = owsql::sqlite::open(":memory:").unwrap();
-    /// // Open a new connection from path of literal.
-    /// let conn = owsql::sqlite::open("/path/to/db").unwrap();
-    /// // Open a new connection from std::path::Path.
-    /// let path = std::path::Path::new("/path/to/db");
-    /// let conn = owsql::sqlite::open(path).unwrap();
-    /// ```
     #[inline]
     pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Self> {
         let path = match path.as_ref().to_str() {
@@ -99,12 +87,6 @@ impl Connection {
                 }),
             _ => Err(OwsqlError::new("failed to connect")),
         }
-    }
-
-    /// Open a readonly connection to a new or existing database.
-    #[inline]
-    pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Self> {
-        Self::open(path, ffi::SQLITE_OPEN_CREATE | ffi::SQLITE_OPEN_READWRITE | ffi::SQLITE_OPEN_READONLY)
     }
 
     /// Execute a statement without processing the resulting rows if any.
