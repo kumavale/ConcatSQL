@@ -246,10 +246,12 @@ impl Connection {
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// let select = conn.ow("SELECT");
     /// let oreilly = conn.ow("O'Reilly");
+    /// let oreilly_unescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
     /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
     /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
     /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
-    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
+    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+    /// assert_eq!(conn.actual_sql(&oreilly_unescape).unwrap(), "'O''Reilly' ");
     /// ```
     #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
@@ -291,14 +293,14 @@ impl Connection {
         }
     }
 
-    /// Return the overwrite definition string without sanitizing.  
+    /// Return the overwrite definition string without HTML escape.  
     ///
     /// # Safety
     ///
     /// This is an unsafe method!! => I am considering whether to use the unsafe keyword :(  
     /// Note that this can be XSS.
     #[inline]
-    pub unsafe fn ow_without_sanitizing<T: Clone + ToString>(&self, value: T) -> String {
+    pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
         let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
         let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
@@ -581,7 +583,7 @@ mod tests {
         assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
         assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
         assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::new("invalid literal")));
-        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
+        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
         assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
         let oreilly = conn.ow("O''Reilly");
         assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));

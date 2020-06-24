@@ -35,18 +35,19 @@ pub(crate) fn escape_for_allowlist(value: &str) -> String {
 }
 
 #[inline]
-fn sanitize(s: &str) -> String {
-    let mut sanitized = String::new();
-    for c in s.chars() {
+fn escape_html(input: &str) -> String {
+    let mut escaped = String::new();
+    for c in input.chars() {
         match c {
-            '"' => sanitized.push_str("&quot;"),
-            '&' => sanitized.push_str("&amp;"),
-            '<' => sanitized.push_str("&lt;"),
-            '>' => sanitized.push_str("&gt;"),
-             c  => sanitized.push(c),
+            '\'' => escaped.push_str("&#39;"),
+            '"'  => escaped.push_str("&quot;"),
+            '&'  => escaped.push_str("&amp;"),
+            '<'  => escaped.push_str("&lt;"),
+            '>'  => escaped.push_str("&gt;"),
+             c   => escaped.push(c),
         }
     }
-    sanitized
+    escaped
 }
 
 #[inline]
@@ -96,7 +97,7 @@ impl Connection {
             } else if let Some(original) = self.overwrite.borrow().get_reverse(&token) {
                 query.push_str(original);
             } else {
-                query.push_str(&sanitize(&token));
+                query.push_str(/*&escape_html(*/&token/*)*/);
             }
 
             query.push(' ');
@@ -117,7 +118,7 @@ impl Connection {
                 if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
                     tokens.push(TokenType::Overwrite(string));
                 } else {
-                    let mut string = single_quotaion_escape(&string);
+                    let mut string = string; // single_quotaion_escape(&string);
                     let mut overwrite = String::new();
                     'untilow: while !parser.eof() {
                         let whitespace = parser.consume_whitespace().unwrap_or_default();
@@ -127,11 +128,12 @@ impl Connection {
                                 break 'untilow;
                             } else {
                                 string.push_str(&whitespace);
-                                string.push_str(&single_quotaion_escape(&s));
+                                string.push_str(/*&single_quotaion_escape(*/&s/*)*/);
                             }
                         }
                     }
-                    tokens.push(TokenType::String(format!("'{}'", string)));
+                    //tokens.push(TokenType::String(format!("'{}'", string)));
+                    tokens.push(TokenType::String(format!("'{}'", escape_html(&string))));
                     if !overwrite.is_empty() {
                         tokens.push(TokenType::Overwrite(overwrite));
                     }
@@ -271,5 +273,13 @@ mod tests {
         assert_eq!(conn.check_valid_literal("'O''Reilly'"),    Ok(()));
         assert_eq!(conn.check_valid_literal("\"O'Reilly\""),   Ok(()));
         assert_eq!(conn.check_valid_literal("'Alice', 'Bob'"), Ok(()));
+    }
+
+    #[test]
+    fn escape_html() {
+        assert_eq!(
+            super::escape_html(r#"<script type="text/javascript">alert('1')</script>"#),
+            r#"&lt;script type=&quot;text/javascript&quot;&gt;alert(&#39;1&#39;)&lt;/script&gt;"#
+        );
     }
 }

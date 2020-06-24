@@ -95,11 +95,11 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let name = r#"".ow(""inside str"") -> String""#;  // expect: '".ow(""inside str"") -> String"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
         conn.execute(&sql).unwrap();
 
         let name = r#"".ow("inside str") -> String""#;  // expect: '".ow("inside str") -> String"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
         conn.execute(&sql).unwrap();
     }
 
@@ -110,10 +110,10 @@ mod sqlite {
         conn.execute(&stmt).unwrap();
 
         let name = r#""I'm Alice""#; // expect: '"I''m Alice"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
         conn.execute(&sql).unwrap();
         let name = r#""I''m Alice""#; // expect: '"I''''m Alice"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_sanitizing(&name) };
+        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
         conn.execute(&sql).unwrap();
     }
 
@@ -254,7 +254,7 @@ mod sqlite {
             true
         });
         assert_eq!(
-            conn.actual_sql( unsafe { conn.ow_without_sanitizing(&name) }),
+            conn.actual_sql( unsafe { conn.ow_without_html_escape(&name) }),
             Ok(format!("'{}' ", name))
         );
     }
