@@ -68,7 +68,7 @@ impl Connection {
     /// let conn = owsql::sqlite::open(path).unwrap();
     /// ```
     #[inline]
-    pub fn open<T: AsRef<Path>>(path: T) -> Result<Self> {
+    pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Self> {
         let path = match path.as_ref().to_str() {
             Some(path) => {
                 match CString::new(path) {
@@ -83,7 +83,7 @@ impl Connection {
         let open_result = unsafe { ffi::sqlite3_open_v2(
             path.as_ptr(),
             &mut conn_ptr,
-            ffi::SQLITE_OPEN_CREATE | ffi::SQLITE_OPEN_READWRITE,
+            openflags,
             ptr::null())
         };
 
@@ -99,6 +99,12 @@ impl Connection {
                 }),
             _ => Err(OwsqlError::new("failed to connect")),
         }
+    }
+
+    /// Open a readonly connection to a new or existing database.
+    #[inline]
+    pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Self> {
+        Self::open(path, ffi::SQLITE_OPEN_CREATE | ffi::SQLITE_OPEN_READWRITE | ffi::SQLITE_OPEN_READONLY)
     }
 
     /// Execute a statement without processing the resulting rows if any.
