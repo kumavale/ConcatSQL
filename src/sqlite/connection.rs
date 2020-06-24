@@ -143,7 +143,8 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            self.err("exec error", &format!("error code: {}", unsafe{ *err_msg }))
+            self.err("exec error",
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.raw.as_ptr())).to_string_lossy().into_owned() })
         }
     }
 
@@ -201,7 +202,8 @@ impl Connection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            self.err("exec error", &format!("error code: {}", unsafe { *err_msg }))
+            self.err("exec error",
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.raw.as_ptr())).to_string_lossy().into_owned() })
         }
     }
 
