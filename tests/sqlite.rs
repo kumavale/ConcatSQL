@@ -458,6 +458,7 @@ mod sqlite {
     }
 
     #[test]
+    #[allow(clippy::int_plus_one)]
     fn range() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.set_ow_len(1);
