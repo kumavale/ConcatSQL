@@ -7,9 +7,10 @@ use std::collections::HashSet;
 use std::fmt;
 use std::cell::RefCell;
 
-use crate::{Result, overwrite_new};
+use crate::{Result, IntoInner, overwrite_new};
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::constants::OW_MINIMUM_LENGTH;
 use super::parser::{escape_for_allowlist, single_quotaion_escape};
 use super::row::Row;
 
@@ -18,6 +19,7 @@ pub struct Connection {
     raw:                    NonNull<ffi::sqlite3>,
     allowlist:              HashSet<String>,
     serial_number:          RefCell<SerialNumber>,
+    ow_len_range:           (usize, usize),
     pub(crate) overwrite:   RefCell<BidiMap<String, String>>,
     pub(crate) error_msg:   RefCell<BidiMap<OwsqlError, String>>,
     pub(crate) error_level: OwsqlErrorLevel,
@@ -78,6 +80,7 @@ impl Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     allowlist:     HashSet::new(),
                     serial_number: RefCell::new(SerialNumber::new()),
+                    ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
                     overwrite:     RefCell::new(BidiMap::new()),
                     error_msg:     RefCell::new(BidiMap::new()),
                     error_level:   OwsqlErrorLevel::default(),
@@ -270,7 +273,7 @@ impl Connection {
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         match result {
             Ok(_) => {
                 self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
@@ -293,7 +296,7 @@ impl Connection {
     pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
         let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         match result {
             Ok(_) => {
                 self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
@@ -331,7 +334,7 @@ impl Connection {
         } else {
             let msg = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
             self.error_msg.borrow_mut()
-                .entry_or_insert(msg.clone(), overwrite_new(self.serial_number.borrow_mut().get(), 32));
+                .entry_or_insert(msg.clone(), overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range));
             format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
     }
@@ -371,7 +374,8 @@ impl Connection {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.borrow_mut().entry_or_insert(
-                escape_for_allowlist(&value.to_string()), overwrite_new(self.serial_number.borrow_mut().get(), 32)
+                escape_for_allowlist(&value.to_string()),
+                overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range)
             );
         }
     }
@@ -390,7 +394,7 @@ impl Connection {
     #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         if value.parse::<i64>().is_ok() {
             self.overwrite.borrow_mut().entry_or_insert(value.to_string(), overwrite);
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
@@ -399,6 +403,30 @@ impl Connection {
             self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite);
             format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
+    }
+
+    /// You can set a different fixed value or a different length each time.  
+    /// The [ow method](./struct.Connection.html#method.ow) outputs a random number of about 32
+    /// digits by default.  
+    /// However, if a number less than 32 digits is entered, it will be set to 32 digits.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.set_ow_len(42);       // 42
+    /// conn.set_ow_len(50..100);  // 50-99
+    /// conn.set_ow_len(50..=100); // 50-100
+    /// ```
+    #[inline]
+    pub fn set_ow_len<T: 'static + IntoInner>(&mut self, range: T) {
+        self.ow_len_range = {
+            let range = range.into_inner();
+            let range0 = if range.0 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.0 };
+            let range1 = if range.1 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.1 };
+            (range0, range1)
+        };
     }
 
     /// Sets the error level.  
@@ -592,6 +620,19 @@ mod tests {
     fn debug_display() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
+    }
+
+    #[test]
+    fn set_ow_len() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        conn.set_ow_len(0);
+        conn.set_ow_len(42);
+        conn.set_ow_len(0..32);
+        conn.set_ow_len(0..=32);
+        conn.set_ow_len(64..64);
+        conn.set_ow_len(64..=64);
+        conn.set_ow_len(64..32);
+        conn.set_ow_len(64..=32);
     }
 }
 

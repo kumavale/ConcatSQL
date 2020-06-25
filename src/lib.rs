@@ -65,6 +65,7 @@
 
 mod bidimap;
 pub mod error;
+pub mod constants;
 #[doc(hidden)]
 pub mod value;
 
@@ -98,18 +99,10 @@ macro_rules! params {
 }
 
 /// Generate new overwrite string.
-fn overwrite_new<T: IntoInner>(serial: usize, range: T) -> String {
+fn overwrite_new(serial: usize, range: (usize, usize)) -> String {
     use rand::{Rng, thread_rng};
     use rand::distributions::Alphanumeric;
     use std::cmp::Ordering;
-
-    static MINIMUM: usize = 32;
-    let range = {
-        let range = range.into_inner();
-        let range0 = if range.0 < MINIMUM { MINIMUM } else { range.0 };
-        let range1 = if range.1 < MINIMUM { MINIMUM } else { range.1 };
-        (range0, range1)
-    };
 
     format!("OWSQL{}{}",
         thread_rng()
@@ -123,7 +116,7 @@ fn overwrite_new<T: IntoInner>(serial: usize, range: T) -> String {
         serial.to_string())
 }
 
-trait IntoInner { fn into_inner(self) -> (usize, usize); }
+pub trait IntoInner { fn into_inner(self) -> (usize, usize); }
 impl IntoInner for usize                           { fn into_inner(self) -> (usize, usize) { (self, self) } }
 impl IntoInner for std::ops::RangeInclusive<usize> { fn into_inner(self) -> (usize, usize) { self.into_inner() } }
 impl IntoInner for std::ops::Range<usize> {
@@ -140,21 +133,6 @@ impl IntoInner for std::ops::Range<usize> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn overwrite_new() {
-        assert!((5+32+1) <= crate::overwrite_new(0, 0).len());       // 32
-        assert!((5+32+1) <= crate::overwrite_new(0, 42).len());      // 42
-        assert!((5+32+1) <= crate::overwrite_new(0, 0..16).len());   // 32
-        assert!((5+32+1) <= crate::overwrite_new(0, 0..32).len());   // 32
-        assert!((5+32+1) <= crate::overwrite_new(0, 0..=32).len());  // 32
-        assert!((5+32+1) <= crate::overwrite_new(0, 64..64).len());  // 64
-        assert!((5+32+1) <= crate::overwrite_new(0, 64..=64).len()); // 64
-        assert!((5+32+1) <= crate::overwrite_new(0, 32..64).len());  // 32-63
-        assert!((5+32+1) <= crate::overwrite_new(0, 32..=64).len()); // 32-64
-        assert!((5+32+1) <= crate::overwrite_new(0, 64..32).len());  // 33-64
-        assert!((5+32+1) <= crate::overwrite_new(0, 64..=32).len()); // 32-64
-    }
-
     #[test]
     fn into_inner() {
         use crate::IntoInner;
