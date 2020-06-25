@@ -7,14 +7,11 @@ use std::collections::HashSet;
 use std::fmt;
 use std::cell::RefCell;
 
-use crate::Result;
+use crate::{Result, overwrite_new};
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use super::parser::{escape_for_allowlist, single_quotaion_escape};
 use super::row::Row;
-
-use rand::{Rng, thread_rng};
-use rand::distributions::Alphanumeric;
 
 /// A database connection
 pub struct Connection {
@@ -273,7 +270,7 @@ impl Connection {
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
         match result {
             Ok(_) => {
                 self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
@@ -296,7 +293,7 @@ impl Connection {
     pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
         let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
         match result {
             Ok(_) => {
                 self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
@@ -333,7 +330,8 @@ impl Connection {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
             let msg = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
-            self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite_new!(self.serial_number.borrow_mut().get()));
+            self.error_msg.borrow_mut()
+                .entry_or_insert(msg.clone(), overwrite_new(self.serial_number.borrow_mut().get(), 32));
             format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
         }
     }
@@ -373,7 +371,7 @@ impl Connection {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.borrow_mut().entry_or_insert(
-                escape_for_allowlist(&value.to_string()), overwrite_new!(self.serial_number.borrow_mut().get())
+                escape_for_allowlist(&value.to_string()), overwrite_new(self.serial_number.borrow_mut().get(), 32)
             );
         }
     }
@@ -392,7 +390,7 @@ impl Connection {
     #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
-        let overwrite = overwrite_new!(self.serial_number.borrow_mut().get());
+        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), 32);
         if value.parse::<i64>().is_ok() {
             self.overwrite.borrow_mut().entry_or_insert(value.to_string(), overwrite);
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())

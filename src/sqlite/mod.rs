@@ -58,12 +58,21 @@ pub fn version() -> usize {
 mod tests {
     use crate::*;
     use crate::value::Value;
+    use crate::error::OwsqlError;
 
     #[test]
     fn sqlite_open() {
         let _conn = crate::sqlite::open(":memory:").unwrap();
         #[cfg(unix)]
         let _conn = crate::sqlite::open("/tmp/tmp.db").unwrap();
+    }
+
+    #[test]
+    fn sqlite_open_readonly() {
+        assert_eq!(
+            crate::sqlite::open_readonly(":memory:"),
+            Err(OwsqlError::Message("failed to connect".to_string()))
+        );
     }
 
     #[test]

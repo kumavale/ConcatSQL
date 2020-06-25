@@ -10,8 +10,9 @@
 //! # conn.execute(stmt).unwrap();
 //! let id_input = "42 OR 1=1; --";
 //! let sql = conn.ow("SELECT name FROM users WHERE id = ") + id_input;
+//! println!("[{}]", sql); // [ OWSQL47xyz6km0CfbRt0BA38Z2DxrleESyPPg4 42 OR 1=1; --]
 //! // At runtime it will be transformed into a query like
-//! // "SELECT name FROM users WHERE id = '42 OR 1=1; --';".
+//! // "SELECT name FROM users WHERE id = '42 OR 1=1; --'".
 //! # conn.iterate(&sql, |_| { true }).unwrap();
 //! ```
 //!
@@ -94,5 +95,77 @@ macro_rules! params {
             temp_vec
         }
     };
+}
+
+/// Generate new overwrite string.
+fn overwrite_new<T: IntoInner>(serial: usize, range: T) -> String {
+    use rand::{Rng, thread_rng};
+    use rand::distributions::Alphanumeric;
+    use std::cmp::Ordering;
+
+    static MINIMUM: usize = 32;
+    let range = {
+        let range = range.into_inner();
+        let range0 = if range.0 < MINIMUM { MINIMUM } else { range.0 };
+        let range1 = if range.1 < MINIMUM { MINIMUM } else { range.1 };
+        (range0, range1)
+    };
+
+    format!("OWSQL{}{}",
+        thread_rng()
+        .sample_iter(Alphanumeric)
+        .take( match (range.0).cmp(&range.1) {
+            Ordering::Equal   => range.0,
+            Ordering::Less    => thread_rng().gen_range(range.0, range.1),
+            Ordering::Greater => thread_rng().gen_range(range.1, range.0),
+        })
+        .collect::<String>(),
+        serial.to_string())
+}
+
+trait IntoInner { fn into_inner(self) -> (usize, usize); }
+impl IntoInner for usize                           { fn into_inner(self) -> (usize, usize) { (self, self) } }
+impl IntoInner for std::ops::RangeInclusive<usize> { fn into_inner(self) -> (usize, usize) { self.into_inner() } }
+impl IntoInner for std::ops::Range<usize> {
+    fn into_inner(self) -> (usize, usize) {
+        use std::cmp::Ordering;
+        match (self.start).cmp(&self.end) {
+            Ordering::Equal   => (self.start, self.end),
+            Ordering::Less    => (self.start, self.end-1),
+            Ordering::Greater => (self.start, self.end+1),
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn overwrite_new() {
+        assert!((5+32+1) <= crate::overwrite_new(0, 0).len());       // 32
+        assert!((5+32+1) <= crate::overwrite_new(0, 42).len());      // 42
+        assert!((5+32+1) <= crate::overwrite_new(0, 0..16).len());   // 32
+        assert!((5+32+1) <= crate::overwrite_new(0, 0..32).len());   // 32
+        assert!((5+32+1) <= crate::overwrite_new(0, 0..=32).len());  // 32
+        assert!((5+32+1) <= crate::overwrite_new(0, 64..64).len());  // 64
+        assert!((5+32+1) <= crate::overwrite_new(0, 64..=64).len()); // 64
+        assert!((5+32+1) <= crate::overwrite_new(0, 32..64).len());  // 32-63
+        assert!((5+32+1) <= crate::overwrite_new(0, 32..=64).len()); // 32-64
+        assert!((5+32+1) <= crate::overwrite_new(0, 64..32).len());  // 33-64
+        assert!((5+32+1) <= crate::overwrite_new(0, 64..=32).len()); // 32-64
+    }
+
+    #[test]
+    fn into_inner() {
+        use crate::IntoInner;
+        assert_eq!(( 0,  0), (0).into_inner());
+        assert_eq!((42, 42), (42).into_inner());
+        assert_eq!(( 0, 31), (0..32).into_inner());
+        assert_eq!(( 0, 32), (0..=32).into_inner());
+        assert_eq!((64, 64), (64..64).into_inner());
+        assert_eq!((64, 64), (64..=64).into_inner());
+        assert_eq!((64, 33), (64..32).into_inner());
+        assert_eq!((64, 32), (64..=32).into_inner());
+    }
 }
 

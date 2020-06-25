@@ -457,6 +457,12 @@ mod sqlite {
         }).sum::<usize>());
     }
 
+    #[test]
+    #[ignore]
+    fn range() {
+        unimplemented!();
+    }
+
     mod should_panic {
         use owsql::params;
         use super::stmt;

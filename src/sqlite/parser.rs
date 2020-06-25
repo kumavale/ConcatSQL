@@ -3,29 +3,6 @@ use crate::error::{OwsqlError, OwsqlErrorLevel};
 use super::connection::Connection;
 use super::token::TokenType;
 
-macro_rules! overwrite_new {
-    ($serial: expr) => {
-        format!("OWSQL{}{}",
-            thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(32)
-            .collect::<String>(),
-            $serial.to_string())
-    };
-    ($serial: expr, $max: expr) => {
-        format!("OWSQL{}{}",
-            thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take( if 32 < $max {
-                thread_rng().gen_range(32, $max)
-            } else {
-                32
-            })
-            .collect::<String>(),
-            $serial.to_string())
-    };
-}
-
 #[inline]
 pub(crate) fn escape_for_allowlist(value: &str) -> String {
     let error_level = OwsqlErrorLevel::default();
