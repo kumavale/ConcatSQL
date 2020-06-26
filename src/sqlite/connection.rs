@@ -7,10 +7,11 @@ use std::collections::HashSet;
 use std::fmt;
 use std::cell::RefCell;
 
-use crate::{Result, IntoInner, overwrite_new};
+use crate::Result;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
+use crate::overwrite::{IntoInner, overwrite_new};
 use super::parser::{escape_for_allowlist, single_quotaion_escape};
 use super::row::Row;
 
