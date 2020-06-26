@@ -29,20 +29,13 @@ pub use self::connection::Connection;
 /// ```
 #[inline]
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
-    Connection::open(path,
-        sqlite3_sys::SQLITE_OPEN_CREATE |
-        sqlite3_sys::SQLITE_OPEN_READWRITE
-    )
+    Connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
 }
 
 /// Open a readonly connection to a new or existing database.
 #[inline]
 pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Connection> {
-    Connection::open(path,
-        sqlite3_sys::SQLITE_OPEN_CREATE |
-        sqlite3_sys::SQLITE_OPEN_READWRITE |
-        sqlite3_sys::SQLITE_OPEN_READONLY
-    )
+    Connection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
 }
 
 /// Return the version number of SQLite.
@@ -56,22 +49,45 @@ pub fn version() -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate::params;
     use crate::value::Value;
-    use crate::error::OwsqlError;
+    use crate::error::{OwsqlError, OwsqlErrorLevel};
+    use temporary::Directory;
 
     #[test]
     fn sqlite_open() {
-        let _conn = crate::sqlite::open(":memory:").unwrap();
-        #[cfg(unix)]
-        let _conn = crate::sqlite::open("/tmp/tmp.db").unwrap();
+        let dir = Directory::new("sqlite").unwrap();
+        let path = dir.path().join("test.db");
+        crate::sqlite::open(":memory:").unwrap();
+        crate::sqlite::open(path).unwrap();
     }
 
     #[test]
     fn sqlite_open_readonly() {
+        crate::sqlite::open_readonly(":memory:").unwrap();
+
+        let dir = Directory::new("sqlite").unwrap();
+        let path = dir.path().join("test.db");
+        {
+            let conn = crate::sqlite::open(&path).unwrap();
+            conn.execute(conn.ow("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+        }
+        crate::sqlite::open_readonly(path).unwrap();
+    }
+
+    #[test]
+    fn should_readonly() {
+        let dir = Directory::new("sqlite").unwrap();
+        let path = dir.path().join("test.db");
+        {
+            let conn = crate::sqlite::open(&path).unwrap();
+            conn.execute(conn.ow("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+        }
+        let mut conn = crate::sqlite::open_readonly(path).unwrap();
+        conn.error_level = OwsqlErrorLevel::Debug;
         assert_eq!(
-            crate::sqlite::open_readonly(":memory:"),
-            Err(OwsqlError::Message("failed to connect".to_string()))
+            conn.execute(conn.ow("INSERT INTO users VALUES(42, 'Alice');")),
+            Err(OwsqlError::Message("exec error: attempt to write a readonly database".to_string()))
         );
     }
 
