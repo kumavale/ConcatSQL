@@ -19,8 +19,10 @@ pub(crate) fn overwrite_new(serial: usize, range: (usize, usize)) -> String {
 }
 
 pub trait IntoInner { fn into_inner(self) -> (usize, usize); }
-impl IntoInner for usize                           { fn into_inner(self) -> (usize, usize) { (self, self) } }
-impl IntoInner for std::ops::RangeInclusive<usize> { fn into_inner(self) -> (usize, usize) { self.into_inner() } }
+impl IntoInner for usize                             { fn into_inner(self) -> (usize, usize) { (self, self) } }
+impl IntoInner for std::ops::RangeTo<usize>          { fn into_inner(self) -> (usize, usize) { (0, self.end-1) } }
+impl IntoInner for std::ops::RangeInclusive<usize>   { fn into_inner(self) -> (usize, usize) { self.into_inner() } }
+impl IntoInner for std::ops::RangeToInclusive<usize> { fn into_inner(self) -> (usize, usize) { (0, self.end) } }
 impl IntoInner for std::ops::Range<usize> {
     fn into_inner(self) -> (usize, usize) {
         use std::cmp::Ordering;
@@ -46,6 +48,10 @@ mod tests {
         assert_eq!((64, 64), (64..=64).into_inner());
         assert_eq!((64, 33), (64..32).into_inner());
         assert_eq!((64, 32), (64..=32).into_inner());
+        assert_eq!(( 0, 15), (..16).into_inner());
+        assert_eq!(( 0, 63), (..64).into_inner());
+        assert_eq!(( 0, 16), (..=16).into_inner());
+        assert_eq!(( 0, 64), (..=64).into_inner());
     }
 }
 
