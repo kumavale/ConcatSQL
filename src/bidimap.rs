@@ -20,13 +20,11 @@ where
         }
     }
 
-    pub fn entry_or_insert(&mut self, a: A, b: B) {
-        if !self.key_value.contains_key(&a) {
-            let a = Arc::new(a);
-            let b = Arc::new(b);
-            self.key_value.insert(a.clone(), b.clone());
-            self.value_key.insert(b, a);
-        }
+    pub fn insert(&mut self, a: A, b: B) {
+        let a = Arc::new(a);
+        let b = Arc::new(b);
+        self.key_value.insert(a.clone(), b.clone());
+        self.value_key.insert(b, a);
     }
 
     pub fn get(&self, key: &A) -> Option<&B> {
@@ -35,6 +33,10 @@ where
 
     pub fn get_reverse(&self, value: &B) -> Option<&A> {
         self.value_key.get(value).map(Deref::deref)
+    }
+
+    pub fn contain(&self, value: &A) -> bool {
+        self.key_value.contains_key(value)
     }
 
     pub fn contain_reverse(&self, value: &B) -> bool {

@@ -266,14 +266,20 @@ impl Connection {
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         match result {
             Ok(_) => {
-                self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
+                let s = s.to_string();
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
                 format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
             },
             Err(e) => {
-                self.error_msg.borrow_mut().entry_or_insert(e.clone(), overwrite);
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
                 format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
             },
         }
@@ -289,14 +295,20 @@ impl Connection {
     pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
         let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         match result {
             Ok(_) => {
-                self.overwrite.borrow_mut().entry_or_insert(s.to_string(), overwrite);
+                let s = s.to_string();
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
                 format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
             },
             Err(e) => {
-                self.error_msg.borrow_mut().entry_or_insert(e.clone(), overwrite);
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
                 format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
             },
         }
@@ -325,10 +337,12 @@ impl Connection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let msg = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
-            self.error_msg.borrow_mut()
-                .entry_or_insert(msg.clone(), overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range));
-            format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
+            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
         }
     }
 
@@ -366,7 +380,7 @@ impl Connection {
     pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
         for value in params {
             self.allowlist.insert(value.to_string());
-            self.overwrite.borrow_mut().entry_or_insert(
+            self.overwrite.borrow_mut().insert(
                 escape_for_allowlist(&value.to_string()),
                 overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range)
             );
@@ -387,14 +401,20 @@ impl Connection {
     #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
-        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
         if value.parse::<i64>().is_ok() {
-            self.overwrite.borrow_mut().entry_or_insert(value.to_string(), overwrite);
+            let value = value.to_string();
+            if !self.overwrite.borrow_mut().contain(&value) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.overwrite.borrow_mut().insert(value.to_string(), overwrite);
+            }
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
-            let msg = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
-            self.error_msg.borrow_mut().entry_or_insert(msg.clone(), overwrite);
-            format!(" {} ", self.error_msg.borrow_mut().get(&msg).unwrap())
+            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
         }
     }
 
