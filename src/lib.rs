@@ -64,6 +64,7 @@
 
 
 mod bidimap;
+mod serial;
 pub mod error;
 pub mod constants;
 pub mod overwrite;

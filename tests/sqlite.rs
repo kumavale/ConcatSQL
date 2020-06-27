@@ -462,27 +462,27 @@ mod sqlite {
     fn range() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.set_ow_len(1);
-        assert_eq!(1+5+32+1+1, conn.ow("1").len());
+        assert_eq!(1+5+32+1+1, conn.ow("0").len());
         conn.set_ow_len(42);
-        assert_eq!(1+5+42+1+1, conn.ow("2").len());
+        assert_eq!(1+5+42+1+1, conn.ow("1").len());
         conn.set_ow_len(0..32);
-        assert_eq!(1+5+32+1+1, conn.ow("3").len());
+        assert_eq!(1+5+32+1+1, conn.ow("2").len());
         conn.set_ow_len(0..=32);
-        assert_eq!(1+5+32+1+1, conn.ow("4").len());
+        assert_eq!(1+5+32+1+1, conn.ow("3").len());
         conn.set_ow_len(64..64);
-        assert_eq!(1+5+64+1+1, conn.ow("5").len());
+        assert_eq!(1+5+64+1+1, conn.ow("4").len());
         conn.set_ow_len(64..=64);
-        assert_eq!(1+5+64+1+1, conn.ow("6").len());
+        assert_eq!(1+5+64+1+1, conn.ow("5").len());
         conn.set_ow_len(64..32);
-        assert!(1+5+33+1+1 <= conn.ow("7").len() && conn.ow("7").len() <= 1+5+64+1+1);
+        assert!(1+5+33+1+1 <= conn.ow("6").len() && conn.ow("6").len() <= 1+5+64+1+1);
         conn.set_ow_len(64..=32);
-        assert!(1+5+32+1+1 <= conn.ow("8").len() && conn.ow("8").len() <= 1+5+64+1+1);
+        assert!(1+5+32+1+1 <= conn.ow("7").len() && conn.ow("7").len() <= 1+5+64+1+1);
         conn.set_ow_len(100..110);
-        assert!(1+5+100+1+1 <= conn.ow("9").len() && conn.ow("9").len() <= 1+5+109+1+1);
+        assert!(1+5+100+1+1 <= conn.ow("8").len() && conn.ow("8").len() <= 1+5+109+1+1);
         conn.set_ow_len(..64);
-        assert!(1+5+32+1+2 <= conn.ow("10").len() && conn.ow("10").len() <= 1+5+63+1+1);
+        assert!(1+5+32+1+1 <= conn.ow("9").len() && conn.ow("9").len() <= 1+5+63+1+1);
         conn.set_ow_len(..=64);
-        assert!(1+5+32+1+1 <= conn.ow("11").len() && conn.ow("11").len() <= 1+5+64+1+1);
+        assert!(1+5+32+2+1 <= conn.ow("10").len() && conn.ow("10").len() <= 1+5+64+2+1);
     }
 
     mod should_panic {

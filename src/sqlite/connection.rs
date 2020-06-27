@@ -12,6 +12,7 @@ use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
+use crate::serial::SerialNumber;
 use super::parser::{escape_for_allowlist, single_quotaion_escape};
 use super::row::Row;
 
@@ -44,15 +45,6 @@ impl fmt::Debug for Connection {
     }
 }
 
-struct SerialNumber(usize);
-impl SerialNumber {
-    fn new() -> Self { Self(0usize) }
-    fn get(&mut self) -> usize {
-        self.0 += 1;
-        self.0
-    }
-}
-
 impl Connection {
     /// Open a read-write connection to a new or existing database.
     #[inline]
@@ -80,7 +72,7 @@ impl Connection {
                 Ok(Connection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     allowlist:     HashSet::new(),
-                    serial_number: RefCell::new(SerialNumber::new()),
+                    serial_number: RefCell::new(SerialNumber::default()),
                     ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
                     overwrite:     RefCell::new(BidiMap::new()),
                     error_msg:     RefCell::new(BidiMap::new()),

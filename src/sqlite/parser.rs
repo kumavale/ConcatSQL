@@ -54,7 +54,7 @@ impl Connection {
                 Ok('\'')  => if parser.consume_string('\'').is_err() {
                     return self.err(err_msg, &s);
                 },
-                _ => (),
+                _other => (), // Do nothing
             }
         }
 
@@ -74,7 +74,7 @@ impl Connection {
             } else if let Some(original) = self.overwrite.borrow().get_reverse(&token) {
                 query.push_str(original);
             } else {
-                query.push_str(/*&escape_html(*/&token/*)*/);
+                query.push_str(&token);
             }
 
             query.push(' ');
@@ -91,11 +91,10 @@ impl Connection {
             parser.skip_whitespace().ok();
 
             if parser.next_char().is_ok() {
-                let string = parser.consume_except_whitespace()?;
+                let mut string = parser.consume_except_whitespace()?;
                 if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
                     tokens.push(TokenType::Overwrite(string));
                 } else {
-                    let mut string = string; // single_quotaion_escape(&string);
                     let mut overwrite = String::new();
                     'untilow: while !parser.eof() {
                         let whitespace = parser.consume_whitespace().unwrap_or_default();
@@ -105,11 +104,10 @@ impl Connection {
                                 break 'untilow;
                             } else {
                                 string.push_str(&whitespace);
-                                string.push_str(/*&single_quotaion_escape(*/&s/*)*/);
+                                string.push_str(&s);
                             }
                         }
                     }
-                    //tokens.push(TokenType::String(format!("'{}'", string)));
                     tokens.push(TokenType::String(format!("'{}'", escape_html(&string))));
                     if !overwrite.is_empty() {
                         tokens.push(TokenType::Overwrite(overwrite));
@@ -258,5 +256,11 @@ mod tests {
             super::escape_html(r#"<script type="text/javascript">alert('1')</script>"#),
             r#"&lt;script type=&quot;text/javascript&quot;&gt;alert(&#39;1&#39;)&lt;/script&gt;"#
         );
+    }
+
+    #[test]
+    fn consume_char() {
+        let mut p = super::Parser::new("", &OwsqlErrorLevel::Debug);
+        assert_eq!(p.consume_char(), Err(OwsqlError::Message("error: consume_char(): None".into())));
     }
 }
