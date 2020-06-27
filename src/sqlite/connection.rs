@@ -268,7 +268,6 @@ impl Connection {
         let result = self.check_valid_literal(&s);
         match result {
             Ok(_) => {
-                let s = s.to_string();
                 if !self.overwrite.borrow_mut().contain(&s) {
                     let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                     self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
@@ -297,7 +296,6 @@ impl Connection {
         let result = self.check_valid_literal(&s);
         match result {
             Ok(_) => {
-                let s = s.to_string();
                 if !self.overwrite.borrow_mut().contain(&s) {
                     let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                     self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
@@ -402,7 +400,6 @@ impl Connection {
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
         if value.parse::<i64>().is_ok() {
-            let value = value.to_string();
             if !self.overwrite.borrow_mut().contain(&value) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.overwrite.borrow_mut().insert(value.to_string(), overwrite);
