@@ -9,7 +9,7 @@ edition = "2018"
 
 [features]
 sqlite = ["sqlite3-sys/linkage"]
-mysql = []
+mysql = ["mysql-sys"]
 
 
 [dependencies]
@@ -18,6 +18,11 @@ rand = "0.7"
 [dependencies.sqlite3-sys]
 version = "0.12"
 default-features = false
+optional = true
+
+[dependencies.mysql-sys]
+package = "mysql"
+version = "18.2"
 optional = true
 
 [dev-dependencies]

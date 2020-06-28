@@ -3,7 +3,6 @@
 use std::path::Path;
 use crate::Result;
 
-#[macro_use]
 mod parser;
 mod connection;
 mod token;
