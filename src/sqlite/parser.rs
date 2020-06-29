@@ -67,14 +67,12 @@ impl SqliteConnection {
         let tokens = self.tokenize(&stmt)?;
 
         for token in tokens {
-            let token = token.unwrap();
-
-            if let Some(e) = self.error_msg.borrow().get_reverse(&token) {
-                return Err(e.clone());
-            } else if let Some(original) = self.overwrite.borrow().get_reverse(&token) {
-                query.push_str(original);
-            } else {
-                query.push_str(&token);
+            match token {
+                TokenType::ErrOverwrite(e) =>
+                    return Err(self.error_msg.borrow().get_reverse(&e).unwrap().clone()),
+                TokenType::Overwrite(original) =>
+                    query.push_str(self.overwrite.borrow().get_reverse(&original).unwrap()),
+                other => query.push_str(&other.unwrap()),
             }
 
             query.push(' ');
@@ -92,15 +90,20 @@ impl SqliteConnection {
 
             if parser.next_char().is_ok() {
                 let mut string = parser.consume_except_whitespace()?;
-                if self.overwrite.borrow().contain_reverse(&string) || self.error_msg.borrow().contain_reverse(&string) {
+                if self.overwrite.borrow().contain_reverse(&string) {
                     tokens.push(TokenType::Overwrite(string));
+                } else if self.error_msg.borrow().contain_reverse(&string) {
+                    tokens.push(TokenType::ErrOverwrite(string));
                 } else {
-                    let mut overwrite = String::new();
+                    let mut overwrite = TokenType::None;
                     'untilow: while !parser.eof() {
                         let whitespace = parser.consume_whitespace().unwrap_or_default();
                         while let Ok(s) = parser.consume_except_whitespace() {
-                            if self.overwrite.borrow().contain_reverse(&s) || self.error_msg.borrow().contain_reverse(&s) {
-                                overwrite = s;
+                            if self.overwrite.borrow().contain_reverse(&s) {
+                                overwrite = TokenType::Overwrite(s);
+                                break 'untilow;
+                            } else if self.error_msg.borrow().contain_reverse(&s) {
+                                overwrite = TokenType::ErrOverwrite(s);
                                 break 'untilow;
                             } else {
                                 string.push_str(&whitespace);
@@ -109,8 +112,8 @@ impl SqliteConnection {
                         }
                     }
                     tokens.push(TokenType::String(format!("'{}'", escape_html(&string))));
-                    if !overwrite.is_empty() {
-                        tokens.push(TokenType::Overwrite(overwrite));
+                    if !overwrite.is_none() {
+                        tokens.push(overwrite);
                     }
                 }
             }

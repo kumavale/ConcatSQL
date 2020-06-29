@@ -21,7 +21,7 @@ mod mysql {
     }
 
     #[test]
-    #[should_panic("exec error")]
+    #[should_panic = "exec error"]
     fn execute_should_error() {
         let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.execute(stmt()).unwrap();
