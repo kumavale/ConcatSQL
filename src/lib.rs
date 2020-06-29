@@ -2,7 +2,7 @@
 //! `owsql` is a secure library for PostgreSQL, MySQL and SQLite.  
 //! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
-//! ```
+//! ```rust,ignore
 //! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -20,7 +20,7 @@
 //!
 //! Open a connection of SQLite, create a table, and insert some rows:
 //!
-//! ```
+//! ```rust,ignore
 //! let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -30,7 +30,7 @@
 //!
 //! Select some rows and process them one by one as plain text:
 //!
-//! ```
+//! ```rust,ignore
 //! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -48,7 +48,7 @@
 //!
 //! It can be executed after getting all the rows of the query:
 //!
-//! ```
+//! ```rust,ignore
 //! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -83,7 +83,7 @@ pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
 
 /// This macro is a convenient way to pass named parameters to a statement.
 ///
-/// ```
+/// ```rust,ignore
 /// # use owsql::params;
 /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
 /// let alice = "Alice";
