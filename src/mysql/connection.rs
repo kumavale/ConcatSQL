@@ -148,6 +148,11 @@ impl MysqlConnection {
     }
 
     #[inline]
+    pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
+        self.convert_to_valid_syntax(query.as_ref())
+    }
+
+    #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
