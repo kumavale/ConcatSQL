@@ -1,7 +1,7 @@
 use crate::Result;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::token::TokenType;
 use super::connection::SqliteConnection;
-use super::token::TokenType;
 
 #[inline]
 pub(crate) fn escape_for_allowlist(value: &str) -> String {

@@ -5,7 +5,6 @@ use crate::Result;
 
 mod parser;
 mod connection;
-mod token;
 mod row;
 
 pub use self::row::SqliteRow;

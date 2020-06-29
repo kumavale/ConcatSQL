@@ -1,7 +1,7 @@
 use crate::Result;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::token::TokenType;
 use super::connection::MysqlConnection;
-use super::token::TokenType;
 
 #[inline]
 fn escape_html(input: &str) -> String {

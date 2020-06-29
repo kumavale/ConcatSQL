@@ -2,7 +2,6 @@
 
 mod connection;
 mod parser;
-mod token;
 
 use crate::Result;
 
