@@ -206,12 +206,12 @@ impl MysqlConnection {
     /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
     /// let select = conn.ow("SELECT");
     /// let oreilly = conn.ow("O'Reilly");
-    ///// let oreilly_unhtmlescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
+    /// let oreilly_unhtmlescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
     /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
     /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
     /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
     /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
-    ///// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
+    /// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
     /// ```
     #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
@@ -262,6 +262,180 @@ impl MysqlConnection {
                 }
                 format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
             },
+        }
+    }
+
+    /// Return the overwrite definition string without HTML escape.  
+    ///
+    /// # Safety
+    ///
+    /// This is an unsafe method!! => I am considering whether to use the unsafe keyword :(  
+    /// Note that this can be XSS.
+    #[inline]
+    pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
+        let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
+        let result = self.check_valid_literal(&s);
+        match result {
+            Ok(_) => {
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
+            },
+            Err(e) => {
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+            },
+        }
+    }
+
+    /// Return the overwrite definition string in allowlist.  
+    /// Returns the escaped string.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob"]);
+    /// let input = "Alice OR 1=1; --";
+    /// let sql = conn.ow("SELECT * FROM users WHERE name = ") + &conn.allowlist(input);
+    ///
+    /// assert!(conn.execute(sql).is_err());
+    /// ```
+    #[inline]
+    pub fn allowlist<T: Clone + ToString>(&self, value: T) -> String {
+        if self.is_allowlist(value.clone()) {
+            format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
+        } else {
+            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+        }
+    }
+
+    /// Checks if the value is within the allowlist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
+    /// assert!(conn.is_allowlist("Alice"));
+    /// assert!(!conn.is_allowlist("'Alice'"));
+    /// assert!(conn.is_allowlist(42));
+    /// assert!(conn.is_allowlist("42"));
+    /// assert!(!conn.is_allowlist("'42'"));
+    /// ```
+    #[inline]
+    pub fn is_allowlist<T: ToString>(&self, value: T) -> bool {
+        self.allowlist.contains(&value.to_string())
+    }
+
+    /// Register it in self.overwrite after performing character string escape processing with
+    /// single quotation added to both sides.  
+    /// Use [params macro](../macro.params.html).  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
+    /// ```
+    #[inline]
+    pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
+        for value in params {
+            self.allowlist.insert(value.to_string());
+            self.overwrite.borrow_mut().insert(
+                escape_for_allowlist(&value.to_string()),
+                overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range)
+            );
+        }
+    }
+
+    /// It is guaranteed to be a signed 64-bit integer without quotation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// conn.int(42);              // ok
+    /// conn.int("42");            // ok
+    /// conn.int("42 or 1=1; --"); // error
+    /// ```
+    #[inline]
+    pub fn int<T: Clone + ToString>(&self, value: T) -> String {
+        let value = value.to_string();
+        if value.parse::<i64>().is_ok() {
+            if !self.overwrite.borrow_mut().contain(&value) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.overwrite.borrow_mut().insert(value.to_string(), overwrite);
+            }
+            format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
+        } else {
+            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+        }
+    }
+
+    /// You can set a different fixed value or a different length each time.  
+    /// The [ow method](./struct.MysqlConnection.html#method.ow) outputs a random number of about 32
+    /// digits by default.  
+    /// However, if a number less than 32 digits is entered, it will be set to 32 digits.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// conn.set_ow_len(42);       // 42
+    /// conn.set_ow_len(50..100);  // 50-99
+    /// conn.set_ow_len(50..=100); // 50-100
+    /// ```
+    #[inline]
+    pub fn set_ow_len<T: 'static + IntoInner>(&mut self, range: T) {
+        self.ow_len_range = {
+            let range = range.into_inner();
+            let range0 = if range.0 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.0 };
+            let range1 = if range.1 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.1 };
+            (range0, range1)
+        };
+    }
+
+    /// Sets the error level.  
+    /// Default is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release.  
+    /// Values can be changed only during debug build.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::error::OwsqlErrorLevel;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// conn.error_level(OwsqlErrorLevel::Develop);
+    /// ```
+    #[inline]
+    pub fn error_level(&mut self, level: OwsqlErrorLevel) {
+        // Values can be changed only during debug build
+        if cfg!(debug_assertions) {
+            self.error_level = level;
         }
     }
 
