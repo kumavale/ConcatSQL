@@ -62,12 +62,24 @@ impl MysqlConnection {
             ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
             overwrite:     RefCell::new(BidiMap::new()),
             error_msg:     RefCell::new(BidiMap::new()),
-            //error_level:   OwsqlErrorLevel::default(),
-            error_level:   OwsqlErrorLevel::Debug, // for develop
+            error_level:   OwsqlErrorLevel::default(),
+            //error_level:   dbg!(OwsqlErrorLevel::Debug), // for develop
         })
     }
 
     /// Execute a statement without processing the resulting rows if any.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.execute(&sql).unwrap();
+    /// ```
     #[inline]
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
         let query = match self.convert_to_valid_syntax(query.as_ref()) {
@@ -85,6 +97,27 @@ impl MysqlConnection {
         }
     }
 
+    /// Execute a statement and process the resulting rows as plain text.
+    ///
+    /// The callback is triggered for each row. If the callback returns `false`,
+    /// no more rows will be processed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.iterate(&sql, |pairs| {
+    ///     for (column, value) in pairs.iter() {
+    ///         println!("{} = {}", column, value.as_ref().unwrap());
+    ///     }
+    ///     true
+    /// }).unwrap();
+    /// ```
     #[inline]
     pub fn iterate<T: AsRef<str>, F>(&self, query: T, mut callback: F) -> Result<()>
         where
@@ -106,13 +139,11 @@ impl MysqlConnection {
         };
 
         while let Some(result_set) = result.next_set() {
-            let mut pairs: Vec<(String, Option<String>)> = Vec::new();
             let result_set = match result_set {
                 Ok(result_set) => result_set,
                 Err(e) => return self.err("exec error", &e.to_string()),
             };
-
-            let columns = result_set.columns();
+            let mut pairs = Vec::with_capacity(result_set.affected_rows() as usize);
 
             for row in result_set {
                 let row = match row {
@@ -123,6 +154,7 @@ impl MysqlConnection {
                 for (i, col) in row.columns().iter().enumerate() {
                     pairs.push((col.name_str().to_string(), row.get(i)));
                 }
+
             }
 
             if !callback(&pairs) {
@@ -133,6 +165,22 @@ impl MysqlConnection {
         Ok(())
     }
 
+    /// Execute a statement and returns the rows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT name FROM users;"#);
+    /// let rows = conn.rows(&sql).unwrap();
+    /// for row in rows.iter() {
+    ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
+    /// }
+    /// ```
     #[inline]
     pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<MysqlRow>> {
         let mut rows: Vec<MysqlRow> = Vec::new();
@@ -149,11 +197,52 @@ impl MysqlConnection {
         Ok(rows)
     }
 
+    /// Return the actual SQL statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::error::OwsqlError;
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// let select = conn.ow("SELECT");
+    /// let oreilly = conn.ow("O'Reilly");
+    ///// let oreilly_unhtmlescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
+    /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
+    /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
+    /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
+    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+    ///// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
+    /// ```
     #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
         self.convert_to_valid_syntax(query.as_ref())
     }
 
+    /// Return the overwrite definition string.  
+    /// All strings assembled without using this method are escaped.  
+    /// This method does not sanitize.  
+    /// A string containing incomplete quotes like the one below will result in an error.  
+    ///
+    /// # Errors
+    ///
+    /// ```rust
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// # let name = "bar";
+    /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");
+    /// # /*
+    ///                                       ^                      ^
+    /// # */
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+    /// let sql = conn.ow("SELECT");
+    ///
+    /// assert_eq!(sql, conn.ow("SELECT"));
+    /// assert_ne!(sql, "SELECT");
+    /// ```
     #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
