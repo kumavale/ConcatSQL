@@ -1,4 +1,5 @@
 extern crate mysql_sys as mysql;
+use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
 use std::collections::HashSet;
@@ -16,7 +17,7 @@ use crate::parser::{escape_for_allowlist, single_quotaion_escape};
 
 /// A database connection for MySQL.
 pub struct MysqlConnection {
-    conn:                   RefCell<mysql::PooledConn>,
+    conn:                   RefCell<mysql::Conn>,
     allowlist:              HashSet<String>,
     serial_number:          RefCell<SerialNumber>,
     ow_len_range:           (usize, usize),
@@ -44,12 +45,12 @@ impl MysqlConnection {
     /// Open a read-write connection to a new or existing database.
     #[inline]
     pub fn open(url: &str) -> Result<Self> {
-        let pool = match mysql::Pool::new(&url) {
-            Ok(pool) => pool,
+        let opts = match Opts::from_url(&url) {
+            Ok(opts) => opts,
             Err(e) => return Err(OwsqlError::new(format!("failed to open: {}", e))),
         };
 
-        let conn = match pool.get_conn() {
+        let conn = match Conn::new(opts) {
             Ok(conn) => conn,
             Err(e) => return Err(OwsqlError::new(format!("failed to open: {}", e))),
         };
