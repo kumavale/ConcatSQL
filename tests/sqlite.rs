@@ -47,6 +47,24 @@ mod sqlite {
     }
 
     #[test]
+    fn iterate_2sets() {
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let expects = ["Alice", "Bob", "Carol", "Alice", "Bob", "Carol"];
+        conn.execute(&conn.ow(stmt())).unwrap();
+
+        let mut i = 0;
+        let sql = conn.ow("SELECT name FROM users; SELECT name FROM users;");
+
+        conn.iterate(&sql, |pairs| {
+            for &(_, value) in pairs.iter() {
+                assert_eq!(value.unwrap(), expects[i]);
+            }
+            i += 1;
+            true
+        }).unwrap();
+    }
+
+    #[test]
     fn iterate_or() {
         let conn = owsql::sqlite::open(":memory:").unwrap();
         let expects = ["Alice", "Bob"];

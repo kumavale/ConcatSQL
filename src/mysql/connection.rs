@@ -86,6 +86,52 @@ impl MysqlConnection {
     }
 
     #[inline]
+    pub fn iterate<T: AsRef<str>, F>(&self, query: T, mut callback: F) -> Result<()>
+        where
+            F: FnMut(&[(String, Option<String>)]) -> bool,
+    {
+        let query = match self.convert_to_valid_syntax(query.as_ref()) {
+            Ok(query) => query,
+            Err(e) => if self.error_level == OwsqlErrorLevel::AlwaysOk {
+                return Ok(());
+            } else {
+                return Err(e);
+            },
+        };
+
+        let mut conn = self.conn.borrow_mut();
+        let mut result = match conn.query_iter(&query) {
+            Ok(result) => result,
+            Err(e) => return self.err("exec error", &e.to_string()),
+        };
+
+        let mut pairs: Vec<(String, Option<String>)> = Vec::new();
+
+        while let Some(result_set) = result.next_set() {
+            let result_set = match result_set {
+                Ok(result_set) => result_set,
+                Err(e) => return self.err("exec error", &e.to_string()),
+            };
+
+            let columns = result_set.columns();
+
+            for row in result_set {
+                let row = match row {
+                    Ok(row) => row,
+                    Err(e) => return self.err("exec error", &e.to_string()),
+                };
+
+                for (i, col) in row.columns().iter().enumerate() {
+                    pairs.push((col.name_str().to_string(), row.get(i)));
+                }
+            }
+        }
+
+        callback(&pairs);
+        Ok(())
+    }
+
+    #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
