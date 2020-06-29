@@ -1,8 +1,7 @@
 //! Interface to [MySQL](https://www.mysql.com/) of OverwriteSQL.
 
-mod connection;
-mod parser;
 mod row;
+pub(crate) mod connection;
 
 use crate::Result;
 

@@ -1,5 +1,13 @@
 use crate::Result;
+use crate::OwsqlConn;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::bidimap::BidiMap;
+use crate::token::TokenType;
+
+#[cfg(feature = "sqlite")]
+use crate::sqlite::connection::SqliteConnection;
+#[cfg(feature = "mysql")]
+use crate::mysql::connection::MysqlConnection;
 
 #[inline]
 pub fn escape_for_allowlist(value: &str) -> String {
@@ -148,6 +156,126 @@ impl<'a> Parser<'a> {
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
         Ok(cur_char)
+    }
+}
+
+#[inline]
+fn check_valid_literal<T: OwsqlConn>(conn: &T, s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
+    let err_msg = "invalid literal";
+    let mut parser = Parser::new(&s, &error_level);
+    while !parser.eof() {
+        parser.consume_while(|c| c != '"' && c != '\'').ok();
+        match parser.next_char() {
+            Ok('"')  => if parser.consume_string('"').is_err() {
+                return conn.err(err_msg, &s);
+            },
+            Ok('\'')  => if parser.consume_string('\'').is_err() {
+                return conn.err(err_msg, &s);
+            },
+            _other => (), // Do nothing
+        }
+    }
+
+    Ok(())
+}
+
+#[inline]
+fn convert_to_valid_syntax(
+    stmt:           &str,
+    conn_overwrite: &BidiMap<String, String>,
+    conn_error_msg: &BidiMap<OwsqlError, String>,
+    error_level:    &OwsqlErrorLevel,
+) -> Result<String> {
+
+    let mut query = String::new();
+    let tokens = tokenize(stmt, conn_overwrite, conn_error_msg, error_level)?;
+
+    for token in tokens {
+        match token {
+            TokenType::ErrOverwrite(e) =>
+                return Err(conn_error_msg.get_reverse(&e).unwrap().clone()),
+            TokenType::Overwrite(original) =>
+                query.push_str(conn_overwrite.get_reverse(&original).unwrap()),
+            other => query.push_str(&other.unwrap()),
+        }
+
+        query.push(' ');
+    }
+
+    Ok(query)
+}
+
+#[inline]
+fn tokenize(
+    stmt:           &str,
+    conn_overwrite: &BidiMap<String, String>,
+    conn_error_msg: &BidiMap<OwsqlError, String>,
+    error_level:    &OwsqlErrorLevel,
+) -> Result<Vec<TokenType>> {
+
+    let mut parser = Parser::new(&stmt, &error_level);
+    let mut tokens = Vec::new();
+
+    while !parser.eof() {
+        parser.skip_whitespace().ok();
+
+        if parser.next_char().is_ok() {
+            let mut string = parser.consume_except_whitespace()?;
+            if conn_overwrite.contain_reverse(&string) {
+                tokens.push(TokenType::Overwrite(string));
+            } else if conn_error_msg.contain_reverse(&string) {
+                tokens.push(TokenType::ErrOverwrite(string));
+            } else {
+                let mut overwrite = TokenType::None;
+                'untilow: while !parser.eof() {
+                    let whitespace = parser.consume_whitespace().unwrap_or_default();
+                    while let Ok(s) = parser.consume_except_whitespace() {
+                        if conn_overwrite.contain_reverse(&s) {
+                            overwrite = TokenType::Overwrite(s);
+                            break 'untilow;
+                        } else if conn_error_msg.contain_reverse(&s) {
+                            overwrite = TokenType::ErrOverwrite(s);
+                            break 'untilow;
+                        } else {
+                            string.push_str(&whitespace);
+                            string.push_str(&s);
+                        }
+                    }
+                }
+                tokens.push(TokenType::String(format!("'{}'", escape_html(&string))));
+                if !overwrite.is_none() {
+                    tokens.push(overwrite);
+                }
+            }
+        }
+    }
+
+    Ok(tokens)
+}
+
+#[cfg(feature = "sqlite")]
+impl SqliteConnection {
+    #[inline]
+    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
+        check_valid_literal(self, &s, &self.error_level)
+    }
+
+    #[inline]
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
+        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
+    }
+}
+
+#[cfg(feature = "mysql")]
+impl MysqlConnection {
+    #[inline]
+    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
+        check_valid_literal(self, &s, &self.error_level)
+    }
+
+    #[inline]
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
+        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
     }
 }
 

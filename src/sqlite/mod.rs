@@ -3,9 +3,8 @@
 use std::path::Path;
 use crate::Result;
 
-mod parser;
-mod connection;
 mod row;
+pub(crate) mod connection;
 
 pub use self::row::SqliteRow;
 pub use self::connection::SqliteConnection;

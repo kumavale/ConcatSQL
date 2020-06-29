@@ -7,12 +7,13 @@ use std::cell::RefCell;
 use std::fmt;
 
 use crate::Result;
+use crate::OwsqlConn;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
-use crate::parser::{escape_for_allowlist, single_quotaion_escape};
+use crate::parser::*;
 use super::row::MysqlRow;
 
 /// A database connection for MySQL.
@@ -438,9 +439,11 @@ impl MysqlConnection {
             self.error_level = level;
         }
     }
+}
 
+impl OwsqlConn for crate::mysql::MysqlConnection {
     #[inline]
-    pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
+    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
         match self.error_level {
             OwsqlErrorLevel::AlwaysOk => Ok(()),
             OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),

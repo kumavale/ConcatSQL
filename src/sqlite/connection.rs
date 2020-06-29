@@ -8,6 +8,7 @@ use std::fmt;
 use std::cell::RefCell;
 
 use crate::Result;
+use crate::OwsqlConn;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
@@ -461,9 +462,11 @@ impl SqliteConnection {
             self.error_level = level;
         }
     }
+}
 
+impl OwsqlConn for crate::sqlite::SqliteConnection {
     #[inline]
-    pub(crate) fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
+    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
         match self.error_level {
             OwsqlErrorLevel::AlwaysOk => Ok(()),
             OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),

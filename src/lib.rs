@@ -104,3 +104,7 @@ macro_rules! params {
     };
 }
 
+pub(crate) trait OwsqlConn {
+    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), crate::error::OwsqlError>;
+}
+
