@@ -248,9 +248,12 @@ impl SqliteConnection {
     ///
     /// # Errors
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");
+    /// # /*
     ///                                       ^                      ^
+    /// # */
     /// ```
     ///
     /// # Examples

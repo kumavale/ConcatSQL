@@ -2,6 +2,7 @@
 
 mod connection;
 mod parser;
+mod row;
 
 use crate::Result;
 

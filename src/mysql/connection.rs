@@ -13,7 +13,7 @@ use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
 use crate::parser::{escape_for_allowlist, single_quotaion_escape};
-//use super::row::SqliteRow;
+use super::row::MysqlRow;
 
 /// A database connection for MySQL.
 pub struct MysqlConnection {
@@ -129,6 +129,22 @@ impl MysqlConnection {
 
         callback(&pairs);
         Ok(())
+    }
+
+    #[inline]
+    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<MysqlRow>> {
+        let mut rows: Vec<MysqlRow> = Vec::new();
+
+        self.iterate(query, |pairs| {
+            let mut row = MysqlRow::new();
+            for (column, value) in pairs.iter() {
+                row.insert(column.to_string(), value.as_ref().map(|v| v.to_string()));
+            }
+            rows.push(row);
+            true
+        })?;
+
+        Ok(rows)
     }
 
     #[inline]
