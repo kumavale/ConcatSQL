@@ -1,5 +1,4 @@
 extern crate mysql_sys as mysql;
-use mysql::*;
 use mysql::prelude::*;
 
 use std::collections::HashSet;
@@ -62,7 +61,8 @@ impl MysqlConnection {
             ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
             overwrite:     RefCell::new(BidiMap::new()),
             error_msg:     RefCell::new(BidiMap::new()),
-            error_level:   OwsqlErrorLevel::default(),
+            //error_level:   OwsqlErrorLevel::default(),
+            error_level:   OwsqlErrorLevel::Debug, // for develop
         })
     }
 
@@ -81,6 +81,28 @@ impl MysqlConnection {
         match self.conn.borrow_mut().query_drop(&query) {
             Ok(_) => Ok(()),
             Err(e) => self.err("exec error", &e.to_string()),
+        }
+    }
+
+    #[inline]
+    pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
+        let s = s.to_string();
+        let result = self.check_valid_literal(&s);
+        match result {
+            Ok(_) => {
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
+            },
+            Err(e) => {
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+            },
         }
     }
 

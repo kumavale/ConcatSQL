@@ -21,6 +21,26 @@ fn escape_html(input: &str) -> String {
 
 impl MysqlConnection {
     #[inline]
+    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
+        let err_msg = "invalid literal";
+        let mut parser = Parser::new(&s, &self.error_level);
+        while !parser.eof() {
+            parser.consume_while(|c| c != '"' && c != '\'').ok();
+            match parser.next_char() {
+                Ok('"')  => if parser.consume_string('"').is_err() {
+                    return self.err(err_msg, &s);
+                },
+                Ok('\'')  => if parser.consume_string('\'').is_err() {
+                    return self.err(err_msg, &s);
+                },
+                _other => (), // Do nothing
+            }
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
         let mut query = String::new();
         let tokens = self.tokenize(&stmt)?;
