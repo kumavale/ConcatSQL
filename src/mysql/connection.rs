@@ -105,9 +105,8 @@ impl MysqlConnection {
             Err(e) => return self.err("exec error", &e.to_string()),
         };
 
-        let mut pairs: Vec<(String, Option<String>)> = Vec::new();
-
         while let Some(result_set) = result.next_set() {
+            let mut pairs: Vec<(String, Option<String>)> = Vec::new();
             let result_set = match result_set {
                 Ok(result_set) => result_set,
                 Err(e) => return self.err("exec error", &e.to_string()),
@@ -125,9 +124,12 @@ impl MysqlConnection {
                     pairs.push((col.name_str().to_string(), row.get(i)));
                 }
             }
+
+            if !callback(&pairs) {
+                return self.err("exec error", "query aborted");
+            }
         }
 
-        callback(&pairs);
         Ok(())
     }
 
