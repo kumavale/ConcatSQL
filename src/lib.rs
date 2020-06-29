@@ -72,8 +72,10 @@ pub mod overwrite;
 pub mod value;
 
 #[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
 pub mod sqlite;
 #[cfg(feature = "mysql")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mysql")))]
 pub mod mysql;
 
 /// A typedef of the result returned by many methods.

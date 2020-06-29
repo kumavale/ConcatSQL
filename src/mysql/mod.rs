@@ -1,3 +1,3 @@
-//! `feature = "mysql"` Interface to [MySQL](https://www.mysql.com/) of OverwriteSQL.
+//! Interface to [MySQL](https://www.mysql.com/) of OverwriteSQL.
 
 mod connection;

@@ -1,4 +1,4 @@
-//! `feature = "sqlite"` Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
+//! Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
 
 use std::path::Path;
 use crate::Result;
@@ -8,8 +8,8 @@ mod connection;
 mod token;
 mod row;
 
-pub use self::row::Row;
-pub use self::connection::Connection;
+pub use self::row::SqliteRow;
+pub use self::connection::SqliteConnection;
 
 /// Open a read-write connection to a new or existing database.
 ///
@@ -27,14 +27,14 @@ pub use self::connection::Connection;
 /// let conn = owsql::sqlite::open(path).unwrap();
 /// ```
 #[inline]
-pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
-    Connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
+pub fn open<T: AsRef<Path>>(path: T) -> Result<SqliteConnection> {
+    SqliteConnection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
 }
 
 /// Open a readonly connection to a new or existing database.
 #[inline]
-pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Connection> {
-    Connection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
+pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<SqliteConnection> {
+    SqliteConnection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
 }
 
 /// Return the version number of SQLite.

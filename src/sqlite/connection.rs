@@ -14,10 +14,10 @@ use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
 use super::parser::{escape_for_allowlist, single_quotaion_escape};
-use super::row::Row;
+use super::row::SqliteRow;
 
-/// A database connection
-pub struct Connection {
+/// A database connection for SQLite.
+pub struct SqliteConnection {
     raw:                    NonNull<ffi::sqlite3>,
     allowlist:              HashSet<String>,
     serial_number:          RefCell<SerialNumber>,
@@ -27,25 +27,25 @@ pub struct Connection {
     pub(crate) error_level: OwsqlErrorLevel,
 }
 
-unsafe impl Send for Connection {}
-unsafe impl Sync for Connection {}
+unsafe impl Send for SqliteConnection {}
+unsafe impl Sync for SqliteConnection {}
 
-impl PartialEq for Connection {
+impl PartialEq for SqliteConnection {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
 
-impl fmt::Debug for Connection {
+impl fmt::Debug for SqliteConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Connection")
+        f.debug_struct("SqliteConnection")
             .field("raw", &self.raw)
             .field("error_level", &self.error_level)
             .finish()
     }
 }
 
-impl Connection {
+impl SqliteConnection {
     /// Open a read-write connection to a new or existing database.
     #[inline]
     pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Self> {
@@ -69,7 +69,7 @@ impl Connection {
 
         match open_result {
             ffi::SQLITE_OK =>
-                Ok(Connection {
+                Ok(SqliteConnection {
                     raw: unsafe { NonNull::new_unchecked(conn_ptr) },
                     allowlist:     HashSet::new(),
                     serial_number: RefCell::new(SerialNumber::default()),
@@ -205,11 +205,11 @@ impl Connection {
     /// }
     /// ```
     #[inline]
-    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
-        let mut rows: Vec<Row> = Vec::new();
+    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<SqliteRow>> {
+        let mut rows: Vec<SqliteRow> = Vec::new();
 
         self.iterate(query, |pairs| {
-            let mut row = Row::new();
+            let mut row = SqliteRow::new();
             for &(column, value) in pairs.iter() {
                 row.insert(column.to_string(), value.map(|v| v.to_string()));
             }
@@ -416,7 +416,7 @@ impl Connection {
     }
 
     /// You can set a different fixed value or a different length each time.  
-    /// The [ow method](./struct.Connection.html#method.ow) outputs a random number of about 32
+    /// The [ow method](./struct.SqliteConnection.html#method.ow) outputs a random number of about 32
     /// digits by default.  
     /// However, if a number less than 32 digits is entered, it will be set to 32 digits.  
     ///
@@ -469,7 +469,7 @@ impl Connection {
     }
 }
 
-impl Drop for Connection {
+impl Drop for SqliteConnection {
     fn drop(&mut self) {
         use std::thread;
 

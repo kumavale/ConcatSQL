@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 /// A single result row of a query.
 #[derive(Debug, PartialEq)]
-pub struct Row {
+pub struct SqliteRow {
     value: HashMap<String, Option<String>>,
 }
 
-impl Row {
+impl SqliteRow {
     #[inline]
     pub(crate) fn new() -> Self {
         Self { value: HashMap::new() }
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn row() {
-        let mut row = Row::new();
+        let mut row = SqliteRow::new();
         row.insert("key1".to_string(), Some("value".to_string()));
         row.insert("key2".to_string(), None);
         assert_eq!(row.get("key1"), Some("value"));

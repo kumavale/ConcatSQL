@@ -1,6 +1,6 @@
 use crate::Result;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
-use super::connection::Connection;
+use super::connection::SqliteConnection;
 use super::token::TokenType;
 
 #[inline]
@@ -40,7 +40,7 @@ pub(crate) fn single_quotaion_escape(s: &str) -> String {
     escaped
 }
 
-impl Connection {
+impl SqliteConnection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
         let err_msg = "invalid literal";
