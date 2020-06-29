@@ -66,6 +66,7 @@
 mod bidimap;
 mod serial;
 mod token;
+mod parser;
 pub mod error;
 pub mod constants;
 pub mod overwrite;

@@ -11,7 +11,7 @@ use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
-//use super::parser::{escape_for_allowlist, single_quotaion_escape};
+use crate::parser::{escape_for_allowlist, single_quotaion_escape};
 //use super::row::SqliteRow;
 
 /// A database connection for MySQL.
