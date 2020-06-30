@@ -422,22 +422,22 @@ impl MysqlConnection {
     }
 
     /// Sets the error level.  
-    /// Default is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release.  
-    /// Values can be changed only during debug build.
+    /// The default value is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Develop for debug builds and [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release for release builds.
     ///
     /// # Examples
     ///
     /// ```
     /// # use owsql::error::OwsqlErrorLevel;
     /// # let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-    /// conn.error_level(OwsqlErrorLevel::Develop);
+    /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     /// ```
     #[inline]
-    pub fn error_level(&mut self, level: OwsqlErrorLevel) {
-        // Values can be changed only during debug build
-        if cfg!(debug_assertions) {
-            self.error_level = level;
+    pub fn error_level(&mut self, level: OwsqlErrorLevel) -> Result<(), &str> {
+        if cfg!(not(debug_assertions)) && level == OwsqlErrorLevel::Debug {
+            return Err("OwsqlErrorLevel::Debug cannot be set during release build");
         }
+        self.error_level = level;
+        Ok(())
     }
 }
 

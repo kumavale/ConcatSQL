@@ -1,4 +1,5 @@
 #[cfg(feature = "mysql")]
+#[cfg(debug_assertions)]
 mod mysql {
     use owsql::params;
     use owsql::error::*;
@@ -287,17 +288,17 @@ mod mysql {
         use owsql::error::OwsqlErrorLevel;
 
         let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk);
-        conn.error_level(OwsqlErrorLevel::Release);
-        conn.error_level(OwsqlErrorLevel::Develop);
-        conn.error_level(OwsqlErrorLevel::Debug);
+        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
+        conn.error_level(OwsqlErrorLevel::Release).unwrap();
+        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
+        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
         let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk);
+        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -323,7 +324,7 @@ mod mysql {
     #[test]
     fn error_level_release() {
         let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.error_level(OwsqlErrorLevel::Release);
+        conn.error_level(OwsqlErrorLevel::Release).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -349,7 +350,7 @@ mod mysql {
     #[test]
     fn error_level_develop() {
         let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.error_level(OwsqlErrorLevel::Develop);
+        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -375,7 +376,7 @@ mod mysql {
     #[test]
     fn error_level_debug() {
         let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.error_level(OwsqlErrorLevel::Debug);
+        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -443,4 +444,20 @@ mod mysql {
         let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(conn.actual_sql(""), Ok("".to_string()));
     }
+}
+
+#[cfg(feature = "mysql")]
+#[cfg(not(debug_assertions))]
+mod mysql_release_build {
+    use owsql::error::*;
+
+    #[test]
+    fn error_level_debug_when_release_build() {
+        let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        assert_eq!(
+            conn.error_level(OwsqlErrorLevel::Debug),
+            Err("OwsqlErrorLevel::Debug cannot be set during release build")
+        );
+    }
+
 }

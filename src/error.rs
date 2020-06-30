@@ -51,7 +51,9 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(debug_assertions)]
     fn owsql_error() {
+        assert_eq!(OwsqlErrorLevel::default(), OwsqlErrorLevel::Develop);
         assert_eq!(OwsqlError::Message("test".to_string()).to_string(), "test");
         assert_eq!(OwsqlError::new("test").to_string(), "test");
         assert_eq!(OwsqlError::new("test".to_string()).to_string(), "test");

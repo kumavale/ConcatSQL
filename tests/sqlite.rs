@@ -1,5 +1,6 @@
 
 #[cfg(feature = "sqlite")]
+#[cfg(debug_assertions)]
 mod sqlite {
     use owsql::params;
     use owsql::error::*;
@@ -287,17 +288,17 @@ mod sqlite {
         use owsql::error::OwsqlErrorLevel;
 
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk);
-        conn.error_level(OwsqlErrorLevel::Release);
-        conn.error_level(OwsqlErrorLevel::Develop);
-        conn.error_level(OwsqlErrorLevel::Debug);
+        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
+        conn.error_level(OwsqlErrorLevel::Release).unwrap();
+        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
+        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk);
+        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -323,7 +324,7 @@ mod sqlite {
     #[test]
     fn error_level_release() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Release);
+        conn.error_level(OwsqlErrorLevel::Release).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -349,7 +350,7 @@ mod sqlite {
     #[test]
     fn error_level_develop() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Develop);
+        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -375,7 +376,7 @@ mod sqlite {
     #[test]
     fn error_level_debug() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Debug);
+        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
         let single_quote = conn.ow("'");
         conn.add_allowlist(params!["Alice"]);
         let name = conn.allowlist("Bob");
@@ -547,4 +548,20 @@ mod sqlite {
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }
     }
+}
+
+#[cfg(feature = "sqlite")]
+#[cfg(not(debug_assertions))]
+mod sqlite_release_build {
+    use owsql::error::*;
+
+    #[test]
+    fn error_level_debug_when_release_build() {
+        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        assert_eq!(
+            conn.error_level(OwsqlErrorLevel::Debug),
+            Err("OwsqlErrorLevel::Debug cannot be set during release build")
+        );
+    }
+
 }
