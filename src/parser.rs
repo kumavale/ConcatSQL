@@ -286,8 +286,21 @@ mod tests {
 
     #[test]
     #[cfg(features = "sqlite")]
-    fn check_valid_literals() {
+    fn check_valid_literals_sqlite() {
         let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(conn.check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
+        assert_eq!(conn.check_valid_literal("'O\"Reilly'"),    Ok(()));
+        assert_eq!(conn.check_valid_literal("'O''Reilly'"),    Ok(()));
+        assert_eq!(conn.check_valid_literal("\"O'Reilly\""),   Ok(()));
+        assert_eq!(conn.check_valid_literal("'Alice', 'Bob'"), Ok(()));
+    }
+
+    #[test]
+    #[cfg(features = "mysql")]
+    fn check_valid_literals_mysql() {
+        let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(conn.check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
         assert_eq!(conn.check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));

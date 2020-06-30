@@ -158,7 +158,7 @@ impl MysqlConnection {
 
             }
 
-            if !callback(&pairs) {
+            if !pairs.is_empty() && !callback(&pairs) {
                 return self.err("exec error", "query aborted");
             }
         }
