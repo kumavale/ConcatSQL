@@ -33,13 +33,15 @@ pub fn escape_html(input: &str) -> String {
     escaped
 }
 
-#[cfg(feature = "sqlite")]
 #[inline]
-pub fn single_quotaion_escape(s: &str) -> String {
+fn escape_string<F>(s: &str, is_escape_char: F) -> String
+where
+    F: Fn(char) -> bool,
+{
     let mut escaped = String::new();
     for c in s.chars() {
-        if c == '\'' {
-            escaped.push('\'');
+        if is_escape_char(c) {
+            escaped.push(c);
         }
         escaped.push(c);
     }
@@ -47,18 +49,16 @@ pub fn single_quotaion_escape(s: &str) -> String {
     escaped
 }
 
+#[cfg(feature = "sqlite")]
+#[inline]
+pub fn single_quotaion_escape(s: &str) -> String {
+    escape_string(&s, |c| c == '\'')
+}
+
 #[cfg(feature = "mysql")]
 #[inline]
 pub fn single_quotaion_and_backslash_escape(s: &str) -> String {
-    let mut escaped = String::new();
-    for c in s.chars() {
-        if c == '\'' || c == '\\' {
-            escaped.push(c);
-        }
-        escaped.push(c);
-    }
-    debug_assert!(!escaped.is_empty());
-    escaped
+    escape_string(&s, |c| c == '\'' || c == '\\')
 }
 
 pub struct Parser<'a> {
@@ -337,5 +337,13 @@ mod tests {
     fn consume_char() {
         let mut p = super::Parser::new("", &OwsqlErrorLevel::Debug);
         assert_eq!(p.consume_char(), Err(OwsqlError::Message("error: consume_char(): None".into())));
+    }
+
+    #[test]
+    fn escape_string() {
+        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\''),            "O''Reilly");
+        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\''),            "O\\''Reilly");
+        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\'' || c=='\\'), "O''Reilly");
+        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\'' || c=='\\'), "O\\\\''Reilly");
     }
 }
