@@ -33,12 +33,27 @@ pub fn escape_html(input: &str) -> String {
     escaped
 }
 
+#[cfg(feature = "sqlite")]
 #[inline]
 pub fn single_quotaion_escape(s: &str) -> String {
     let mut escaped = String::new();
     for c in s.chars() {
         if c == '\'' {
             escaped.push('\'');
+        }
+        escaped.push(c);
+    }
+    debug_assert!(!escaped.is_empty());
+    escaped
+}
+
+#[cfg(feature = "mysql")]
+#[inline]
+pub fn single_quotaion_and_backslash_escape(s: &str) -> String {
+    let mut escaped = String::new();
+    for c in s.chars() {
+        if c == '\'' || c == '\\' {
+            escaped.push(c);
         }
         escaped.push(c);
     }

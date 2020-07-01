@@ -274,7 +274,7 @@ impl MysqlConnection {
     /// Note that this can be XSS.
     #[inline]
     pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
-        let s = format!("'{}'", single_quotaion_escape(&value.to_string()));
+        let s = format!("'{}'", single_quotaion_and_backslash_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
         match result {
             Ok(_) => {
