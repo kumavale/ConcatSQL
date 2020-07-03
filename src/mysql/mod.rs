@@ -1,6 +1,5 @@
 //! Interface to [MySQL](https://www.mysql.com/) of OverwriteSQL.
 
-mod row;
 pub(crate) mod connection;
 
 use crate::Result;

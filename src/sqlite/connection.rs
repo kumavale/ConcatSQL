@@ -15,7 +15,7 @@ use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
 use crate::parser::{escape_for_allowlist, single_quotaion_escape};
-use super::row::SqliteRow;
+use crate::row::Row;
 
 /// A database connection for SQLite.
 pub struct SqliteConnection {
@@ -206,11 +206,11 @@ impl SqliteConnection {
     /// }
     /// ```
     #[inline]
-    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<SqliteRow>> {
-        let mut rows: Vec<SqliteRow> = Vec::new();
+    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
+        let mut rows: Vec<Row> = Vec::new();
 
         self.iterate(query, |pairs| {
-            let mut row = SqliteRow::new();
+            let mut row = Row::new();
             for &(column, value) in pairs.iter() {
                 row.insert(column.to_string(), value.map(|v| v.to_string()));
             }

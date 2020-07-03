@@ -3,10 +3,8 @@
 use std::path::Path;
 use crate::Result;
 
-mod row;
 pub(crate) mod connection;
 
-pub use self::row::SqliteRow;
 pub use self::connection::SqliteConnection;
 
 /// Open a read-write connection to a new or existing database.
