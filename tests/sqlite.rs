@@ -23,6 +23,35 @@ mod sqlite {
     }
 
     #[test]
+    fn static_strings() {
+        macro_rules! static_strings {(
+            $(
+                $var:ident = $($expr:expr),* $(,)? ;
+            )*
+        ) => (
+        $(
+            macro_rules! $var {() => (
+                concat!($( $expr, )* )
+            )}
+            #[allow(dead_code, non_upper_case_globals)]
+            const $var: &'static str = $var!();
+        )*
+        )}
+
+        let conn = owsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.ow(stmt());
+        conn.execute(&stmt).unwrap();
+        static_strings! {
+            select = "SELECT ";
+            cols   = "name ";
+            from   = "FROM ";
+            table  = "users";
+            sql = select!(), cols!(), from!(), table!();
+        }
+        assert_eq!(conn.actual_sql(&conn.ow(sql)), Ok("SELECT name FROM users ".into()));
+    }
+
+    #[test]
     fn execute() {
         let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
