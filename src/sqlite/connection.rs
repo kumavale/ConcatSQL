@@ -323,7 +323,7 @@ impl SqliteConnection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::params;
+    /// use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -354,7 +354,7 @@ impl SqliteConnection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::params;
+    /// use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
     /// assert!(conn.is_allowlist("Alice"));
@@ -375,12 +375,13 @@ impl SqliteConnection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::params;
+    /// use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
     #[inline]
     pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
+    //pub fn add_allowlist(&mut self, params: &[&(dyn ToString + Sync)]) {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.borrow_mut().insert(
