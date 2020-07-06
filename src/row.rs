@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// A single result row of a query.
 #[derive(Debug, PartialEq)]
@@ -21,6 +22,12 @@ impl Row {
     #[inline]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.value.get(key)?.as_deref()
+    }
+
+    /// Transforms and gets the columns of the result row.
+    #[inline]
+    pub fn get_into<T: FromStr>(&self, key: &str) -> Result<T,  <T as std::str::FromStr>::Err> {
+        T::from_str(self.value.get(key).unwrap_or(&None).as_deref().unwrap_or(""))
     }
 
     /// Return the number of columns.
@@ -46,12 +53,20 @@ mod tests {
         let mut row = Row::new();
         row.insert("key1".to_string(), Some("value".to_string()));
         row.insert("key2".to_string(), None);
+        row.insert("key3".to_string(), Some("42".to_string()));
         assert_eq!(row.get("key1"), Some("value"));
         assert_eq!(row.get("key1").unwrap(), "value");
         assert_eq!(row.get("key2"), None);
-        assert_eq!(row.get("key3"), None);
-        assert_eq!(row.column_count(), 2);
-        assert!(row.column_names() == vec!["key1", "key2"] || row.column_names() == vec!["key2", "key1"]);
+        assert_eq!(row.get("key3"), Some("42"));
+        assert_eq!(row.column_count(), 3);
+        assert_eq!(row.get_into::<String>("key1"), Ok(String::from("value")));
+        assert_eq!(row.get_into::<i32>("key3"), Ok(42));
+        assert_eq!(row.get_into::<usize>("key3"), Ok(42));
+        assert_eq!(row.get_into("key3"), Ok(42));
+        assert_eq!(row.get_into("key2"), Ok(String::new()));
+        assert_eq!(row.get_into("key1"), Ok(String::from("value")));
+        assert!(row.get_into::<u32>("key1").is_err());
+        assert!(row.get_into::<u32>("key2").is_err());
     }
 }
 
