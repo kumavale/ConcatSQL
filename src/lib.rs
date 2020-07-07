@@ -80,6 +80,9 @@ pub mod sqlite;
 #[cfg(feature = "mysql")]
 #[cfg_attr(docsrs, doc(cfg(feature = "mysql")))]
 pub mod mysql;
+#[cfg(feature = "postgres")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
+pub mod postgres;
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;

@@ -10,6 +10,7 @@ edition = "2018"
 [features]
 sqlite = ["sqlite3-sys/linkage"]
 mysql = ["mysql-sys"]
+postgres = ["postgres-sys"]
 
 
 [dependencies]
@@ -23,6 +24,11 @@ optional = true
 [dependencies.mysql-sys]
 package = "mysql"
 version = "18.2"
+optional = true
+
+[dependencies.postgres-sys]
+package = "postgres"
+version = "0.17"
 optional = true
 
 [dev-dependencies]
