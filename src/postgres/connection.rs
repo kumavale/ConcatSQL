@@ -163,6 +163,37 @@ impl PostgreSQLConnection {
         Ok(())
     }
 
+    /// Execute a statement and returns the rows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT name FROM users;"#);
+    /// let rows = conn.rows(&sql).unwrap();
+    /// for row in rows.iter() {
+    ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
+    /// }
+    /// ```
+    #[inline]
+    pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
+        let mut rows: Vec<Row> = Vec::new();
+
+        self.iterate(query, |pairs| {
+            let mut row = Row::new();
+            for (column, value) in pairs.iter() {
+                row.insert(column.to_string(), value.as_ref().map(|v| v.to_string()));
+            }
+            rows.push(row);
+            true
+        })?;
+
+        Ok(rows)
+    }
 
     /// Return the overwrite definition string.  
     /// All strings assembled without using this method are escaped.  

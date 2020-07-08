@@ -76,4 +76,31 @@ mod postgres {
             true
         }).unwrap();
     }
+
+    #[test]
+    fn rows() {
+        let conn = owsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
+        conn.execute(&conn.ow(stmt())).unwrap();
+
+        let sql = conn.ow("SELECT * FROM users;");
+
+        let rows = conn.rows(&sql).unwrap();
+        for (i, row) in rows.iter().enumerate() {
+            assert_eq!(row.get("name").unwrap(), expects[i].0);
+            assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
+        }
+    }
+
+    #[test]
+    fn rows_foreach() {
+        let conn = owsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
+        conn.execute(&conn.ow(stmt())).unwrap();
+
+        conn.rows(&conn.ow("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+            assert_eq!(row.get("name").unwrap(), expects[i].0);
+            assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
+        });
+    }
 }
