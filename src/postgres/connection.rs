@@ -363,6 +363,79 @@ impl PostgreSQLConnection {
             );
         }
     }
+
+    /// It is guaranteed to be a signed 64-bit integer without quotation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// conn.int(42);              // ok
+    /// conn.int("42");            // ok
+    /// conn.int("42 or 1=1; --"); // error
+    /// ```
+    #[inline]
+    pub fn int<T: Clone + ToString>(&self, value: T) -> String {
+        let value = value.to_string();
+        if value.parse::<i64>().is_ok() {
+            if !self.overwrite.borrow_mut().contain(&value) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.overwrite.borrow_mut().insert(value.to_string(), overwrite);
+            }
+            format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
+        } else {
+            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+        }
+    }
+
+    /// You can set a different fixed value or a different length each time.  
+    /// The [ow method](./struct.PostgreSQLConnection.html#method.ow) outputs a random number of about 32
+    /// digits by default.  
+    /// However, if a number less than 32 digits is entered, it will be set to 32 digits.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// conn.set_ow_len(42);       // 42
+    /// conn.set_ow_len(50..100);  // 50-99
+    /// conn.set_ow_len(50..=100); // 50-100
+    /// ```
+    #[inline]
+    pub fn set_ow_len<T: 'static + IntoInner>(&mut self, range: T) {
+        self.ow_len_range = {
+            let range = range.into_inner();
+            let range0 = if range.0 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.0 };
+            let range1 = if range.1 < OW_MINIMUM_LENGTH { OW_MINIMUM_LENGTH } else { range.1 };
+            (range0, range1)
+        };
+    }
+
+    /// Sets the error level.  
+    /// The default value is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Develop for debug builds and [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release for release builds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::error::OwsqlErrorLevel;
+    /// # let mut conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
+    /// ```
+    #[inline]
+    pub fn error_level(&mut self, level: OwsqlErrorLevel) -> Result<(), &str> {
+        if cfg!(not(debug_assertions)) && level == OwsqlErrorLevel::Debug {
+            return Err("OwsqlErrorLevel::Debug cannot be set during release build");
+        }
+        self.error_level = level;
+        Ok(())
+    }
 }
 
 impl OwsqlConn for crate::postgres::PostgreSQLConnection {
