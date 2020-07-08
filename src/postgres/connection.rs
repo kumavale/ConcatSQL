@@ -95,6 +95,75 @@ impl PostgreSQLConnection {
         }
     }
 
+    /// Execute a statement and process the resulting rows as plain text.
+    ///
+    /// The callback is triggered for each row. If the callback returns `false`,
+    /// no more rows will be processed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.iterate(&sql, |pairs| {
+    ///     for (column, value) in pairs {
+    ///         println!("{} = {}", column, value.as_ref().unwrap());
+    ///     }
+    ///     true
+    /// }).unwrap();
+    /// ```
+    #[inline]
+    pub fn iterate<T: AsRef<str>, F>(&self, query: T, mut callback: F) -> Result<()>
+        where
+            F: FnMut(&[(String, Option<String>)]) -> bool,
+    {
+        let query = match self.convert_to_valid_syntax(query.as_ref()) {
+            Ok(query) => query,
+            Err(e) => if self.error_level == OwsqlErrorLevel::AlwaysOk {
+                return Ok(());
+            } else {
+                return Err(e);
+            },
+        };
+
+        let mut conn = self.conn.borrow_mut();
+        let statement = match conn.prepare(&query) {
+            Ok(stmt) => stmt,
+            Err(e) => return self.err("exec error", &e.to_string()),
+        };
+
+        let rows = match conn.query(&statement, &[]) {
+            Ok(result) => result,
+            Err(e) => return self.err("exec error", &e.to_string()),
+        };
+
+        let mut pairs = Vec::new();
+        for row in rows {
+            for col in row.columns() {
+                //pairs.push((col.name().to_string(), row.try_get::<&str, String>(col.name()).ok()));
+                let value = if let Ok(v) = row.try_get::<&str, String>(col.name()) {
+                    Some(v)
+                } else if let Ok(v) = row.try_get::<&str, i32>(col.name()) {
+                    Some(v.to_string())
+                } else {
+                    None
+                };
+
+                pairs.push((col.name().to_string(), value));
+            }
+        }
+        if !pairs.is_empty() && !callback(&pairs) {
+            return self.err("exec error", "query aborted");
+        }
+
+        Ok(())
+    }
+
+
     /// Return the overwrite definition string.  
     /// All strings assembled without using this method are escaped.  
     /// This method does not sanitize.  
