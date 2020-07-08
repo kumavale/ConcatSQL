@@ -290,6 +290,79 @@ impl PostgreSQLConnection {
             },
         }
     }
+
+    /// Return the overwrite definition string in allowlist.  
+    /// Returns the escaped string.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob"]);
+    /// let input = "Alice OR 1=1; --";
+    /// let sql = conn.ow("SELECT * FROM users WHERE name = ") + &conn.allowlist(input);
+    ///
+    /// assert!(conn.execute(sql).is_err());
+    /// ```
+    #[inline]
+    pub fn allowlist<T: Clone + ToString>(&self, value: T) -> String {
+        if self.is_allowlist(value.clone()) {
+            format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
+        } else {
+            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            if !self.error_msg.borrow_mut().contain(&e) {
+                let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+            }
+            format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+        }
+    }
+
+    /// Checks if the value is within the allowlist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// conn.add_allowlist(params!["Alice", "Bob", 42, 123]);
+    /// assert!(conn.is_allowlist("Alice"));
+    /// assert!(!conn.is_allowlist("'Alice'"));
+    /// assert!(conn.is_allowlist(42));
+    /// assert!(conn.is_allowlist("42"));
+    /// assert!(!conn.is_allowlist("'42'"));
+    /// ```
+    #[inline]
+    pub fn is_allowlist<T: ToString>(&self, value: T) -> bool {
+        self.allowlist.contains(&value.to_string())
+    }
+
+    /// Register it in self.overwrite after performing character string escape processing with
+    /// single quotation added to both sides.  
+    /// Use [params macro](../macro.params.html).  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::params;
+    /// # let mut conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
+    /// ```
+    #[inline]
+    pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
+        for value in params {
+            self.allowlist.insert(value.to_string());
+            self.overwrite.borrow_mut().insert(
+                escape_for_allowlist(&value.to_string()),
+                overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range)
+            );
+        }
+    }
 }
 
 impl OwsqlConn for crate::postgres::PostgreSQLConnection {
