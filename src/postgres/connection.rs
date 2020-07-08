@@ -195,6 +195,27 @@ impl PostgreSQLConnection {
         Ok(rows)
     }
 
+    /// Return the actual SQL statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::error::OwsqlError;
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// let select = conn.ow("SELECT");
+    /// let oreilly = conn.ow("O'Reilly");
+    /// let oreilly_unhtmlescape = unsafe { conn.ow_without_html_escape("O'Reilly") };
+    /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
+    /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
+    /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
+    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+    /// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
+    /// ```
+    #[inline]
+    pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
+        self.convert_to_valid_syntax(query.as_ref())
+    }
+
     /// Return the overwrite definition string.  
     /// All strings assembled without using this method are escaped.  
     /// This method does not sanitize.  
@@ -223,6 +244,34 @@ impl PostgreSQLConnection {
     #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
+        let result = self.check_valid_literal(&s);
+        match result {
+            Ok(_) => {
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
+            },
+            Err(e) => {
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+            },
+        }
+    }
+
+    /// Return the overwrite definition string without HTML escape.  
+    ///
+    /// # Safety
+    ///
+    /// This is an unsafe method!! => I am considering whether to use the unsafe keyword :(  
+    /// Note that this can be XSS.
+    #[inline]
+    pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
+        let s = format!("'{}'", single_quotaion_and_backslash_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
         match result {
             Ok(_) => {

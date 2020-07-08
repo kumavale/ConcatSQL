@@ -56,8 +56,7 @@ where
 pub fn single_quotaion_escape(s: &str) -> String {
     escape_string(&s, |c| c == '\'')
 }
-
-#[cfg(feature = "mysql")]
+#[cfg(any(feature = "mysql", feature = "postgres"))]
 #[inline]
 pub fn single_quotaion_and_backslash_escape(s: &str) -> String {
     escape_string(&s, |c| c == '\'' || c == '\\')
