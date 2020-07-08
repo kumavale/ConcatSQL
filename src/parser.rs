@@ -8,6 +8,8 @@ use crate::token::TokenType;
 use crate::sqlite::connection::SqliteConnection;
 #[cfg(feature = "mysql")]
 use crate::mysql::connection::MysqlConnection;
+#[cfg(feature = "postgres")]
+use crate::postgres::connection::PostgreSQLConnection;
 
 #[inline]
 pub fn escape_for_allowlist(value: &str) -> String {
@@ -283,6 +285,19 @@ impl SqliteConnection {
 
 #[cfg(feature = "mysql")]
 impl MysqlConnection {
+    #[inline]
+    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
+        check_valid_literal(self, &s, &self.error_level)
+    }
+
+    #[inline]
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
+        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl PostgreSQLConnection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
         check_valid_literal(self, &s, &self.error_level)

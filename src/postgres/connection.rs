@@ -64,4 +64,93 @@ impl PostgreSQLConnection {
             //error_level:   dbg!(OwsqlErrorLevel::Debug), // for develop
         })
     }
+
+    /// Execute a statement without processing the resulting rows if any.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TEMPORARY TABLE users (name TEXT, id INTEGER);
+    /// #                       INSERT INTO users (name, id) VALUES ('Alice', 42);
+    /// #                       INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let sql = conn.ow(r#"SELECT * FROM users;"#);
+    /// conn.execute(&sql).unwrap();
+    /// ```
+    #[inline]
+    pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
+        let query = match self.convert_to_valid_syntax(query.as_ref()) {
+            Ok(query) => query,
+            Err(e) => if self.error_level == OwsqlErrorLevel::AlwaysOk {
+                return Ok(());
+            } else {
+                return Err(e);
+            },
+        };
+
+        match self.conn.borrow_mut().batch_execute(&query) {
+            Ok(_) => Ok(()),
+            Err(e) => self.err("exec error", &e.to_string()),
+        }
+    }
+
+    /// Return the overwrite definition string.  
+    /// All strings assembled without using this method are escaped.  
+    /// This method does not sanitize.  
+    /// A string containing incomplete quotes like the one below will result in an error.  
+    ///
+    /// # Errors
+    ///
+    /// ```rust
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// # let name = "bar";
+    /// conn.ow("where name = 'foo' OR name = '") + name + &conn.ow("';");
+    /// # /*
+    ///                                       ^                      ^
+    /// # */
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let conn = owsql::postgres::open("host=localhost user=postgres password=postgres").unwrap();
+    /// let sql = conn.ow("SELECT");
+    ///
+    /// assert_eq!(sql, conn.ow("SELECT"));
+    /// assert_ne!(sql, "SELECT");
+    /// ```
+    #[inline]
+    pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
+        let s = s.to_string();
+        let result = self.check_valid_literal(&s);
+        match result {
+            Ok(_) => {
+                if !self.overwrite.borrow_mut().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
+                format!(" {} ", self.overwrite.borrow_mut().get(&s).unwrap())
+            },
+            Err(e) => {
+                if !self.error_msg.borrow_mut().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
+                format!(" {} ", self.error_msg.borrow_mut().get(&e).unwrap())
+            },
+        }
+    }
+}
+
+impl OwsqlConn for crate::postgres::PostgreSQLConnection {
+    #[inline]
+    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
+        match self.error_level {
+            OwsqlErrorLevel::AlwaysOk => Ok(()),
+            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
+            OwsqlErrorLevel::Develop  => Err(OwsqlError::new(&err_msg)),
+            OwsqlErrorLevel::Debug    => Err(OwsqlError::new(&format!("{}: {}", err_msg, detail_msg))),
+        }
+    }
 }
