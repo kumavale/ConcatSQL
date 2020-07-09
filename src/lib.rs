@@ -110,9 +110,9 @@ macro_rules! params {
 }
 
 pub(crate) trait OwsqlConn {
-    fn db_type(&self) -> crate::connection::DBType;
     fn _execute(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel) -> Result<()>;
     fn _iterate(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+    fn literal_escape(&self, s: &str) -> String;
 }
 

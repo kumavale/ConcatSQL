@@ -12,12 +12,6 @@ use crate::serial::SerialNumber;
 use crate::parser::*;
 use crate::row::Row;
 
-pub(crate) enum DBType {
-    Sqlite,
-    Mysql,
-    Postgresql,
-}
-
 /// A database connection.
 pub struct Connection {
     pub(crate) conn:          Box<dyn OwsqlConn>,
@@ -204,10 +198,7 @@ impl Connection {
     /// Note that this can be XSS.
     #[inline]
     pub unsafe fn ow_without_html_escape<T: Clone + ToString>(&self, value: T) -> String {
-        let s = match self.conn.db_type() {
-            DBType::Sqlite => format!("'{}'", single_quotaion_escape(&value.to_string())),
-            _ => format!("'{}'", single_quotaion_and_backslash_escape(&value.to_string())),
-        };
+        let s = format!("'{}'", self.conn.literal_escape(&value.to_string()));
         let result = self.check_valid_literal(&s);
         match result {
             Ok(_) => {

@@ -29,7 +29,7 @@ pub fn escape_html(input: &str) -> String {
 }
 
 #[inline]
-fn escape_string<F>(s: &str, is_escape_char: F) -> String
+pub(crate) fn escape_string<F>(s: &str, is_escape_char: F) -> String
 where
     F: Fn(char) -> bool,
 {
@@ -42,17 +42,6 @@ where
     }
     debug_assert!(!escaped.is_empty());
     escaped
-}
-
-#[cfg(feature = "sqlite")]
-#[inline]
-pub fn single_quotaion_escape(s: &str) -> String {
-    escape_string(&s, |c| c == '\'')
-}
-#[cfg(any(feature = "mysql", feature = "postgres"))]
-#[inline]
-pub fn single_quotaion_and_backslash_escape(s: &str) -> String {
-    escape_string(&s, |c| c == '\'' || c == '\\')
 }
 
 pub struct Parser<'a> {
