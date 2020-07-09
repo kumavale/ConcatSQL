@@ -119,7 +119,7 @@ impl Connection {
         self.iterate(query, |pairs| {
             let mut row = Row::new();
             for (column, value) in pairs.iter() {
-                row.insert(column.to_string(), value.as_ref().map(|v| v.to_string()));
+                row.insert((*column).to_string(), value.map(|v| v.to_string()));
             }
             rows.push(row);
             true

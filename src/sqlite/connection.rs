@@ -89,7 +89,7 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
     }
 
     fn _iterate<'a>(&self, query: Result<String>, error_level: &OwsqlErrorLevel,
-        callback: &mut FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
+        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = match query {
             Ok(query) => query,
@@ -105,7 +105,7 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
-        type F<'a> = &'a mut FnMut(&[(&str, Option<&str>)]) -> bool;
+        type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&str>)]) -> bool;
 
         unsafe {
             ffi::sqlite3_exec(
@@ -148,7 +148,7 @@ extern "C" fn process_callback(
     columns: *mut *mut i8,
 ) -> i32
 {
-    type F<'a> = &'a mut FnMut(&[(&str, Option<&str>)]) -> bool;
+    type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&str>)]) -> bool;
     let mut pairs = Vec::with_capacity(count as usize);
     for i in 0..(count as isize) {
         let column = {
@@ -185,8 +185,8 @@ mod tests {
         let dir = Directory::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         assert_ne!(crate::sqlite::open(""), crate::sqlite::open(""));
-        assert_eq!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
-        assert_eq!(crate::sqlite::open(&path), crate::sqlite::open(&path));
+        assert_ne!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
+        assert_ne!(crate::sqlite::open(&path), crate::sqlite::open(&path));
         assert_eq!(
             crate::sqlite::open("foo\0bar"),
             Err(OwsqlError::Message("invalid path: foo\u{0}bar".into()))

@@ -59,7 +59,7 @@ impl OwsqlConn for RefCell<mysql::Conn> {
     }
 
     fn _iterate(&self, query: Result<String>, error_level: &OwsqlErrorLevel,
-        callback: &mut FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
+        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = match query {
             Ok(query) => query,

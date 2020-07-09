@@ -113,6 +113,6 @@ pub(crate) trait OwsqlConn {
     fn db_type(&self) -> crate::connection::DBType;
     fn _execute(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel) -> Result<()>;
     fn _iterate(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel,
-        callback: &mut FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
 }
 
