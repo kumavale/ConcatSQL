@@ -50,7 +50,7 @@ impl PostgreSQLConnection {
     pub fn open(params: &str) -> Result<Self> {
         let conn = match Client::connect(&params, NoTls) {
             Ok(conn) => conn,
-            Err(e) => return Err(OwsqlError::new(format!("failed to open: {}", e))),
+            Err(e) => return Err(OwsqlError::Message(format!("failed to open: {}", e))),
         };
 
         Ok(PostgreSQLConnection {
@@ -91,7 +91,7 @@ impl PostgreSQLConnection {
 
         match self.conn.borrow_mut().batch_execute(&query) {
             Ok(_) => Ok(()),
-            Err(e) => self.err("exec error", &e.to_string()),
+            Err(e) => OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
         }
     }
 
@@ -133,12 +133,12 @@ impl PostgreSQLConnection {
         let mut conn = self.conn.borrow_mut();
         let statement = match conn.prepare(&query) {
             Ok(stmt) => stmt,
-            Err(e) => return self.err("exec error", &e.to_string()),
+            Err(e) => return OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
         };
 
         let rows = match conn.query(&statement, &[]) {
             Ok(result) => result,
-            Err(e) => return self.err("exec error", &e.to_string()),
+            Err(e) => return OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
         };
 
         let mut pairs = Vec::new();
@@ -157,7 +157,7 @@ impl PostgreSQLConnection {
             }
         }
         if !pairs.is_empty() && !callback(&pairs) {
-            return self.err("exec error", "query aborted");
+            return OwsqlError::new(&self.error_level, "exec error", "query aborted");
         }
 
         Ok(())
@@ -314,7 +314,7 @@ impl PostgreSQLConnection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -385,7 +385,7 @@ impl PostgreSQLConnection {
             }
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
-            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "non integer", &value).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -438,14 +438,5 @@ impl PostgreSQLConnection {
     }
 }
 
-impl OwsqlConn for crate::postgres::PostgreSQLConnection {
-    #[inline]
-    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
-        match self.error_level {
-            OwsqlErrorLevel::AlwaysOk => Ok(()),
-            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
-            OwsqlErrorLevel::Develop  => Err(OwsqlError::new(&err_msg)),
-            OwsqlErrorLevel::Debug    => Err(OwsqlError::new(&format!("{}: {}", err_msg, detail_msg))),
-        }
-    }
-}
+impl OwsqlConn for crate::postgres::PostgreSQLConnection {}
+

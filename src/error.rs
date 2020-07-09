@@ -32,8 +32,13 @@ impl Default for OwsqlErrorLevel {
 }
 
 impl OwsqlError {
-    pub(crate) fn new<T: Clone + ToString>(msg: T) -> Self {
-        OwsqlError::Message(msg.to_string())
+    pub(crate) fn new(error_level: &OwsqlErrorLevel, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
+        match error_level {
+            OwsqlErrorLevel::AlwaysOk => Ok(()),
+            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
+            OwsqlErrorLevel::Develop  => Err(OwsqlError::Message(err_msg.to_string())),
+            OwsqlErrorLevel::Debug    => Err(OwsqlError::Message(format!("{}: {}", err_msg, detail_msg))),
+        }
     }
 }
 
@@ -55,9 +60,18 @@ mod tests {
     fn owsql_error() {
         assert_eq!(OwsqlErrorLevel::default(), OwsqlErrorLevel::Develop);
         assert_eq!(OwsqlError::Message("test".to_string()).to_string(), "test");
-        assert_eq!(OwsqlError::new("test").to_string(), "test");
-        assert_eq!(OwsqlError::new("test".to_string()).to_string(), "test");
-        assert_eq!(OwsqlError::new(42).to_string(), "42");
+        assert_eq!(
+            OwsqlError::new(&OwsqlErrorLevel::AlwaysOk, "test", "test"),
+            Ok(()));
+        assert_eq!(
+            OwsqlError::new(&OwsqlErrorLevel::Release,  "test", "test"),
+            Err(OwsqlError::AnyError));
+        assert_eq!(
+            OwsqlError::new(&OwsqlErrorLevel::Develop,  "test", "test"),
+            Err(OwsqlError::Message("test".into())));
+        assert_eq!(
+            OwsqlError::new(&OwsqlErrorLevel::Debug,    "test", "test"),
+            Err(OwsqlError::Message("test: test".into())));
     }
 }
 

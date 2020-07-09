@@ -1,5 +1,4 @@
 use crate::Result;
-use crate::OwsqlConn;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::bidimap::BidiMap;
 use crate::token::TokenType;
@@ -85,8 +84,8 @@ impl<'a> Parser<'a> {
         self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop  => OwsqlError::new("error: next_char()"),
-            OwsqlErrorLevel::Debug    => OwsqlError::new("error: next_char(): None"),
+            OwsqlErrorLevel::Develop  => OwsqlError::Message("error: next_char()".to_string()),
+            OwsqlErrorLevel::Debug    => OwsqlError::Message("error: next_char(): None".to_string()),
         })
     }
 
@@ -111,8 +110,8 @@ impl<'a> Parser<'a> {
             Err( match self.error_level {
                 OwsqlErrorLevel::AlwaysOk |
                 OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop  => OwsqlError::new("error: consume_except_whitespace()"),
-                OwsqlErrorLevel::Debug    => OwsqlError::new("error: consume_except_whitespace(): empty"),
+                OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_except_whitespace()".to_string()),
+                OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_except_whitespace(): empty".to_string()),
             })
         } else {
             Ok(s)
@@ -136,8 +135,8 @@ impl<'a> Parser<'a> {
         Err( match self.error_level {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop  => OwsqlError::new("endless"),
-            OwsqlErrorLevel::Debug    => OwsqlError::new(format!("endless: {}", s)),
+            OwsqlErrorLevel::Develop  => OwsqlError::Message("endless".to_string()),
+            OwsqlErrorLevel::Debug    => OwsqlError::Message(format!("endless: {}", s)),
         })
     }
 
@@ -153,8 +152,8 @@ impl<'a> Parser<'a> {
             Err( match self.error_level {
                 OwsqlErrorLevel::AlwaysOk |
                 OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop  => OwsqlError::new("error: consume_while()"),
-                OwsqlErrorLevel::Debug    => OwsqlError::new("error: consume_while(): empty"),
+                OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_while()".to_string()),
+                OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_while(): empty".to_string()),
             })
         } else {
             Ok(s)
@@ -166,8 +165,8 @@ impl<'a> Parser<'a> {
         let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::new("error: consume_char()"),
-            OwsqlErrorLevel::Debug   => OwsqlError::new("error: consume_char(): None"),
+            OwsqlErrorLevel::Develop => OwsqlError::Message("error: consume_char()".to_string()),
+            OwsqlErrorLevel::Debug   => OwsqlError::Message("error: consume_char(): None".to_string()),
         })?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
@@ -176,17 +175,17 @@ impl<'a> Parser<'a> {
 }
 
 #[inline]
-fn check_valid_literal<T: OwsqlConn>(conn: &T, s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
+fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s, &error_level);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'').ok();
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
-                return conn.err(err_msg, &s);
+                return OwsqlError::new(error_level, err_msg, &s);
             },
             Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return conn.err(err_msg, &s);
+                return OwsqlError::new(error_level, err_msg, &s);
             },
             _other => (), // Do nothing
         }
@@ -273,7 +272,7 @@ fn tokenize(
 impl SqliteConnection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(self, &s, &self.error_level)
+        check_valid_literal(&s, &self.error_level)
     }
 
     #[inline]
@@ -286,7 +285,7 @@ impl SqliteConnection {
 impl MysqlConnection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(self, &s, &self.error_level)
+        check_valid_literal(&s, &self.error_level)
     }
 
     #[inline]
@@ -299,7 +298,7 @@ impl MysqlConnection {
 impl PostgreSQLConnection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(self, &s, &self.error_level)
+        check_valid_literal(&s, &self.error_level)
     }
 
     #[inline]

@@ -49,12 +49,12 @@ impl MysqlConnection {
     pub fn open(url: &str) -> Result<Self> {
         let opts = match Opts::from_url(&url) {
             Ok(opts) => opts,
-            Err(e) => return Err(OwsqlError::new(format!("failed to open: {}", e))),
+            Err(e) => return Err(OwsqlError::Message(format!("failed to open: {}", e))),
         };
 
         let conn = match Conn::new(opts) {
             Ok(conn) => conn,
-            Err(e) => return Err(OwsqlError::new(format!("failed to open: {}", e))),
+            Err(e) => return Err(OwsqlError::Message(format!("failed to open: {}", e))),
         };
 
         Ok(MysqlConnection {
@@ -94,7 +94,7 @@ impl MysqlConnection {
 
         match self.conn.borrow_mut().query_drop(&query) {
             Ok(_) => Ok(()),
-            Err(e) => self.err("exec error", &e.to_string()),
+            Err(e) => OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
         }
     }
 
@@ -136,20 +136,20 @@ impl MysqlConnection {
         let mut conn = self.conn.borrow_mut();
         let mut result = match conn.query_iter(&query) {
             Ok(result) => result,
-            Err(e) => return self.err("exec error", &e.to_string()),
+            Err(e) => return OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
         };
 
         while let Some(result_set) = result.next_set() {
             let result_set = match result_set {
                 Ok(result_set) => result_set,
-                Err(e) => return self.err("exec error", &e.to_string()),
+                Err(e) => return OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
             };
             let mut pairs = Vec::with_capacity(result_set.affected_rows() as usize);
 
             for row in result_set {
                 let row = match row {
                     Ok(row) => row,
-                    Err(e) => return self.err("exec error", &e.to_string()),
+                    Err(e) => return OwsqlError::new(&self.error_level, "exec error", &e.to_string()),
                 };
 
                 for (i, col) in row.columns().iter().enumerate() {
@@ -159,7 +159,7 @@ impl MysqlConnection {
             }
 
             if !pairs.is_empty() && !callback(&pairs) {
-                return self.err("exec error", "query aborted");
+                return OwsqlError::new(&self.error_level, "exec error", "query aborted");
             }
         }
 
@@ -317,7 +317,7 @@ impl MysqlConnection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -388,7 +388,7 @@ impl MysqlConnection {
             }
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
-            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "non integer", &value).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -441,15 +441,5 @@ impl MysqlConnection {
     }
 }
 
-impl OwsqlConn for crate::mysql::MysqlConnection {
-    #[inline]
-    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
-        match self.error_level {
-            OwsqlErrorLevel::AlwaysOk => Ok(()),
-            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
-            OwsqlErrorLevel::Develop  => Err(OwsqlError::new(&err_msg)),
-            OwsqlErrorLevel::Debug    => Err(OwsqlError::new(&format!("{}: {}", err_msg, detail_msg))),
-        }
-    }
-}
+impl OwsqlConn for crate::mysql::MysqlConnection {}
 

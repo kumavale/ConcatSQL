@@ -55,10 +55,10 @@ impl SqliteConnection {
             Some(path) => {
                 match CString::new(path) {
                     Ok(string) => string,
-                    _ => return Err(OwsqlError::new(format!("invalid path: {}", path))),
+                    _ => return Err(OwsqlError::Message(format!("invalid path: {}", path))),
                 }
             },
-            _ => return Err(OwsqlError::new(format!("failed to open path: {:?}", path.as_ref()))),
+            _ => return Err(OwsqlError::Message(format!("failed to open path: {:?}", path.as_ref()))),
         };
         let mut conn_ptr = ptr::null_mut();
 
@@ -80,7 +80,7 @@ impl SqliteConnection {
                     error_msg:     RefCell::new(BidiMap::new()),
                     error_level:   OwsqlErrorLevel::default(),
                 }),
-            _ => Err(OwsqlError::new("failed to connect")),
+            _ => Err(OwsqlError::Message("failed to connect".into())),
         }
     }
 
@@ -109,7 +109,7 @@ impl SqliteConnection {
         }.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return self.err("invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return OwsqlError::new(&self.error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -126,7 +126,7 @@ impl SqliteConnection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            self.err("exec error",
+            OwsqlError::new(&self.error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.raw.as_ptr())).to_string_lossy().into_owned() })
         }
     }
@@ -167,7 +167,7 @@ impl SqliteConnection {
         }.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return self.err("invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return OwsqlError::new(&self.error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -185,7 +185,7 @@ impl SqliteConnection {
         if err_msg.is_null() {
             Ok(())
         } else {
-            self.err("exec error",
+            OwsqlError::new(&self.error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.raw.as_ptr())).to_string_lossy().into_owned() })
         }
     }
@@ -341,7 +341,7 @@ impl SqliteConnection {
         if self.is_allowlist(value.clone()) {
             format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
         } else {
-            let e = self.err("deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -413,7 +413,7 @@ impl SqliteConnection {
             }
             format!(" {} ", self.overwrite.borrow_mut().get(&value).unwrap())
         } else {
-            let e = self.err("non integer", &value).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "non integer", &value).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -466,17 +466,7 @@ impl SqliteConnection {
     }
 }
 
-impl OwsqlConn for crate::sqlite::SqliteConnection {
-    #[inline]
-    fn err(&self, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
-        match self.error_level {
-            OwsqlErrorLevel::AlwaysOk => Ok(()),
-            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
-            OwsqlErrorLevel::Develop  => Err(OwsqlError::new(&err_msg)),
-            OwsqlErrorLevel::Debug    => Err(OwsqlError::new(&format!("{}: {}", err_msg, detail_msg))),
-        }
-    }
-}
+impl OwsqlConn for crate::sqlite::SqliteConnection {}
 
 impl Drop for SqliteConnection {
     fn drop(&mut self) {
@@ -540,7 +530,7 @@ mod tests {
         assert_ne!(crate::sqlite::open("/tmp/tmp.db"), crate::sqlite::open("/tmp/tmp.db"));
         assert_eq!(
             crate::sqlite::open("foo\0bar"),
-            Err(OwsqlError::new("invalid path: foo\u{0}bar"))
+            Err(OwsqlError::Message("invalid path: foo\u{0}bar".into()))
         );
     }
 
@@ -550,11 +540,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.execute("\0"),
-            Err(OwsqlError::new("invalid query")),
+            Err(OwsqlError::Message("invalid query".into())),
         );
         assert_eq!(
             conn.execute("invalid query"),
-            Err(OwsqlError::new("exec error")),
+            Err(OwsqlError::Message("exec error".into())),
         );
     }
 
@@ -564,11 +554,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.iterate("\0", |_| { unreachable!(); }),
-            Err(OwsqlError::new("invalid query")),
+            Err(OwsqlError::Message("invalid query".into())),
         );
         assert_eq!(
             conn.iterate("invalid query", |_| { unreachable!(); }),
-            Err(OwsqlError::new("exec error")),
+            Err(OwsqlError::Message("exec error".into())),
         );
     }
 
@@ -625,15 +615,15 @@ mod tests {
         let allow = conn.allowlist("Alice");
         assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
         assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
-        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::new("invalid literal")));
+        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".into())));
         assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
-        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
         let oreilly = conn.ow("O''Reilly");
         assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
         let oreilly = conn.ow("\"O'Reilly\"");
         assert_eq!(conn.actual_sql(&oreilly), Ok("\"O'Reilly\" ".to_string()));
         conn.add_allowlist(params!["Alice"]);
-        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::new("deny value")));
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
         let allow = conn.allowlist("Alice");
         assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
     }
