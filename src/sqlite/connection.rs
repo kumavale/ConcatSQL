@@ -41,6 +41,7 @@ impl fmt::Debug for SqliteConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SqliteConnection")
             .field("raw", &self.raw)
+            .field("ow_len_range", &self.ow_len_range)
             .field("error_level", &self.error_level)
             .finish()
     }

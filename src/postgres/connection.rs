@@ -38,6 +38,7 @@ impl fmt::Debug for PostgreSQLConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PostgreSQLConnection")
             .field("params", &self.params)
+            .field("ow_len_range", &self.ow_len_range)
             .field("error_level", &self.error_level)
             .finish()
     }
@@ -61,7 +62,6 @@ impl PostgreSQLConnection {
             overwrite:     RefCell::new(BidiMap::new()),
             error_msg:     RefCell::new(BidiMap::new()),
             error_level:   OwsqlErrorLevel::default(),
-            //error_level:   dbg!(OwsqlErrorLevel::Debug), // for develop
         })
     }
 

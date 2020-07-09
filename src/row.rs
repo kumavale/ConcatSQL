@@ -67,6 +67,10 @@ mod tests {
         assert_eq!(row.get_into("key1"), Ok(String::from("value")));
         assert!(row.get_into::<u32>("key1").is_err());
         assert!(row.get_into::<u32>("key2").is_err());
+        assert!(row.column_names().contains(&"key1"));
+        assert!(row.column_names().contains(&"key2"));
+        assert!(row.column_names().contains(&"key3"));
+        assert!(!row.column_names().contains(&"key4"));
     }
 }
 

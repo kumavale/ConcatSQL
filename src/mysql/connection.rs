@@ -37,6 +37,7 @@ impl fmt::Debug for MysqlConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MysqlConnection")
             .field("conn", &self.conn)
+            .field("ow_len_range", &self.ow_len_range)
             .field("error_level", &self.error_level)
             .finish()
     }
@@ -64,7 +65,6 @@ impl MysqlConnection {
             overwrite:     RefCell::new(BidiMap::new()),
             error_msg:     RefCell::new(BidiMap::new()),
             error_level:   OwsqlErrorLevel::default(),
-            //error_level:   dbg!(OwsqlErrorLevel::Debug), // for develop
         })
     }
 
