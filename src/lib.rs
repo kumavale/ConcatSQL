@@ -64,13 +64,14 @@
 
 
 mod bidimap;
+mod parser;
 mod serial;
 mod token;
-mod parser;
-pub mod row;
-pub mod error;
+pub mod connection;
 pub mod constants;
+pub mod error;
 pub mod overwrite;
+pub mod row;
 #[doc(hidden)]
 pub mod value;
 
@@ -109,5 +110,8 @@ macro_rules! params {
 }
 
 pub(crate) trait OwsqlConn {
+    fn _execute(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel) -> Result<()>;
+    fn _iterate(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel,
+        callback: &mut FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
 }
 

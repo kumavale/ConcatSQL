@@ -3,8 +3,7 @@
 pub(crate) mod connection;
 
 use crate::Result;
-
-pub use self::connection::PostgreSQLConnection;
+use crate::connection::Connection;
 
 /// Open a read-write connection to a new or existing database.
 ///
@@ -15,7 +14,7 @@ pub use self::connection::PostgreSQLConnection;
 /// let conn = owsql::postgres::open(&params).unwrap();
 /// ```
 #[inline]
-pub fn open(params: &str) -> Result<PostgreSQLConnection> {
-    PostgreSQLConnection::open(&params)
+pub fn open(params: &str) -> Result<Connection> {
+    connection::open(&params)
 }
 

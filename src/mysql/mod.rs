@@ -3,8 +3,7 @@
 pub(crate) mod connection;
 
 use crate::Result;
-
-pub use self::connection::MysqlConnection;
+use crate::connection::Connection;
 
 /// Open a read-write connection to a new or existing database.
 ///
@@ -18,7 +17,7 @@ pub use self::connection::MysqlConnection;
 /// let conn = owsql::mysql::open(&url).unwrap();
 /// ```
 #[inline]
-pub fn open(url: &str) -> Result<MysqlConnection> {
-    MysqlConnection::open(&url)
+pub fn open(url: &str) -> Result<Connection> {
+    connection::open(&url)
 }
 

@@ -2,10 +2,9 @@
 
 use std::path::Path;
 use crate::Result;
+use crate::connection::Connection;
 
 pub(crate) mod connection;
-
-pub use self::connection::SqliteConnection;
 
 /// Open a read-write connection to a new or existing database.
 ///
@@ -23,14 +22,14 @@ pub use self::connection::SqliteConnection;
 /// let conn = owsql::sqlite::open(path).unwrap();
 /// ```
 #[inline]
-pub fn open<T: AsRef<Path>>(path: T) -> Result<SqliteConnection> {
-    SqliteConnection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
+pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
+    connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
 }
 
 /// Open a readonly connection to a new or existing database.
 #[inline]
-pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<SqliteConnection> {
-    SqliteConnection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
+pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Connection> {
+    connection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
 }
 
 /// Return the version number of SQLite.

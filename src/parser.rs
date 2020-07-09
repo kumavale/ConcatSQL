@@ -1,14 +1,8 @@
 use crate::Result;
-use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::bidimap::BidiMap;
+use crate::connection::Connection;
+use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::token::TokenType;
-
-#[cfg(feature = "sqlite")]
-use crate::sqlite::connection::SqliteConnection;
-#[cfg(feature = "mysql")]
-use crate::mysql::connection::MysqlConnection;
-#[cfg(feature = "postgres")]
-use crate::postgres::connection::PostgreSQLConnection;
 
 #[inline]
 pub fn escape_for_allowlist(value: &str) -> String {
@@ -268,34 +262,7 @@ fn tokenize(
     Ok(tokens)
 }
 
-#[cfg(feature = "sqlite")]
-impl SqliteConnection {
-    #[inline]
-    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(&s, &self.error_level)
-    }
-
-    #[inline]
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
-        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
-    }
-}
-
-#[cfg(feature = "mysql")]
-impl MysqlConnection {
-    #[inline]
-    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(&s, &self.error_level)
-    }
-
-    #[inline]
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
-        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
-    }
-}
-
-#[cfg(feature = "postgres")]
-impl PostgreSQLConnection {
+impl Connection {
     #[inline]
     pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
         check_valid_literal(&s, &self.error_level)

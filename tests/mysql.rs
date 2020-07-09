@@ -9,7 +9,7 @@ mod mysql {
         ($msg:expr) => { Err(owsql::error::OwsqlError::Message($msg.to_string())) };
     }
 
-    fn prepare() -> owsql::mysql::MysqlConnection {
+    fn prepare() -> owsql::connection::Connection {
         let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
@@ -50,7 +50,7 @@ mod mysql {
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
-                assert_eq!(value.as_ref().unwrap(), expects[i]);
+                assert_eq!(*value.as_ref().unwrap(), expects[i]);
             }
             true
         }).unwrap();
@@ -64,7 +64,7 @@ mod mysql {
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
-                assert_eq!(value.as_ref().unwrap(), expects[i]);
+                assert_eq!(*value.as_ref().unwrap(), expects[i]);
             }
             true
         }).unwrap();
@@ -80,7 +80,7 @@ mod mysql {
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
-                assert_eq!(value.as_ref().unwrap(), expects[i]);
+                assert_eq!(*value.as_ref().unwrap(), expects[i]);
             }
             true
         }).unwrap();

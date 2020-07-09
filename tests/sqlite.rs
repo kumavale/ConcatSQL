@@ -10,7 +10,7 @@ mod sqlite {
         ($msg:expr) => { Err(owsql::error::OwsqlError::Message($msg.to_string())) };
     }
 
-    fn prepare() -> owsql::sqlite::SqliteConnection {
+    fn prepare() -> owsql::connection::Connection {
         let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
