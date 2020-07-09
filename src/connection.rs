@@ -28,13 +28,14 @@ unsafe impl Sync for Connection {}
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
-        true
+        (&self.conn as *const _) == (&other.conn as *const _)
     }
 }
 
 impl fmt::Debug for Connection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
+            .field("conn", &(&self.conn as *const _))
             .field("ow_len_range", &self.ow_len_range)
             .field("error_level", &self.error_level)
             .finish()
@@ -364,3 +365,4 @@ impl Connection {
         Ok(())
     }
 }
+

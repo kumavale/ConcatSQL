@@ -12,7 +12,6 @@ use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::serial::SerialNumber;
-use crate::row::Row;
 
 /// Open a read-write connection to a new or existing database.
 #[inline]
@@ -98,3 +97,54 @@ impl OwsqlConn for RefCell<postgres::Client> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::error::*;
+
+    #[test]
+    fn open() {
+        assert!(crate::postgres::open("postgresql://postgres:postgres@localhost").is_ok());
+        assert_eq!(
+            crate::postgres::open(""),
+            Err(OwsqlError::Message("failed to open: invalid configuration: host missing".into()))
+        );
+        assert_eq!(
+            crate::postgres::open("foo\0bar"),
+            Err(OwsqlError::Message("failed to open: invalid connection string: unexpected EOF".into()))
+        );
+    }
+
+    #[test]
+    fn debug_display() {
+        let conn = crate::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn execute() {
+        let conn = crate::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        assert_eq!(
+            conn.execute("\0"),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+        assert_eq!(
+            conn.execute("invalid query"),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn iterate() {
+        let conn = crate::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        assert_eq!(
+            conn.iterate("\0", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+        assert_eq!(
+            conn.iterate("invalid query", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+    }
+}

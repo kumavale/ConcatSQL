@@ -13,7 +13,6 @@ use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::serial::SerialNumber;
-use crate::row::Row;
 
 /// Open a read-write connection to a new or existing database.
 #[inline]
@@ -171,134 +170,136 @@ extern "C" fn process_callback(
 }
 
 
-//#[cfg(test)]
-//mod tests {
-//    use crate::*;
-//    use crate::error::*;
-//
-//    #[test]
-//    fn open() {
-//        assert_ne!(crate::sqlite::open(""), crate::sqlite::open(""));
-//        assert_ne!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
-//        #[cfg(unix)]
-//        assert_ne!(crate::sqlite::open("/tmp/tmp.db"), crate::sqlite::open("/tmp/tmp.db"));
-//        assert_eq!(
-//            crate::sqlite::open("foo\0bar"),
-//            Err(OwsqlError::Message("invalid path: foo\u{0}bar".into()))
-//        );
-//    }
-//
-//    #[test]
-//    #[cfg(debug_assertions)]
-//    fn execute() {
-//        let conn = crate::sqlite::open(":memory:").unwrap();
-//        assert_eq!(
-//            conn.execute("\0"),
-//            Err(OwsqlError::Message("invalid query".into())),
-//        );
-//        assert_eq!(
-//            conn.execute("invalid query"),
-//            Err(OwsqlError::Message("exec error".into())),
-//        );
-//    }
-//
-//    #[test]
-//    #[cfg(debug_assertions)]
-//    fn iterate() {
-//        let conn = crate::sqlite::open(":memory:").unwrap();
-//        assert_eq!(
-//            conn.iterate("\0", |_| { unreachable!(); }),
-//            Err(OwsqlError::Message("invalid query".into())),
-//        );
-//        assert_eq!(
-//            conn.iterate("invalid query", |_| { unreachable!(); }),
-//            Err(OwsqlError::Message("exec error".into())),
-//        );
-//    }
-//
-//    #[test]
-//    fn ow() {
-//        let conn = crate::sqlite::open(":memory:").unwrap();
-//        //let test0: String  = String::from("test");
-//        //let test1: &String = &String::from("test");
-//        //let test2: &str    = &String::from("test");
-//        let test3: &'static str  = "test";
-//        let test4: &'static i32  = &42;
-//        let test5: &'static char = &'A';
-//        //conn.ow(test0);  // build failed
-//        //conn.ow(test1);  // build failed
-//        //conn.ow(test2);  // build failed
-//        conn.ow(test3);
-//        conn.ow(test4);
-//        conn.ow(test5);
-//        assert_eq!(conn.ow("42"), conn.ow(&42));
-//    }
-//
-//    #[test]
-//    fn allowlist() {
-//        let mut conn = crate::sqlite::open(":memory:").unwrap();
-//        conn.add_allowlist(params!["Alice", "Bob", 42]);
-//        conn.add_allowlist(params!["O'Reilly", "\""]);
-//        conn.add_allowlist(params!['A', 0.123, 456.]);
-//        assert!(conn.is_allowlist("Alice"));
-//        assert!(conn.is_allowlist(&"Alice"));
-//        assert!(conn.is_allowlist(42));
-//        assert!(conn.is_allowlist(&42));
-//        assert!(conn.is_allowlist("O'Reilly"));
-//        assert!(conn.is_allowlist('"'));
-//        assert!(!conn.is_allowlist("Alice OR 1=1; --"));
-//        assert_ne!(conn.allowlist(42), conn.ow(&42));  // "'42'", "42"
-//        assert_ne!(conn.allowlist("Bob"), conn.ow("Bob"));  // "'Bob'", "Bob"
-//        assert!(conn.is_allowlist('A'));
-//        assert!(conn.is_allowlist("A"));
-//        assert!(conn.is_allowlist("0.123"));
-//        assert!(conn.is_allowlist("456"));
-//        assert!(!conn.is_allowlist("456."));
-//        assert!(conn.is_allowlist(0.123));
-//        assert!(conn.is_allowlist(456.));
-//        assert!(conn.is_allowlist(456.0));
-//        assert!(conn.is_allowlist(0.1230));
-//    }
-//
-//    #[test]
-//    #[cfg(debug_assertions)]
-//    fn actual_sql() {
-//        let mut conn = crate::sqlite::open(":memory:").unwrap();
-//        let select = conn.ow("SELECT");
-//        let oreilly = conn.ow("O'Reilly");
-//        let allow = conn.allowlist("Alice");
-//        assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
-//        assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
-//        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".into())));
-//        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
-//        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
-//        let oreilly = conn.ow("O''Reilly");
-//        assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
-//        let oreilly = conn.ow("\"O'Reilly\"");
-//        assert_eq!(conn.actual_sql(&oreilly), Ok("\"O'Reilly\" ".to_string()));
-//        conn.add_allowlist(params!["Alice"]);
-//        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
-//        let allow = conn.allowlist("Alice");
-//        assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
-//    }
-//
-//    #[test]
-//    fn debug_display() {
-//        let conn = crate::sqlite::open(":memory:").unwrap();
-//        assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
-//    }
-//
-//    #[test]
-//    fn set_ow_len() {
-//        let mut conn = crate::sqlite::open(":memory:").unwrap();
-//        conn.set_ow_len(0);
-//        conn.set_ow_len(42);
-//        conn.set_ow_len(0..32);
-//        conn.set_ow_len(0..=32);
-//        conn.set_ow_len(64..64);
-//        conn.set_ow_len(64..=64);
-//        conn.set_ow_len(64..32);
-//        conn.set_ow_len(64..=32);
-//    }
-//}
+#[cfg(test)]
+mod tests {
+    use crate::*;
+    use crate::error::*;
+    use temporary::Directory;
+
+    #[test]
+    fn open() {
+        let dir = Directory::new("sqlite").unwrap();
+        let path = dir.path().join("test.db");
+        assert_ne!(crate::sqlite::open(""), crate::sqlite::open(""));
+        assert_eq!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
+        assert_eq!(crate::sqlite::open(&path), crate::sqlite::open(&path));
+        assert_eq!(
+            crate::sqlite::open("foo\0bar"),
+            Err(OwsqlError::Message("invalid path: foo\u{0}bar".into()))
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn execute() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(
+            conn.execute("\0"),
+            Err(OwsqlError::Message("invalid query".into())),
+        );
+        assert_eq!(
+            conn.execute("invalid query"),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn iterate() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(
+            conn.iterate("\0", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("invalid query".into())),
+        );
+        assert_eq!(
+            conn.iterate("invalid query", |_| { unreachable!(); }),
+            Err(OwsqlError::Message("exec error".into())),
+        );
+    }
+
+    #[test]
+    fn ow() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        //let test0: String  = String::from("test");
+        //let test1: &String = &String::from("test");
+        //let test2: &str    = &String::from("test");
+        let test3: &'static str  = "test";
+        let test4: &'static i32  = &42;
+        let test5: &'static char = &'A';
+        //conn.ow(test0);  // build failed
+        //conn.ow(test1);  // build failed
+        //conn.ow(test2);  // build failed
+        conn.ow(test3);
+        conn.ow(test4);
+        conn.ow(test5);
+        assert_eq!(conn.ow("42"), conn.ow(&42));
+    }
+
+    #[test]
+    fn allowlist() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        conn.add_allowlist(params!["Alice", "Bob", 42]);
+        conn.add_allowlist(params!["O'Reilly", "\""]);
+        conn.add_allowlist(params!['A', 0.123, 456.]);
+        assert!(conn.is_allowlist("Alice"));
+        assert!(conn.is_allowlist(&"Alice"));
+        assert!(conn.is_allowlist(42));
+        assert!(conn.is_allowlist(&42));
+        assert!(conn.is_allowlist("O'Reilly"));
+        assert!(conn.is_allowlist('"'));
+        assert!(!conn.is_allowlist("Alice OR 1=1; --"));
+        assert_ne!(conn.allowlist(42), conn.ow(&42));  // "'42'", "42"
+        assert_ne!(conn.allowlist("Bob"), conn.ow("Bob"));  // "'Bob'", "Bob"
+        assert!(conn.is_allowlist('A'));
+        assert!(conn.is_allowlist("A"));
+        assert!(conn.is_allowlist("0.123"));
+        assert!(conn.is_allowlist("456"));
+        assert!(!conn.is_allowlist("456."));
+        assert!(conn.is_allowlist(0.123));
+        assert!(conn.is_allowlist(456.));
+        assert!(conn.is_allowlist(456.0));
+        assert!(conn.is_allowlist(0.1230));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn actual_sql() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        let select = conn.ow("SELECT");
+        let oreilly = conn.ow("O'Reilly");
+        let allow = conn.allowlist("Alice");
+        assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
+        assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
+        assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".into())));
+        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
+        let oreilly = conn.ow("O''Reilly");
+        assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));
+        let oreilly = conn.ow("\"O'Reilly\"");
+        assert_eq!(conn.actual_sql(&oreilly), Ok("\"O'Reilly\" ".to_string()));
+        conn.add_allowlist(params!["Alice"]);
+        assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
+        let allow = conn.allowlist("Alice");
+        assert_eq!(conn.actual_sql(&allow), Ok("'Alice' ".to_string()));
+    }
+
+    #[test]
+    fn debug_display() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
+    }
+
+    #[test]
+    fn set_ow_len() {
+        let mut conn = crate::sqlite::open(":memory:").unwrap();
+        conn.set_ow_len(0);
+        conn.set_ow_len(42);
+        conn.set_ow_len(0..32);
+        conn.set_ow_len(0..=32);
+        conn.set_ow_len(64..64);
+        conn.set_ow_len(64..=64);
+        conn.set_ow_len(64..32);
+        conn.set_ow_len(64..=32);
+    }
+}
 
