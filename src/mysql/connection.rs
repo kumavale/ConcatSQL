@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use crate::Result;
 use crate::OwsqlConn;
-use crate::connection::Connection;
+use crate::connection::{Connection, DBType};
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
@@ -38,6 +38,10 @@ pub fn open(url: &str) -> Result<Connection> {
 }
 
 impl OwsqlConn for RefCell<mysql::Conn> {
+    fn db_type(&self) -> DBType {
+        DBType::Mysql
+    }
+
     fn _execute(&self, query: Result<String>, error_level: &OwsqlErrorLevel) -> Result<()> {
         let query = match query {
             Ok(query) => query,

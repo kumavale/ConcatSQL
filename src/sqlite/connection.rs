@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use crate::Result;
 use crate::OwsqlConn;
-use crate::connection::Connection;
+use crate::connection::{Connection, DBType};
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
@@ -51,6 +51,10 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
 }
 
 impl OwsqlConn for NonNull<ffi::sqlite3> {
+    fn db_type(&self) -> DBType {
+        DBType::Sqlite
+    }
+
     fn _execute(&self, query: Result<String>, error_level: &OwsqlErrorLevel) -> Result<()> {
         let query = match query {
             Ok(query) => query,
