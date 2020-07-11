@@ -7,6 +7,8 @@ use crate::connection::Connection;
 
 /// Open a read-write connection to a new or existing database.
 ///
+/// See the documentation for [Config](https://docs.rs/postgres/latest/postgres/config/struct.Config.html) for information about the connection syntax.
+///
 /// # Examples
 ///
 /// ```rust

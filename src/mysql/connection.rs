@@ -6,8 +6,7 @@ use std::collections::HashSet;
 use std::cell::RefCell;
 
 use crate::Result;
-use crate::OwsqlConn;
-use crate::connection::Connection;
+use crate::connection::{Connection, OwsqlConn};
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;

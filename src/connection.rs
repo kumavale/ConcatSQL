@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::fmt;
 
 use crate::Result;
-use crate::OwsqlConn;
 use crate::bidimap::BidiMap;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
@@ -11,6 +10,13 @@ use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
 use crate::parser::*;
 use crate::row::Row;
+
+pub(crate) trait OwsqlConn {
+    fn _execute(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel) -> Result<()>;
+    fn _iterate(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel,
+        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+    fn literal_escape(&self, s: &str) -> String;
+}
 
 /// A database connection.
 pub struct Connection {
@@ -191,6 +197,7 @@ impl Connection {
     }
 
     /// Return the overwrite definition string without HTML escape.  
+    /// Escape single quotes and back quotes(MySQL/PostgreSQL).  
     ///
     /// # Safety
     ///
