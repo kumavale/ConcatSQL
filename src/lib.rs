@@ -64,14 +64,14 @@
 
 
 mod bidimap;
+mod connection;
+mod error;
+mod overwrite;
 mod parser;
+mod row;
 mod serial;
 mod token;
-pub mod connection;
 pub mod constants;
-pub mod error;
-pub mod overwrite;
-pub mod row;
 #[doc(hidden)]
 pub mod value;
 
@@ -84,6 +84,11 @@ pub mod mysql;
 #[cfg(feature = "postgres")]
 #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres;
+
+pub use crate::connection::Connection;
+pub use crate::error::{OwsqlError, OwsqlErrorLevel};
+pub use crate::overwrite::IntoInner;
+pub use crate::row::Row;
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;

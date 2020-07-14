@@ -1,15 +1,14 @@
 #[cfg(feature = "postgres")]
 #[cfg(debug_assertions)]
 mod postgres {
-    use owsql::params;
-    use owsql::error::*;
+    use owsql::*;
 
     macro_rules! err {
-        () => { Err(owsql::error::OwsqlError::AnyError) };
-        ($msg:expr) => { Err(owsql::error::OwsqlError::Message($msg.to_string())) };
+        () => { Err(owsql::OwsqlError::AnyError) };
+        ($msg:expr) => { Err(owsql::OwsqlError::Message($msg.to_string())) };
     }
 
-    fn prepare() -> owsql::connection::Connection {
+    fn prepare() -> owsql::Connection {
         let conn = owsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
@@ -244,8 +243,6 @@ mod postgres {
 
     #[test]
     fn error_level() {
-        use owsql::error::OwsqlErrorLevel;
-
         let mut conn = owsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
         conn.error_level(OwsqlErrorLevel::Release).unwrap();

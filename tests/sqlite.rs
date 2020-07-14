@@ -2,15 +2,14 @@
 #[cfg(feature = "sqlite")]
 #[cfg(debug_assertions)]
 mod sqlite {
-    use owsql::params;
-    use owsql::error::*;
+    use owsql::*;
 
     macro_rules! err {
-        () => { Err(owsql::error::OwsqlError::AnyError) };
-        ($msg:expr) => { Err(owsql::error::OwsqlError::Message($msg.to_string())) };
+        () => { Err(owsql::OwsqlError::AnyError) };
+        ($msg:expr) => { Err(owsql::OwsqlError::Message($msg.to_string())) };
     }
 
-    fn prepare() -> owsql::connection::Connection {
+    fn prepare() -> owsql::Connection {
         let conn = owsql::sqlite::open(":memory:").unwrap();
         let stmt = conn.ow(stmt());
         conn.execute(&stmt).unwrap();
@@ -273,8 +272,6 @@ mod sqlite {
 
     #[test]
     fn error_level() {
-        use owsql::error::OwsqlErrorLevel;
-
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
         conn.error_level(OwsqlErrorLevel::Release).unwrap();

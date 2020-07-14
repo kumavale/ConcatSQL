@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::Result;
 use crate::bidimap::BidiMap;
-use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::{OwsqlError, OwsqlErrorLevel};
 use crate::constants::OW_MINIMUM_LENGTH;
 use crate::overwrite::{IntoInner, overwrite_new};
 use crate::serial::SerialNumber;
@@ -12,8 +12,8 @@ use crate::parser::*;
 use crate::row::Row;
 
 pub(crate) trait OwsqlConn {
-    fn _execute(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel) -> Result<()>;
-    fn _iterate(&self, query: Result<String>, error_level: &crate::error::OwsqlErrorLevel,
+    fn _execute(&self, query: Result<String>, error_level: &crate::OwsqlErrorLevel) -> Result<()>;
+    fn _iterate(&self, query: Result<String>, error_level: &crate::OwsqlErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
     fn literal_escape(&self, s: &str) -> String;
 }
@@ -133,7 +133,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::error::OwsqlError;
+    /// # use owsql::OwsqlError;
     /// let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// let select = conn.ow("SELECT");
     /// let oreilly = conn.ow("O'Reilly");
@@ -354,12 +354,12 @@ impl Connection {
     }
 
     /// Sets the error level.  
-    /// The default value is [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Develop for debug builds and [OwsqlErrorLevel](../error/enum.OwsqlErrorLevel.html)::Release for release builds.
+    /// The default value is [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Develop for debug builds and [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Release for release builds.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use owsql::error::OwsqlErrorLevel;
+    /// # use owsql::OwsqlErrorLevel;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     /// ```
