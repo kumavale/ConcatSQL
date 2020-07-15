@@ -71,9 +71,8 @@ mod parser;
 mod row;
 mod serial;
 mod token;
+mod value;
 pub mod constants;
-#[doc(hidden)]
-pub mod value;
 
 #[cfg(feature = "sqlite")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
@@ -89,6 +88,7 @@ pub use crate::connection::Connection;
 pub use crate::error::{OwsqlError, OwsqlErrorLevel};
 pub use crate::overwrite::IntoInner;
 pub use crate::row::Row;
+pub use crate::value::Value;
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
@@ -107,7 +107,7 @@ macro_rules! params {
         {
             let mut temp_vec = Vec::new();
             $(
-                temp_vec.push($crate::value::Value::from($param));
+                temp_vec.push($crate::Value::from($param));
             )*
             temp_vec
         }
