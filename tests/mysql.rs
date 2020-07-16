@@ -201,12 +201,13 @@ mod mysql {
 
     #[test]
     fn allowlist() {
-        let mut conn = prepare();
-        conn.add_allowlist(params![ 30 ]);
-        let age = 30;
-        let sql = conn.ow("select age from users where age <") + &conn.allowlist(age) + &conn.ow(";");
-
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        let mut conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        conn.add_allowlist(params![42, "foo"]);
+        conn.add_allowlist(&[&21, &"bar"]);
+        assert_eq!(conn.actual_sql(conn.allowlist(21)), Ok("'21' ".into()));
+        assert_eq!(conn.actual_sql(conn.allowlist(42)), Ok("'42' ".into()));
+        assert_eq!(conn.actual_sql(conn.allowlist("foo")), Ok("'foo' ".into()));
+        assert_eq!(conn.actual_sql(conn.allowlist("bar")), Ok("'bar' ".into()));
     }
 
     #[test]

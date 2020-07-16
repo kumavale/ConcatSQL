@@ -244,11 +244,12 @@ impl Connection {
     /// assert!(conn.execute(sql).is_err());
     /// ```
     #[inline]
-    pub fn allowlist<T: Clone + ToString>(&self, value: T) -> String {
-        if self.is_allowlist(value.clone()) {
-            format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value.to_string())).unwrap())
+    pub fn allowlist<T: ToString>(&self, value: T) -> String {
+        let value = value.to_string();
+        if self.allowlist.contains(&value) {
+            format!(" {} ", self.overwrite.borrow_mut().get(&escape_for_allowlist(&value)).unwrap())
         } else {
-            let e = OwsqlError::new(&self.error_level, "deny value", &value.to_string()).err().unwrap_or(OwsqlError::AnyError);
+            let e = OwsqlError::new(&self.error_level, "deny value", &value).err().unwrap_or(OwsqlError::AnyError);
             if !self.error_msg.borrow_mut().contain(&e) {
                 let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                 self.error_msg.borrow_mut().insert(e.clone(), overwrite);
@@ -278,7 +279,7 @@ impl Connection {
 
     /// Register it in self.overwrite after performing character string escape processing with
     /// single quotation added to both sides.  
-    /// Use [params macro](../macro.params.html).  
+    /// Use [params macro](./macro.params.html).  
     ///
     /// # Examples
     ///
@@ -288,8 +289,7 @@ impl Connection {
     /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
     #[inline]
-    pub fn add_allowlist(&mut self, params: Vec<crate::value::Value>) {
-    //pub fn add_allowlist(&mut self, params: &[&(dyn ToString + Sync)]) {
+    pub fn add_allowlist(&mut self, params: &[&(dyn ToString + Sync)]) {
         for value in params {
             self.allowlist.insert(value.to_string());
             self.overwrite.borrow_mut().insert(
@@ -337,7 +337,6 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use owsql::params;
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.set_ow_len(42);       // 42
     /// conn.set_ow_len(50..100);  // 50-99

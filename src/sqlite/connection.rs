@@ -177,7 +177,6 @@ extern "C" fn process_callback(
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use crate::error::*;
     use temporary::Directory;
 
     #[test]

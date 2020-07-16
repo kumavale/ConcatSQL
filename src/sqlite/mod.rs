@@ -43,8 +43,6 @@ pub fn version() -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::params;
-    use crate::value::Value;
     use crate::error::{OwsqlError, OwsqlErrorLevel};
     use temporary::Directory;
 
@@ -90,22 +88,6 @@ mod tests {
     fn sqlite_open_failed() {
         use std::path::Path;
         let _conn = crate::sqlite::open(Path::new("/path/to/db")).unwrap();
-    }
-
-    #[test]
-    #[allow(clippy::blacklisted_name)]
-    fn params_macro() {
-        let foo = 42;
-        let bar = "bar";
-
-        assert_eq!(vec![Value::Int(42)], params![ 42 ]);
-        assert_eq!(vec![Value::String(String::from("bar"))], params![ "bar" ]);
-        assert_eq!(vec![Value::Int(42)], params![ foo ]);
-        assert_eq!(vec![Value::String(String::from("bar"))], params![ bar ]);
-        assert_eq!(
-            vec![Value::Int(42), Value::String(String::from("bar")),],
-            params![ foo, bar ]
-        );
     }
 
     #[test]
