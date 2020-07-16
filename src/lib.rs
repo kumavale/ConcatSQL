@@ -102,13 +102,7 @@ pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
 #[macro_export]
 macro_rules! params {
     ( $( $param:expr ),* ) => {
-        &{
-            let mut temp_vec: Vec<&(dyn ToString + Sync)> = Vec::new();
-            $(
-                temp_vec.push(&$param);
-            )*
-            temp_vec
-        }
+        &{ [ $(&$param),* ] }
     };
 }
 
