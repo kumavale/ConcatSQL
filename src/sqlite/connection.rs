@@ -126,21 +126,6 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
     }
 }
 
-//impl Drop for SqliteConnection {
-//    fn drop(&mut self) {
-//        use std::thread;
-//
-//        let close_result = unsafe { ffi::sqlite3_close(self.raw.as_ptr()) };
-//        if close_result != ffi::SQLITE_OK {
-//            if thread::panicking() {
-//                eprintln!("error closing SQLite connection");
-//            } else {
-//                panic!("error closing SQLite connection");
-//            }
-//        }
-//    }
-//}
-
 extern "C" fn process_callback(
     callback: *mut c_void,
     count: i32,

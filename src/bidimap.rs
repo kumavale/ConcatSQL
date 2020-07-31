@@ -15,8 +15,8 @@ where
 {
     pub fn new() -> Self {
         Self {
-            key_value: HashMap::with_capacity(64),
-            value_key: HashMap::with_capacity(64),
+            key_value: HashMap::new(),
+            value_key: HashMap::new(),
         }
     }
 
