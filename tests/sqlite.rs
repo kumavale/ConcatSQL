@@ -487,6 +487,38 @@ mod sqlite {
         assert!(1+5+32+2+1 <= conn.ow("10").len() && conn.ow("10").len() <= 1+5+64+2+1);
     }
 
+    #[test]
+    fn like() {
+        let conn = prepare();
+
+        let name = "A%";
+        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + name + &conn.ow(";");
+
+        let mut executed = false;
+        conn.rows(&sql).unwrap().iter().all(|row| {
+            assert_eq!(row.get("name").unwrap(), "Alice");
+            executed = true;
+            true
+        });
+        assert!(executed);
+    }
+
+    #[test]
+    fn glob() {
+        let conn = prepare();
+
+        let name = "A?['i]*";
+        let sql = conn.ow("SELECT * FROM users WHERE name GLOB") + name + &conn.ow(";");
+
+        let mut executed = false;
+        conn.rows(&sql).unwrap().iter().all(|row| {
+            assert_eq!(row.get("name").unwrap(), "Alice");
+            executed = true;
+            true
+        });
+        assert!(executed);
+    }
+
     mod should_panic {
         use owsql::params;
         use super::stmt;
