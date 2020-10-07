@@ -289,17 +289,5 @@ mod tests {
         conn.set_ow_len(64..32);
         conn.set_ow_len(64..=32);
     }
-
-    #[test]
-    fn actual() {
-        let conn = crate::sqlite::open(":memory:").unwrap();
-        let tests = [
-            (conn.ow("aaa") + "bbb" + &conn.ow("ccc"), "aaa 'bbb' ccc "),
-            (conn.ow("\"\"") + "'" + &conn.ow("\\"), "\"\" '&#39;' \\ "),
-        ];
-        for (actual, expect) in tests.iter() {
-            assert_eq!(conn.actual(&actual).unwrap(), *expect);
-        }
-    }
 }
 

@@ -370,11 +370,5 @@ impl Connection {
         self.error_level = level;
         Ok(())
     }
-
-
-    #[cfg(debug_assertions)]
-    pub fn actual<T: AsRef<str>>(&self, query: T) -> Result<String> {
-        self.convert_to_valid_syntax(query.as_ref())
-    }
 }
 
