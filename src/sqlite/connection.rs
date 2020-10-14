@@ -282,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::reversed_empty_ranges)]
     fn set_ow_len() {
         let mut conn = crate::sqlite::open(":memory:").unwrap();
         conn.set_ow_len(0);

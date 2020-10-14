@@ -38,6 +38,7 @@ impl IntoInner for std::ops::Range<usize> {
 #[cfg(test)]
 mod tests {
     #[test]
+    #[allow(clippy::reversed_empty_ranges)]
     fn into_inner() {
         use super::IntoInner;
         assert_eq!(( 0,  0), (0).into_inner());

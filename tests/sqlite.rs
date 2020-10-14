@@ -461,7 +461,7 @@ mod sqlite {
     }
 
     #[test]
-    #[allow(clippy::int_plus_one)]
+    #[allow(clippy::int_plus_one, clippy::reversed_empty_ranges)]
     fn range() {
         let mut conn = owsql::sqlite::open(":memory:").unwrap();
         conn.set_ow_len(1);
