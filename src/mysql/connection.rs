@@ -100,8 +100,12 @@ impl OwsqlConn for RefCell<mysql::Conn> {
         Ok(())
     }
 
+    fn must_escape(&self) -> Box<dyn Fn(char) -> bool> {
+        Box::new(|c| c == '\'' || c == '\\')
+    }
+
     fn literal_escape(&self, s: &str) -> String {
-        escape_string(&s, |c| c == '\'' || c == '\\')
+        escape_string(&s, self.must_escape())
     }
 }
 

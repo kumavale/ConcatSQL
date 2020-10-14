@@ -15,6 +15,7 @@ pub(crate) trait OwsqlConn {
     fn _execute(&self, query: Result<String>, error_level: &crate::OwsqlErrorLevel) -> Result<()>;
     fn _iterate(&self, query: Result<String>, error_level: &crate::OwsqlErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+    fn must_escape(&self) ->  Box<dyn Fn(char) -> bool>;
     fn literal_escape(&self, s: &str) -> String;
 }
 
@@ -64,7 +65,10 @@ impl Connection {
     /// ```
     #[inline]
     pub fn execute<T: AsRef<str>>(&self, query: T) -> Result<()> {
-        self.conn._execute(self.convert_to_valid_syntax(query.as_ref()), &self.error_level)
+        self.conn._execute(
+            self.convert_to_valid_syntax(query.as_ref(), self.conn.must_escape()),
+            &self.error_level
+        )
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -93,7 +97,11 @@ impl Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn._iterate(self.convert_to_valid_syntax(query.as_ref()), &self.error_level, &mut callback)
+        self.conn._iterate(
+            self.convert_to_valid_syntax(query.as_ref(), self.conn.must_escape()),
+            &self.error_level,
+            &mut callback
+        )
     }
 
     /// Execute a statement and returns the rows.
@@ -144,7 +152,7 @@ impl Connection {
     /// ```
     #[inline]
     pub fn actual_sql<T: AsRef<str>>(&self, query: T) -> Result<String> {
-        self.convert_to_valid_syntax(query.as_ref())
+        self.convert_to_valid_syntax(query.as_ref(), self.conn.must_escape())
     }
 
     /// Return the overwrite definition string.  

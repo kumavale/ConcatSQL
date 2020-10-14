@@ -121,8 +121,12 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
         }
     }
 
+    fn must_escape(&self) -> Box<dyn Fn(char) -> bool> {
+        Box::new(|c| c == '\'')
+    }
+
     fn literal_escape(&self, s: &str) -> String {
-        escape_string(&s, |c| c == '\'')
+        escape_string(&s, self.must_escape())
     }
 }
 

@@ -180,13 +180,14 @@ fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
 #[inline]
 fn convert_to_valid_syntax(
     stmt:           &str,
+    must_escape:    &dyn Fn(char) -> bool,
     conn_overwrite: &BidiMap<String, String>,
     conn_error_msg: &BidiMap<OwsqlError, String>,
     error_level:    &OwsqlErrorLevel,
 ) -> Result<String> {
 
     let mut query = String::new();
-    let tokens = tokenize(stmt, conn_overwrite, conn_error_msg, error_level)?;
+    let tokens = tokenize(stmt, must_escape, conn_overwrite, conn_error_msg, error_level)?;
 
     for token in tokens {
         match token {
@@ -206,6 +207,7 @@ fn convert_to_valid_syntax(
 #[inline]
 fn tokenize(
     stmt:           &str,
+    must_escape:    &dyn Fn(char) -> bool,
     conn_overwrite: &BidiMap<String, String>,
     conn_error_msg: &BidiMap<OwsqlError, String>,
     error_level:    &OwsqlErrorLevel,
@@ -240,7 +242,7 @@ fn tokenize(
                         }
                     }
                 }
-                tokens.push(TokenType::String(format!("'{}'", escape_string(&string, |c| c=='\''))));
+                tokens.push(TokenType::String(format!("'{}'", escape_string(&string, must_escape))));
                 if !overwrite.is_none() {
                     tokens.push(overwrite);
                 }
@@ -258,8 +260,8 @@ impl Connection {
     }
 
     #[inline]
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str) -> Result<String> {
-        convert_to_valid_syntax(&stmt, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
+    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str, must_escape: Box<dyn Fn(char) -> bool>) -> Result<String> {
+        convert_to_valid_syntax(&stmt, &must_escape, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
     }
 }
 
