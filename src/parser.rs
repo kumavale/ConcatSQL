@@ -240,7 +240,7 @@ fn tokenize(
                         }
                     }
                 }
-                tokens.push(TokenType::String(format!("'{}'", escape_html(&string))));
+                tokens.push(TokenType::String(format!("'{}'", escape_string(&string, |c| c=='\''))));
                 if !overwrite.is_none() {
                     tokens.push(overwrite);
                 }

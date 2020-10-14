@@ -141,7 +141,7 @@ impl Connection {
     /// assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
     /// assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
     /// assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".to_string())));
-    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+    /// assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
     /// assert_eq!(conn.actual_sql(&oreilly_unhtmlescape).unwrap(), "'O''Reilly' ");
     /// ```
     #[inline]

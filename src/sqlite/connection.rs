@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(conn.actual_sql(&select).unwrap(), "SELECT ");
         assert_eq!(conn.actual_sql("SELECT").unwrap(), "'SELECT' ");
         assert_eq!(conn.actual_sql(&oreilly), Err(OwsqlError::Message("invalid literal".into())));
-        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O&#39;Reilly' ");
+        assert_eq!(conn.actual_sql("O'Reilly").unwrap(), "'O''Reilly' ");
         assert_eq!(conn.actual_sql(&allow), Err(OwsqlError::Message("deny value".into())));
         let oreilly = conn.ow("O''Reilly");
         assert_eq!(conn.actual_sql(&oreilly), Ok("O''Reilly ".to_string()));

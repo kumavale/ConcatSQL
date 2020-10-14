@@ -224,23 +224,23 @@ mod mysql {
         assert_eq!(&invalid, &conn.int("str"));
     }
 
-    #[test]
-    fn sanitizing() {
-        let conn = prepare();
-        let name = r#"<script>alert("&1");</script>"#;
-        let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
+    //#[test]
+    //fn sanitizing() {
+    //    let conn = prepare();
+    //    let name = r#"<script>alert("&1");</script>"#;
+    //    let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
 
-        conn.execute(&sql).unwrap();
+    //    conn.execute(&sql).unwrap();
 
-        conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
-            assert_eq!(row.get("name").unwrap(), "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;");
-            true
-        });
-        assert_eq!(
-            conn.actual_sql( unsafe { conn.ow_without_html_escape(&name) }),
-            Ok(format!("'{}' ", name))
-        );
-    }
+    //    conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+    //        assert_eq!(row.get("name").unwrap(), "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;");
+    //        true
+    //    });
+    //    assert_eq!(
+    //        conn.actual_sql( unsafe { conn.ow_without_html_escape(&name) }),
+    //        Ok(format!("'{}' ", name))
+    //    );
+    //}
 
     #[test]
     fn error_level() {
@@ -342,21 +342,21 @@ mod mysql {
         assert_eq!(conn.execute("INVALID SQL"),
             err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
         assert_eq!(conn.execute("'endless"),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'&#39;endless\'\' at line 1 }"));
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
         assert_eq!(conn.execute(&single_quote),                     err!("invalid literal: '"));
         assert_eq!(conn.execute(&name),                             err!("deny value: Bob"));
         assert_eq!(conn.execute(&integer),                          err!("non integer: 50 or 1=1; --"));
         assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()),
             err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
         assert_eq!(conn.iterate("'endless",    |_| unreachable!()),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'&#39;endless\'\' at line 1 }"));
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
         assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), err!("invalid literal: '"));
         assert_eq!(conn.iterate(&name,         |_| unreachable!()), err!("deny value: Bob"));
         assert_eq!(conn.iterate(&integer,      |_| unreachable!()), err!("non integer: 50 or 1=1; --"));
         assert_eq!(conn.rows("INVALID SQL"),
             err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
         assert_eq!(conn.rows("'endless"),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'&#39;endless\'\' at line 1 }"));
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
         assert_eq!(conn.rows(&single_quote),                        err!("invalid literal: '"));
         assert_eq!(conn.rows(&name),                                err!("deny value: Bob"));
         assert_eq!(conn.rows(&integer),                             err!("non integer: 50 or 1=1; --"));
