@@ -112,72 +112,74 @@ mod postgres {
     #[test]
     fn double_quotaion_inside_double_quote() {
         let conn = prepare();
-        let name = r#"".ow(""inside str"") -> String""#;  // expect: '".ow(""inside str"") -> String"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
-        conn.execute(&sql).unwrap();
-
-        let name = r#"".ow("inside str") -> String""#;  // expect: '".ow("inside str") -> String"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql(r#"".ow(""inside str"") -> String""#).unwrap(),
+            r#"'".ow(""inside str"") -> String"' "#
+        );
+        assert_eq!(
+            conn.actual_sql(r#"".ow("inside str") -> String""#).unwrap(),
+            r#"'".ow("inside str") -> String"' "#
+        );
     }
 
     #[test]
     fn double_quotaion_inside_sigle_quote() {
         let conn = prepare();
-        let name = r#""I'm Alice""#; // expect: '"I''m Alice"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
-        conn.execute(&sql).unwrap();
-        let name = r#""I''m Alice""#; // expect: '"I''''m Alice"'
-        let sql = conn.ow("select age from users where name = ") + unsafe { &conn.ow_without_html_escape(&name) };
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql(r#""I'm Alice""#).unwrap(),
+            r#"'"I''m Alice"' "#
+        );
+        assert_eq!(
+            conn.actual_sql(r#""I''m Alice""#).unwrap(),
+            r#"'"I''''m Alice"' "#
+        );
     }
 
     #[test]
     fn single_quotaion_inside_double_quote() {
         let conn = prepare();
-        let name = r#"'.ow("inside str") -> String'"#; // expect: '''.ow("inside str") -> String'''
-        let sql = conn.ow("select age from users where name = ") + name;
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql(r#"'.ow("inside str") -> String'"#).unwrap(),
+            r#"'''.ow("inside str") -> String''' "#
+        );
     }
 
     #[test]
     fn single_quotaion_inside_sigle_quote() {
         let conn = prepare();
-        let name = "'I''m Alice'"; // expect: '''I''''m Alice'''
-        let sql = conn.ow("select age from users where name = ") + name;
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql("'I''m Alice'").unwrap(),
+            r#"'''I''''m Alice''' "#
+        );
     }
 
     #[test]
     fn non_quotaion_inside_sigle_quote() {
         let conn = prepare();
-        let name = "foo'bar'foo"; // expect: 'foo''bar''foo'
-        let sql = conn.ow("select age from users where name = ") + name;
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql("foo'bar'foo").unwrap(),
+            r#"'foo''bar''foo' "#
+        );
     }
 
     #[test]
     fn non_quotaion_inside_double_quote() {
         let conn = prepare();
-        let name = "foo\"bar\"foo"; // expect: 'foo\"bar\"foo'
-        let sql = conn.ow("select age from users where name = ") + name;
-        conn.execute(&sql).unwrap();
-    }
-
-    #[test]
-    fn non_quotaion_inside_double_quote_after_owstring() {
-        let conn = prepare();
-        let name = "foo\"bar\"foo"; // expect: 'foo\"bar\"foo'
-        let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
-        conn.execute(&sql).unwrap();
+        assert_eq!(
+            conn.actual_sql("foo\"bar\"foo").unwrap(),
+            r#"'foo"bar"foo' "#
+        );
     }
 
     #[test]
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
-        let name = "'Alice'; DROP TABLE users; --"; // expect: '''Alice''); DROP TABLE users; --'
+        let name = "'Alice'; DROP TABLE users; --";
         let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
-
+        assert_eq!(
+            conn.actual_sql(name).unwrap(),
+            r#"'''Alice''; DROP TABLE users; --' "#
+        );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 
