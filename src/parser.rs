@@ -12,8 +12,26 @@ pub fn escape_for_allowlist(value: &str) -> String {
     parser.consume_string('\'').unwrap_or_default()
 }
 
+/// Convert special characters to HTML entities.
+///
+/// # Performed translations
+///
+/// Character | Replacement
+/// --------- | -----------
+/// &amp;     | &amp;amp;
+/// &quot;    | &amp;quot;
+/// &#39;     | &amp;#39;
+/// &lt;      | &amp;lt;
+/// &gt;      | &amp;gt;
+///
+/// # Examples
+///
+/// ```
+/// let encoded = owsql::html_special_chars("<a href='test'>Test</a>");
+/// assert_eq!(&encoded, "&lt;a href=&#39;test&#39;&gt;Test&lt;/a&gt;");
+/// ```
 #[inline]
-pub fn escape_html(input: &str) -> String {
+pub fn html_special_chars(input: &str) -> String {
     let mut escaped = String::new();
     for c in input.chars() {
         match c {
@@ -297,9 +315,9 @@ mod tests {
     }
 
     #[test]
-    fn escape_html() {
+    fn html_special_chars() {
         assert_eq!(
-            super::escape_html(r#"<script type="text/javascript">alert('1')</script>"#),
+            super::html_special_chars(r#"<script type="text/javascript">alert('1')</script>"#),
             r#"&lt;script type=&quot;text/javascript&quot;&gt;alert(&#39;1&#39;)&lt;/script&gt;"#
         );
     }

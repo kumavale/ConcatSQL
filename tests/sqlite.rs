@@ -265,7 +265,7 @@ mod sqlite {
 
         conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
-                owsql::escape_html(&row.get("name").unwrap()),
+                owsql::html_special_chars(&row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
             );
             true

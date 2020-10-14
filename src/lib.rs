@@ -87,7 +87,7 @@ pub use crate::connection::Connection;
 pub use crate::error::{OwsqlError, OwsqlErrorLevel};
 pub use crate::overwrite::IntoInner;
 pub use crate::row::Row;
-pub use crate::parser::escape_html;
+pub use crate::parser::html_special_chars;
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
