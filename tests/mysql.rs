@@ -226,23 +226,22 @@ mod mysql {
         assert_eq!(&invalid, &conn.int("str"));
     }
 
-    //#[test]
-    //fn sanitizing() {
-    //    let conn = prepare();
-    //    let name = r#"<script>alert("&1");</script>"#;
-    //    let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
+    #[test]
+    fn sanitizing() {
+        let conn = prepare();
+        let name = r#"<script>alert("&1");</script>"#;
+        let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
 
-    //    conn.execute(&sql).unwrap();
+        conn.execute(&sql).unwrap();
 
-    //    conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
-    //        assert_eq!(row.get("name").unwrap(), "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;");
-    //        true
-    //    });
-    //    assert_eq!(
-    //        conn.actual_sql( unsafe { conn.ow_without_html_escape(&name) }),
-    //        Ok(format!("'{}' ", name))
-    //    );
-    //}
+        conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+            assert_eq!(
+                owsql::escape_html(row.get("name").unwrap()),
+                "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
+            );
+            true
+        });
+    }
 
     #[test]
     fn error_level() {
