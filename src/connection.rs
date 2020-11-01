@@ -202,6 +202,37 @@ impl Connection {
         }
     }
 
+    /// TODO
+    /// ```
+    /// # let conn = owsql::sqlite::open(":memory:").unwrap();
+    /// let foo = &String::from("   foo   ");
+    /// assert_eq!(conn.actual_sql(foo).unwrap(), "'foo' ");
+    /// let bar = conn.ow_with_whitespace(&String::from("   bar   "));
+    /// assert_eq!(conn.actual_sql(bar).unwrap(), "'   bar   ' ");
+    /// ```
+    #[inline]
+    pub fn ow_with_whitespace<T: ?Sized + std::string::ToString>(&self, s: &T) -> String {
+        let s = s.to_string();
+        let result = self.check_valid_literal(&s);
+        let s = format!("'{}'", self.conn.literal_escape(&s));
+        match result {
+            Ok(_) => {
+                if !self.overwrite.borrow().contain(&s) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+                }
+                format!(" {} ", self.overwrite.borrow().get(&s).unwrap())
+            },
+            Err(e) => {
+                if !self.error_msg.borrow().contain(&e) {
+                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                }
+                format!(" {} ", self.error_msg.borrow().get(&e).unwrap())
+            },
+        }
+    }
+
     /// Return the overwrite definition string in allowlist.  
     /// Returns the escaped string.  
     ///
