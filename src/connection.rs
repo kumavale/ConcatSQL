@@ -204,6 +204,38 @@ impl Connection {
         }
     }
 
+    /// Does not escape.  
+    /// Don't use if the value entered is unreliable (e.g. entered by user).  
+    ///
+    /// # Danger
+    ///
+    /// ```
+    /// # let conn = owsql::sqlite::open(":memory:").unwrap();
+    /// # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
+    /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
+    /// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#);
+    /// # conn.execute(stmt).unwrap();
+    /// let age = String::from("42 or 1=1; --");  // input by attcker
+    /// let sql = conn.ow("SELECT name FROM users WHERE age <") + unsafe { &conn.without_escape(&age) };
+    /// assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT name FROM users WHERE age < 42 or 1=1; -- ");
+    /// dbg!(conn.execute(&sql));
+    /// assert!(conn.rows(&sql).is_ok());
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// - Use trusted values
+    /// - Use in an environment where SQL injection does not occur
+    #[inline]
+    pub unsafe fn without_escape<T: ?Sized + std::string::ToString>(&self, s: &T) -> String {
+        let s = s.to_string();
+        if !self.overwrite.borrow().contain(&s) {
+            let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+            self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
+        }
+        format!(" {} ", self.overwrite.borrow().get(&s).unwrap())
+    }
+
     /// If there are whitespaces before or after the string entered, or if the string is only
     /// whitespace, using this method will work properly.
     ///
