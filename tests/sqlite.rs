@@ -541,6 +541,21 @@ mod sqlite {
             true
         });
         assert!(executed);
+
+        let name = "A";
+        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + name + "%";
+        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%A%' ");
+        conn.execute(&sql).unwrap();
+
+        let name = "%A%";
+        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + &owsql::sanitize_like!(name) + "%";
+        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%' ");
+        conn.execute(&sql).unwrap();
+
+        let name = String::from("%A%");
+        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + &owsql::sanitize_like!(name, '$') + "%";
+        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%$%A$%%' ");
+        conn.execute(&sql).unwrap();
     }
 
     #[test]

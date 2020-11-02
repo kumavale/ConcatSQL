@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::cell::RefCell;
 use std::fmt;
-use std::borrow::Cow;
 
 use crate::Result;
 use crate::bidimap::BidiMap;
@@ -250,7 +249,7 @@ impl Connection {
     /// assert_eq!(conn.actual_sql(bar).unwrap(), "'   bar   ' ");
     /// ```
     #[inline]
-    pub fn whitespace_around<'a, T: Into<Cow<'a, str>> + std::string::ToString>(&self, s: T) -> String {
+    pub fn whitespace_around<T: std::string::ToString>(&self, s: T) -> String {
         let s = s.to_string();
         if !self.whitespace_around.borrow().contain(&s) {
             let whitespace_around = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);

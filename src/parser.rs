@@ -46,6 +46,32 @@ pub fn html_special_chars(input: &str) -> String {
     escaped
 }
 
+/// Sanitizes a string so that it is safe to use within an SQL LIKE statement.  
+/// This method uses escape_character to escape all occurrences of '_' and '%'.  
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(owsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
+/// assert_eq!(owsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
+/// ```
+#[macro_export]
+macro_rules! sanitize_like {
+    ($pattern:tt) =>             { owsql::_sanitize_like($pattern, '\\') };
+    ($pattern:tt, $escape:tt) => { owsql::_sanitize_like($pattern, $escape) };
+}
+#[doc(hidden)]
+pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: char) -> String {
+    let mut escaped_str = String::new();
+    for ch in pattern.to_string().chars() {
+        if ch == '%' || ch == '_' {
+            escaped_str.push(escape_character);
+        }
+        escaped_str.push(ch);
+    }
+    escaped_str
+}
+
 #[inline]
 pub(crate) fn escape_string<F>(s: &str, is_escape_char: F) -> String
 where
