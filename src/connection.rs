@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::cell::RefCell;
 use std::fmt;
+use std::borrow::Cow;
 
 use crate::Result;
 use crate::bidimap::BidiMap;
@@ -21,13 +22,14 @@ pub(crate) trait OwsqlConn {
 
 /// A database connection.
 pub struct Connection {
-    pub(crate) conn:          Box<dyn OwsqlConn>,
-    pub(crate) allowlist:     HashSet<String>,
-    pub(crate) serial_number: RefCell<SerialNumber>,
-    pub(crate) ow_len_range:  (usize, usize),
-    pub(crate) overwrite:     RefCell<BidiMap<String, String>>,
-    pub(crate) error_msg:     RefCell<BidiMap<OwsqlError, String>>,
-    pub(crate) error_level:   OwsqlErrorLevel,
+    pub(crate) conn:              Box<dyn OwsqlConn>,
+    pub(crate) allowlist:         HashSet<String>,
+    pub(crate) serial_number:     RefCell<SerialNumber>,
+    pub(crate) ow_len_range:      (usize, usize),
+    pub(crate) overwrite:         RefCell<BidiMap<String, String>>,
+    pub(crate) whitespace_around: RefCell<BidiMap<String, String>>,
+    pub(crate) error_msg:         RefCell<BidiMap<OwsqlError, String>>,
+    pub(crate) error_level:       OwsqlErrorLevel,
 }
 
 unsafe impl Send for Connection {}
@@ -202,35 +204,27 @@ impl Connection {
         }
     }
 
-    /// TODO
+    /// If there are whitespaces before or after the string entered, or if the string is only
+    /// whitespace, using this method will work properly.
+    ///
+    /// # Example
+    ///
     /// ```
     /// # let conn = owsql::sqlite::open(":memory:").unwrap();
-    /// let foo = &String::from("   foo   ");
+    /// let foo = String::from("   foo   ");
     /// assert_eq!(conn.actual_sql(foo).unwrap(), "'foo' ");
-    /// let bar = conn.ow_with_whitespace(&String::from("   bar   "));
+    ///
+    /// let bar = conn.whitespace_around(String::from("   bar   "));
     /// assert_eq!(conn.actual_sql(bar).unwrap(), "'   bar   ' ");
     /// ```
     #[inline]
-    pub fn ow_with_whitespace<T: ?Sized + std::string::ToString>(&self, s: &T) -> String {
+    pub fn whitespace_around<'a, T: Into<Cow<'a, str>> + std::string::ToString>(&self, s: T) -> String {
         let s = s.to_string();
-        let result = self.check_valid_literal(&s);
-        let s = format!("'{}'", self.conn.literal_escape(&s));
-        match result {
-            Ok(_) => {
-                if !self.overwrite.borrow().contain(&s) {
-                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
-                    self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
-                }
-                format!(" {} ", self.overwrite.borrow().get(&s).unwrap())
-            },
-            Err(e) => {
-                if !self.error_msg.borrow().contain(&e) {
-                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
-                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
-                }
-                format!(" {} ", self.error_msg.borrow().get(&e).unwrap())
-            },
+        if !self.whitespace_around.borrow().contain(&s) {
+            let whitespace_around = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+            self.whitespace_around.borrow_mut().insert(s.to_string(), whitespace_around);
         }
+        format!(" {} ", self.whitespace_around.borrow().get(&s).unwrap())
     }
 
     /// Return the overwrite definition string in allowlist.  

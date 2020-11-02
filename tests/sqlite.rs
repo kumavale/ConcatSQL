@@ -221,6 +221,45 @@ mod sqlite {
     }
 
     #[test]
+    fn whitespace_around() {
+        let conn = prepare();
+
+        assert_eq!(
+            conn.actual_sql("   foo   ").unwrap(),
+            "'foo' ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   bar   ")).unwrap(),
+            "'   bar   ' ");
+        assert_eq!(
+            conn.actual_sql("    foo   ".to_owned() + "   bar   ").unwrap(),
+            "'foo      bar' ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   foo   ") + "   bar   ").unwrap(),
+            "'   foo      bar' ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   foo   ") + &conn.whitespace_around("   bar   ")).unwrap(),
+            "'   foo      bar   ' ");
+        assert_eq!(
+            conn.actual_sql("   foo   ".to_owned() + &conn.whitespace_around("   bar   ")).unwrap(),
+            "'foo      bar   ' ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   foo   ") + "bar" +  &conn.whitespace_around("   baz   ")).unwrap(),
+            "'   foo   bar   baz   ' ");
+        assert_eq!(
+            conn.actual_sql("   foo   ".to_owned() + &conn.ow("   bar   ")).unwrap(),
+            "'foo'    bar    ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   foo   ") + &conn.ow("   bar   ")).unwrap(),
+            "'   foo   '    bar    ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   foo   ") + "bar" +  &conn.ow("   baz   ")).unwrap(),
+            "'   foo   bar'    baz    ");
+        assert_eq!(
+            conn.actual_sql(conn.whitespace_around("   'foo'   ") + "'" +  &conn.whitespace_around("   bar'   ")).unwrap(),
+            "'   ''foo''   ''   bar''   ' ");
+    }
+
+    #[test]
     fn sqli_eq_nonquote() {
         let conn = prepare();
         let name = "Alice' or '1'='1";

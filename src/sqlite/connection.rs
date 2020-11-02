@@ -38,13 +38,14 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
     match open_result {
         ffi::SQLITE_OK =>
             Ok(Connection {
-                conn:          Box::new(unsafe { NonNull::new_unchecked(conn_ptr) }),
-                allowlist:     HashSet::new(),
-                serial_number: RefCell::new(SerialNumber::default()),
-                ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
-                overwrite:     RefCell::new(BidiMap::new()),
-                error_msg:     RefCell::new(BidiMap::new()),
-                error_level:   OwsqlErrorLevel::default(),
+                conn:              Box::new(unsafe { NonNull::new_unchecked(conn_ptr) }),
+                allowlist:         HashSet::new(),
+                serial_number:     RefCell::new(SerialNumber::default()),
+                ow_len_range:      (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
+                overwrite:         RefCell::new(BidiMap::new()),
+                whitespace_around: RefCell::new(BidiMap::new()),
+                error_msg:         RefCell::new(BidiMap::new()),
+                error_level:       OwsqlErrorLevel::default(),
             }),
         _ => Err(OwsqlError::Message("failed to connect".into())),
     }

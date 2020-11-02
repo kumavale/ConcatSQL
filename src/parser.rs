@@ -197,15 +197,16 @@ fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
 
 #[inline]
 fn convert_to_valid_syntax(
-    stmt:           &str,
-    must_escape:    &dyn Fn(char) -> bool,
-    conn_overwrite: &BidiMap<String, String>,
-    conn_error_msg: &BidiMap<OwsqlError, String>,
-    error_level:    &OwsqlErrorLevel,
+    stmt:                   &str,
+    must_escape:            &dyn Fn(char) -> bool,
+    conn_overwrite:         &BidiMap<String, String>,
+    conn_whitespace_around: &BidiMap<String, String>,
+    conn_error_msg:         &BidiMap<OwsqlError, String>,
+    error_level:            &OwsqlErrorLevel,
 ) -> Result<String> {
 
     let mut query = String::new();
-    let tokens = tokenize(stmt, must_escape, conn_overwrite, conn_error_msg, error_level)?;
+    let tokens = tokenize(stmt, must_escape, conn_overwrite, conn_whitespace_around, conn_error_msg, error_level)?;
 
     for token in tokens {
         match token {
@@ -224,11 +225,12 @@ fn convert_to_valid_syntax(
 
 #[inline]
 fn tokenize(
-    stmt:           &str,
-    must_escape:    &dyn Fn(char) -> bool,
-    conn_overwrite: &BidiMap<String, String>,
-    conn_error_msg: &BidiMap<OwsqlError, String>,
-    error_level:    &OwsqlErrorLevel,
+    stmt:                   &str,
+    must_escape:            &dyn Fn(char) -> bool,
+    conn_overwrite:         &BidiMap<String, String>,
+    conn_whitespace_around: &BidiMap<String, String>,
+    conn_error_msg:         &BidiMap<OwsqlError, String>,
+    error_level:            &OwsqlErrorLevel,
 ) -> Result<Vec<TokenType>> {
 
     let mut parser = Parser::new(&stmt, &error_level);
@@ -244,9 +246,16 @@ fn tokenize(
             } else if conn_error_msg.contain_reverse(&string) {
                 tokens.push(TokenType::ErrOverwrite(string));
             } else {
+                let starts_with_whitespace_around = conn_whitespace_around.contain_reverse(&string);
+                if starts_with_whitespace_around {
+                    string = conn_whitespace_around.get_reverse(&string).unwrap().to_string();
+                }
                 let mut overwrite = TokenType::None;
                 'untilow: while !parser.eof() {
-                    let whitespace = parser.consume_whitespace().unwrap_or_default();
+                    let mut whitespace = parser.consume_whitespace().unwrap_or_default();
+                    if starts_with_whitespace_around {
+                        whitespace.remove(0);
+                    }
                     while let Ok(s) = parser.consume_except_whitespace() {
                         if conn_overwrite.contain_reverse(&s) {
                             overwrite = TokenType::Overwrite(s);
@@ -254,10 +263,14 @@ fn tokenize(
                         } else if conn_error_msg.contain_reverse(&s) {
                             overwrite = TokenType::ErrOverwrite(s);
                             break 'untilow;
+                        } else if let Some(s) = conn_whitespace_around.get_reverse(&s) {
+                            string.push_str(&whitespace[..whitespace.len()-1]);
+                            string.push_str(&s);
                         } else {
                             string.push_str(&whitespace);
                             string.push_str(&s);
                         }
+                        whitespace = parser.consume_whitespace().unwrap_or_default();
                     }
                 }
                 tokens.push(TokenType::String(format!("'{}'", escape_string(&string, must_escape))));
@@ -279,7 +292,13 @@ impl Connection {
 
     #[inline]
     pub(crate) fn convert_to_valid_syntax(&self, stmt: &str, must_escape: Box<dyn Fn(char) -> bool>) -> Result<String> {
-        convert_to_valid_syntax(&stmt, &must_escape, &self.overwrite.borrow(), &self.error_msg.borrow(), &self.error_level)
+        convert_to_valid_syntax(
+            &stmt,
+            &must_escape,
+            &self.overwrite.borrow(),
+            &self.whitespace_around.borrow(),
+            &self.error_msg.borrow(),
+            &self.error_level)
     }
 }
 

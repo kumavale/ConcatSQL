@@ -27,13 +27,14 @@ pub fn open(url: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:          Box::new(RefCell::new(conn)),
-        allowlist:     HashSet::new(),
-        serial_number: RefCell::new(SerialNumber::default()),
-        ow_len_range:  (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
-        overwrite:     RefCell::new(BidiMap::new()),
-        error_msg:     RefCell::new(BidiMap::new()),
-        error_level:   OwsqlErrorLevel::default(),
+        conn:              Box::new(RefCell::new(conn)),
+        allowlist:         HashSet::new(),
+        serial_number:     RefCell::new(SerialNumber::default()),
+        ow_len_range:      (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
+        overwrite:         RefCell::new(BidiMap::new()),
+        whitespace_around: RefCell::new(BidiMap::new()),
+        error_msg:         RefCell::new(BidiMap::new()),
+        error_level:       OwsqlErrorLevel::default(),
     })
 }
 
