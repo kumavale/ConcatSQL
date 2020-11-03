@@ -1,9 +1,8 @@
 # OverwriteSQL
 
 [![Actions Status](https://github.com/kumavale/OverwriteSQL/workflows/CI/badge.svg)](https://github.com/kumavale/OverwriteSQL/actions)
-[![Crates.io](https://img.shields.io/crates/v/owsql.svg)](https://crates.io/crates/owsql)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
-[![Documentation](https://docs.rs/owsql/badge.svg)](https://docs.rs/owsql)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-0.1.0-5378aa.svg?style=flat)](https://kumavale.github.io/OverwriteSQL/owsql/index.html)
   
 
 OverwriteSQL(`owsql`) is a secure SQL database library I'm currently developing as project for my graduation work.  
@@ -20,7 +19,7 @@ You can configure the database backend in `Cargo.toml`:
 
 ```toml
 [dependencies]
-owsql = { version = "<version>", features = ["<postgres|mysql|sqlite>"] }
+owsql = { git = "https://github.com/kumavale/OverwriteSQL", features = ["<postgres|mysql|sqlite>"] }
 ```
 
 ## Examples
