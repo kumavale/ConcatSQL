@@ -388,9 +388,6 @@ impl Connection {
     /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     /// ```
     pub fn error_level(&mut self, level: OwsqlErrorLevel) -> Result<(), &str> {
-        if cfg!(not(debug_assertions)) && level == OwsqlErrorLevel::Debug {
-            return Err("OwsqlErrorLevel::Debug cannot be set during release build");
-        }
         self.error_level = level;
         Ok(())
     }

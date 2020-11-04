@@ -109,6 +109,7 @@ impl<'a> Parser<'a> {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release  => OwsqlError::AnyError,
             OwsqlErrorLevel::Develop  => OwsqlError::Message("error: next_char()".to_string()),
+            #[cfg(debug_assertions)]
             OwsqlErrorLevel::Debug    => OwsqlError::Message("error: next_char(): None".to_string()),
         })
     }
@@ -135,6 +136,7 @@ impl<'a> Parser<'a> {
                 OwsqlErrorLevel::AlwaysOk |
                 OwsqlErrorLevel::Release  => OwsqlError::AnyError,
                 OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_except_whitespace()".to_string()),
+                #[cfg(debug_assertions)]
                 OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_except_whitespace(): empty".to_string()),
             })
         } else {
@@ -160,6 +162,7 @@ impl<'a> Parser<'a> {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release  => OwsqlError::AnyError,
             OwsqlErrorLevel::Develop  => OwsqlError::Message("endless".to_string()),
+            #[cfg(debug_assertions)]
             OwsqlErrorLevel::Debug    => OwsqlError::Message(format!("endless: {}", s)),
         })
     }
@@ -177,6 +180,7 @@ impl<'a> Parser<'a> {
                 OwsqlErrorLevel::AlwaysOk |
                 OwsqlErrorLevel::Release  => OwsqlError::AnyError,
                 OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_while()".to_string()),
+                #[cfg(debug_assertions)]
                 OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_while(): empty".to_string()),
             })
         } else {
@@ -190,6 +194,7 @@ impl<'a> Parser<'a> {
             OwsqlErrorLevel::AlwaysOk |
             OwsqlErrorLevel::Release => OwsqlError::AnyError,
             OwsqlErrorLevel::Develop => OwsqlError::Message("error: consume_char()".to_string()),
+            #[cfg(debug_assertions)]
             OwsqlErrorLevel::Debug   => OwsqlError::Message("error: consume_char(): None".to_string()),
         })?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
@@ -362,6 +367,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     fn consume_char() {
         let mut p = super::Parser::new("", &OwsqlErrorLevel::Debug);
         assert_eq!(p.consume_char(), Err(OwsqlError::Message("error: consume_char(): None".into())));

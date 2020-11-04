@@ -17,7 +17,10 @@ pub enum OwsqlErrorLevel {
     Release,
     /// This is the level that should be set during development.
     Develop,
-    /// Output more detailed messages during development.
+
+    #[cfg(debug_assertions)]
+    /// Output more detailed messages during development.  
+    /// &#x26a0;&#xfe0f; **Not available when Release build**  
     Debug,
 }
 
@@ -32,11 +35,13 @@ impl Default for OwsqlErrorLevel {
 }
 
 impl OwsqlError {
+    #[allow(unused_variables)]
     pub(crate) fn new(error_level: &OwsqlErrorLevel, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
         match error_level {
             OwsqlErrorLevel::AlwaysOk => Ok(()),
             OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
             OwsqlErrorLevel::Develop  => Err(OwsqlError::Message(err_msg.to_string())),
+            #[cfg(debug_assertions)]
             OwsqlErrorLevel::Debug    => Err(OwsqlError::Message(format!("{}: {}", err_msg, detail_msg))),
         }
     }
