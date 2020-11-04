@@ -3,6 +3,7 @@
 use std::path::Path;
 use crate::Result;
 use crate::connection::Connection;
+use crate::error::OwsqlErrorLevel;
 
 pub(crate) mod connection;
 
@@ -30,6 +31,16 @@ pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
 #[inline]
 pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Connection> {
     connection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
+}
+
+/// Open a read-write connection to a new or existing database with OwsqlErrorLevel.
+///
+/// The default value is [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Develop for debug
+/// builds and [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Release for release builds.
+#[inline]
+pub fn open_with_error_level<T: AsRef<Path>>(path: T, error_level: OwsqlErrorLevel) -> Result<Connection> {
+    let conn = connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE);
+    conn.map(|conn| conn.error_level(error_level))
 }
 
 /// Return the version number of SQLite.
@@ -65,6 +76,14 @@ mod tests {
             conn.execute(conn.ow("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         crate::sqlite::open_readonly(path).unwrap();
+    }
+
+    #[test]
+    fn sqlite_open_with_error_level() {
+        crate::sqlite::open_with_error_level(":memory:", OwsqlErrorLevel::AlwaysOk).unwrap();
+        crate::sqlite::open_with_error_level(":memory:", OwsqlErrorLevel::Release).unwrap();
+        crate::sqlite::open_with_error_level(":memory:", OwsqlErrorLevel::Develop).unwrap();
+        crate::sqlite::open_with_error_level(":memory:", OwsqlErrorLevel::Debug).unwrap();
     }
 
     #[test]
