@@ -14,7 +14,6 @@ use crate::serial::SerialNumber;
 use crate::parser::escape_string;
 
 /// Open a read-write connection to a new or existing database.
-#[inline]
 pub fn open(url: &str) -> Result<Connection> {
     let opts = match Opts::from_url(&url) {
         Ok(opts) => opts,

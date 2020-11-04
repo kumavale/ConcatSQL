@@ -4,7 +4,6 @@ use crate::connection::Connection;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
 use crate::token::TokenType;
 
-#[inline]
 pub fn escape_for_allowlist(value: &str) -> String {
     let error_level = OwsqlErrorLevel::default();
     let value = format!("'{}'", value);
@@ -30,7 +29,6 @@ pub fn escape_for_allowlist(value: &str) -> String {
 /// let encoded = owsql::html_special_chars("<a href='test'>Test</a>");
 /// assert_eq!(&encoded, "&lt;a href=&#39;test&#39;&gt;Test&lt;/a&gt;");
 /// ```
-#[inline]
 pub fn html_special_chars(input: &str) -> String {
     let mut escaped = String::new();
     for c in input.chars() {
@@ -72,7 +70,6 @@ pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: ch
     escaped_str
 }
 
-#[inline]
 pub(crate) fn escape_string<F>(s: &str, is_escape_char: F) -> String
 where
     F: Fn(char) -> bool,
@@ -201,7 +198,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[inline]
 fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s, &error_level);
@@ -221,7 +217,6 @@ fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     Ok(())
 }
 
-#[inline]
 fn convert_to_valid_syntax(
     stmt:                   &str,
     must_escape:            &dyn Fn(char) -> bool,
@@ -249,7 +244,6 @@ fn convert_to_valid_syntax(
     Ok(query)
 }
 
-#[inline]
 fn tokenize(
     stmt:                   &str,
     must_escape:            &dyn Fn(char) -> bool,

@@ -15,7 +15,6 @@ use crate::serial::SerialNumber;
 use crate::parser::escape_string;
 
 /// Open a read-write connection to a new or existing database.
-#[inline]
 pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
     let path = match path.as_ref().to_str() {
         Some(path) => {

@@ -121,7 +121,6 @@ impl Connection {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    #[inline]
     pub fn rows<T: AsRef<str>>(&self, query: T) -> Result<Vec<Row>> {
         let mut rows: Vec<Row> = Vec::new();
 
@@ -181,7 +180,6 @@ impl Connection {
     /// assert_eq!(sql, conn.ow("SELECT"));
     /// assert_ne!(sql, "SELECT");
     /// ```
-    #[inline]
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
         let result = self.check_valid_literal(&s);
@@ -225,7 +223,6 @@ impl Connection {
     ///
     /// - Use trusted values
     /// - Use in an environment where SQL injection does not occur
-    #[inline]
     pub unsafe fn without_escape<T: ?Sized + std::string::ToString>(&self, s: &T) -> String {
         let s = s.to_string();
         if !self.overwrite.borrow().contain(&s) {
@@ -248,7 +245,6 @@ impl Connection {
     /// let bar = conn.whitespace_around(String::from("   bar   "));
     /// assert_eq!(conn.actual_sql(bar).unwrap(), "'   bar   ' ");
     /// ```
-    #[inline]
     pub fn whitespace_around<T: std::string::ToString>(&self, s: T) -> String {
         let s = s.to_string();
         if !self.whitespace_around.borrow().contain(&s) {
@@ -276,7 +272,6 @@ impl Connection {
     ///
     /// assert!(conn.execute(sql).is_err());
     /// ```
-    #[inline]
     pub fn allowlist<T: ToString>(&self, value: T) -> String {
         let value = value.to_string();
         if self.allowlist.contains(&value) {
@@ -321,7 +316,6 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.add_allowlist(params!["Alice", 'A', 42, 0.123]);
     /// ```
-    #[inline]
     pub fn add_allowlist(&mut self, params: &[&(dyn ToString + Sync)]) {
         for value in params {
             self.allowlist.insert(value.to_string());
@@ -343,7 +337,6 @@ impl Connection {
     /// conn.int("42");            // ok
     /// conn.int("42 or 1=1; --"); // error
     /// ```
-    #[inline]
     pub fn int<T: Clone + ToString>(&self, value: T) -> String {
         let value = value.to_string();
         if value.parse::<i64>().is_ok() {
@@ -375,7 +368,6 @@ impl Connection {
     /// conn.set_ow_len(50..100);  // 50-99
     /// conn.set_ow_len(50..=100); // 50-100
     /// ```
-    #[inline]
     pub fn set_ow_len<T: 'static + IntoInner>(&mut self, range: T) {
         self.ow_len_range = {
             let range = range.into_inner();
@@ -395,7 +387,6 @@ impl Connection {
     /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
     /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
     /// ```
-    #[inline]
     pub fn error_level(&mut self, level: OwsqlErrorLevel) -> Result<(), &str> {
         if cfg!(not(debug_assertions)) && level == OwsqlErrorLevel::Debug {
             return Err("OwsqlErrorLevel::Debug cannot be set during release build");
