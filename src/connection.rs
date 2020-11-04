@@ -378,11 +378,18 @@ impl Connection {
     }
 
     /// Sets the error level.  
-    /// The default value is [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Develop for debug
-    /// builds and [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Release for release builds.
-    pub(crate) fn error_level(mut self, level: OwsqlErrorLevel) -> Self {
+    /// The default value is [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Develop for debug builds and [OwsqlErrorLevel](./enum.OwsqlErrorLevel.html)::Release for release builds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use owsql::OwsqlErrorLevel;
+    /// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
+    /// conn.error_level(OwsqlErrorLevel::Debug).unwrap();
+    /// ```
+    pub fn error_level(&mut self, level: OwsqlErrorLevel) -> Result<(), &str> {
         self.error_level = level;
-        self
+        Ok(())
     }
 }
 
