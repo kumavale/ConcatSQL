@@ -203,6 +203,7 @@ impl<'a> Parser<'a> {
     }
 }
 
+// I want to write with const fn
 fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s, &error_level);

@@ -182,23 +182,23 @@ impl Connection {
     /// ```
     pub fn ow<T: ?Sized + std::string::ToString>(&self, s: &'static T) -> String {
         let s = s.to_string();
-        let result = self.check_valid_literal(&s);
-        match result {
-            Ok(_) => {
-                if !self.overwrite.borrow().contain(&s) {
+        if !self.overwrite.borrow().contain(&s) {
+            let result = self.check_valid_literal(&s);
+            match result {
+                Ok(_) => {
                     let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
                     self.overwrite.borrow_mut().insert(s.to_string(), overwrite);
-                }
-                format!(" {} ", self.overwrite.borrow().get(&s).unwrap())
-            },
-            Err(e) => {
-                if !self.error_msg.borrow().contain(&e) {
-                    let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
-                    self.error_msg.borrow_mut().insert(e.clone(), overwrite);
-                }
-                format!(" {} ", self.error_msg.borrow().get(&e).unwrap())
-            },
+                },
+                Err(e) => {
+                    if !self.error_msg.borrow().contain(&e) {
+                        let overwrite = overwrite_new(self.serial_number.borrow_mut().get(), self.ow_len_range);
+                        self.error_msg.borrow_mut().insert(e.clone(), overwrite);
+                    }
+                    return format!(" {} ", self.error_msg.borrow().get(&e).unwrap());
+                },
+            }
         }
+        format!(" {} ", self.overwrite.borrow().get(&s).unwrap())
     }
 
     /// Does not escape.  
