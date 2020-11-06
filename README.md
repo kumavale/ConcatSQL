@@ -26,12 +26,12 @@ owsql = { git = "https://github.com/kumavale/ExOverwriteSQL", features = ["<post
 ### Normal value
 
 ```rust
-use exowsql::{dynamic as d, static as s};
+use exowsql::{prepare, bind};
 let conn = exowsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
-let sql = s("SELECT name FROM users WHERE id=") + &d(&id) + &s(" AND passwd='") + &d(passwd) + &s("';");
-assert_eq!(exowsql::actual_sql(&sql).unwrap(), "SELECT name FROM users WHERE id=42 AND passwd='pass';");
+let sql = prepare("SELECT name FROM users WHERE id=") + bind(&id) + prepare(" AND passwd='") + bind(passwd) + prepare("';");
+assert_eq!(exowsql::actual_sql(&sql), "SELECT name FROM users WHERE id=42 AND passwd='pass';");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     assert_eq!(row.get("name").unwrap(), "Alice");
 }
@@ -40,12 +40,12 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 ### Illegal value
 
 ```rust
-use exowsql::{dynamic as d, static as s};
+use exowsql::{prepare, bind};
 let conn = exowsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
-let sql = s("SELECT name FROM users WHERE id=") + &d(&id) + &s(" AND passwd='") + &d(passwd) + &s("';");
-assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT name FROM users WHERE id=42 AND passwd=''' or 1=1; --';");
+let sql = prepare("SELECT name FROM users WHERE id=") + bind(&id) + prepare(" AND passwd='") + bind(passwd) + prepare("';");
+assert_eq!(conn.actual_sql(&sql), "SELECT name FROM users WHERE id=42 AND passwd=''' or 1=1; --';");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     unreachable!();
 }
@@ -60,21 +60,21 @@ let conn = exowsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
 let sql = "SELECT name FROM users WHERE id=" + &id + " AND passwd='" + &passwd + "';";
-conn.execute(&sql);  // error
+conn.execute(&sql).unwrap();  // error
 ```
 
-### exowsql::static(\<String\>)
+### exowsql::prepare(\<String\>)
 
 cannot compile
 
 >> ```rust
->> pub const fn dynamic(&self, s: &'static str) -> OwString;
+>> pub const fn prepare(query: &'static str) -> OwString;
 >> ```
 
 ```rust
 let conn = exowsql::sqlite::open(":memory:").unwrap();
 let age = String::from("50 or 1=1; --");
-let sql = exowsql::static("SELECT name FROM users WHERE age < ") + &exowsql::static(&age);  // error
+let sql = exowsql::prepare("SELECT name FROM users WHERE age < ") + exowsql::prepare(&age);  // error
 ```
 
 ## License
