@@ -1,5 +1,5 @@
 [package]
-name = "owsql"
+name = "exowsql"
 version = "0.1.0"
 authors = ["kmgy <bhnk1270223@gn.iwasaki.ac.jp>"]
 edition = "2018"
