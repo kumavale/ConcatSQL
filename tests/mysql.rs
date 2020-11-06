@@ -399,6 +399,25 @@ mod mysql {
         let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(conn.actual_sql(""), Ok("".to_string()));
     }
+
+    #[test]
+    fn executable_comment_syntax() {
+        let conn = prepare();
+        let sqls = vec![
+            (conn.ow("SELECT 1 ") + "/*! +1 */", "SELECT 1  '/*! +1 */' ", "1"),
+            (conn.ow("SELECT 1 /*! +1 */"),      "SELECT 1 /*! +1 */ ",    "2"),
+        ];
+
+        for (sql, actual_sql, result) in sqls {
+            assert_eq!(conn.actual_sql(&sql).unwrap(), actual_sql);
+            conn.iterate(&sql, |pairs| {
+                for (_, (_, value)) in pairs.iter().enumerate() {
+                    assert_eq!(*value.as_ref().unwrap(), result);
+                }
+                true
+            }).unwrap();
+        }
+    }
 }
 
 #[cfg(feature = "mysql")]
