@@ -3,14 +3,13 @@
 //! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
 //! ```rust
-//! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, id INTEGER);
+//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # let stmt = conn.prepare(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let id_input = "42 OR 1=1; --";
-//! let sql = conn.ow("SELECT name FROM users WHERE id = ") + id_input;
-//! println!("[{}]", sql); // [ OWSQL47xyz6km0CfbRt0BA38Z2DxrleESyPPg4 42 OR 1=1; --]
+//! let sql = conn.prepare("SELECT name FROM users WHERE id = ") + conn.bind(id_input);
 //! // At runtime it will be transformed into a query like
 //! // "SELECT name FROM users WHERE id = '42 OR 1=1; --'".
 //! # conn.iterate(&sql, |_| { true }).unwrap();
@@ -21,8 +20,8 @@
 //! Open a connection of SQLite, create a table, and insert some rows:
 //!
 //! ```rust
-//! let mut conn = owsql::sqlite::open(":memory:").unwrap();
-//! let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
+//! let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! let stmt = conn.prepare(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! conn.execute(&stmt).unwrap();
@@ -31,13 +30,13 @@
 //! Select some rows and process them one by one as plain text:
 //!
 //! ```rust
-//! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
+//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # let stmt = conn.prepare(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
-//! let sql = conn.ow("SELECT * FROM users WHERE age > ") + age;
+//! let sql = conn.prepare("SELECT * FROM users WHERE age > ") + conn.bind(age);
 //! conn.iterate(&sql, |pairs| {
 //!     for &(column, value) in pairs.iter() {
 //!         println!("{} = {}", column, value.unwrap());
@@ -49,13 +48,13 @@
 //! It can be executed after getting all the rows of the query:
 //!
 //! ```rust
-//! # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = conn.ow(r#"CREATE TABLE users (name TEXT, age INTEGER);
+//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # let stmt = conn.prepare(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
-//! let sql = conn.ow("SELECT * FROM users WHERE age > ") + age;
+//! let sql = conn.prepare("SELECT * FROM users WHERE age > ") + conn.bind(age);
 //! let rows = conn.rows(&sql).unwrap();
 //! for row in rows.iter() {
 //!     println!("name = {}", row.get("name").unwrap_or("NULL"));
@@ -63,15 +62,11 @@
 //! ```
 
 
-mod bidimap;
 mod connection;
 mod error;
-mod overwrite;
 mod parser;
 mod row;
-mod serial;
-mod token;
-pub mod constants;
+mod owstring;
 
 #[cfg(feature = "sqlite")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
@@ -85,24 +80,9 @@ pub mod postgres;
 
 pub use crate::connection::Connection;
 pub use crate::error::{OwsqlError, OwsqlErrorLevel};
-pub use crate::overwrite::IntoInner;
 pub use crate::row::Row;
 pub use crate::parser::{html_special_chars, _sanitize_like};
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
 
-/// This macro is a convenient way to pass named parameters to a statement.
-///
-/// ```rust
-/// use owsql::params;
-/// # let mut conn = owsql::sqlite::open(":memory:").unwrap();
-/// let alice = "Alice";
-/// let sql = conn.add_allowlist( params![ alice, "Bob" ] );
-/// ```
-#[macro_export]
-macro_rules! params {
-    ( $( $param:expr ),* ) => {
-        &{ [ $(&$param),* ] }
-    };
-}

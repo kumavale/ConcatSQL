@@ -14,12 +14,12 @@ pub(crate) mod connection;
 ///
 /// ```should_panic
 /// // Open a new connection to an in-memory.
-/// let conn = owsql::sqlite::open(":memory:").unwrap();
+/// let conn = exowsql::sqlite::open(":memory:").unwrap();
 /// // Open a new connection from path of literal.
-/// let conn = owsql::sqlite::open("/path/to/db").unwrap();
+/// let conn = exowsql::sqlite::open("/path/to/db").unwrap();
 /// // Open a new connection from std::path::Path.
 /// let path = std::path::Path::new("/path/to/db");
-/// let conn = owsql::sqlite::open(path).unwrap();
+/// let conn = exowsql::sqlite::open(path).unwrap();
 /// ```
 #[inline]
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
@@ -62,7 +62,7 @@ mod tests {
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(conn.ow("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(conn.prepare("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         crate::sqlite::open_readonly(path).unwrap();
     }
@@ -73,12 +73,12 @@ mod tests {
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(conn.ow("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(conn.prepare("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         let mut conn = crate::sqlite::open_readonly(path).unwrap();
         conn.error_level = OwsqlErrorLevel::Debug;
         assert_eq!(
-            conn.execute(conn.ow("INSERT INTO users VALUES(42, 'Alice');")),
+            conn.execute(conn.prepare("INSERT INTO users VALUES(42, 'Alice');")),
             Err(OwsqlError::Message("exec error: attempt to write a readonly database".to_string()))
         );
     }

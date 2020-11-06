@@ -2,16 +2,16 @@
 #[cfg(feature = "sqlite")]
 #[cfg(debug_assertions)]
 mod sqlite {
-    use owsql::*;
+    use exowsql::*;
 
     macro_rules! err {
-        () => { Err(owsql::OwsqlError::AnyError) };
-        ($msg:expr) => { Err(owsql::OwsqlError::Message($msg.to_string())) };
+        () => { Err(exowsql::OwsqlError::AnyError) };
+        ($msg:expr) => { Err(exowsql::OwsqlError::Message($msg.to_string())) };
     }
 
-    fn prepare() -> owsql::Connection {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+    fn prepare() -> exowsql::Connection {
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.prepare(stmt());
         conn.execute(&stmt).unwrap();
         conn
     }
@@ -25,7 +25,7 @@ mod sqlite {
 
     #[test]
     fn open() {
-        let _conn = owsql::sqlite::open(":memory:").unwrap();
+        let _conn = exowsql::sqlite::open(":memory:").unwrap();
     }
 
     #[test]
@@ -44,8 +44,8 @@ mod sqlite {
         )*
         )}
 
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.prepare(stmt());
         conn.execute(&stmt).unwrap();
         static_strings! {
             select = "SELECT ";
@@ -54,13 +54,13 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(conn.actual_sql(&conn.ow(sql)), Ok("SELECT name FROM users ".into()));
+        assert_eq!(conn.prepare(sql).actual_sql(), "SELECT name FROM users");
     }
 
     #[test]
     fn execute() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.ow(stmt());
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        let stmt = conn.prepare(stmt());
         conn.execute(&stmt).unwrap();
     }
 
@@ -68,7 +68,7 @@ mod sqlite {
     fn iterate() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol"];
-        let sql = conn.ow("SELECT name FROM users;");
+        let sql = conn.prepare("SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -84,7 +84,7 @@ mod sqlite {
     fn iterate_2sets() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol", "Alice", "Bob", "Carol"];
-        let sql = conn.ow("SELECT name FROM users; SELECT name FROM users;");
+        let sql = conn.prepare("SELECT name FROM users; SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -101,8 +101,8 @@ mod sqlite {
         let conn = prepare();
         let expects = ["Alice", "Bob"];
         let age = "50";
-        let sql = conn.ow("SELECT name FROM users WHERE") +
-            &conn.ow("age <") + age + &conn.ow("OR") + age + &conn.ow("< age");
+        let sql = conn.prepare("SELECT name FROM users WHERE ") +
+            &conn.prepare("age < ") + conn.bind(age) + &conn.prepare(" OR ") + conn.bind(age) + &conn.prepare(" < age");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -118,7 +118,7 @@ mod sqlite {
     fn rows() {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
-        let sql = conn.ow("SELECT * FROM users;");
+        let sql = conn.prepare("SELECT * FROM users;");
 
         let rows = conn.rows(&sql).unwrap();
         for (i, row) in rows.iter().enumerate() {
@@ -132,7 +132,7 @@ mod sqlite {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
 
-        conn.rows(&conn.ow("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+        conn.rows(&conn.prepare("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         });
@@ -142,12 +142,12 @@ mod sqlite {
     fn double_quotaion_inside_double_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql(r#"".ow(""inside str"") -> String""#).unwrap(),
-            r#"'".ow(""inside str"") -> String"' "#
+            conn.bind(r#"".ow(""inside str"") -> String""#).actual_sql(),
+            r#"'".ow(""inside str"") -> String"'"#
         );
         assert_eq!(
-            conn.actual_sql(r#"".ow("inside str") -> String""#).unwrap(),
-            r#"'".ow("inside str") -> String"' "#
+            conn.bind(r#"".ow("inside str") -> String""#).actual_sql(),
+            r#"'".ow("inside str") -> String"'"#
         );
     }
 
@@ -155,12 +155,12 @@ mod sqlite {
     fn double_quotaion_inside_sigle_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql(r#""I'm Alice""#).unwrap(),
-            r#"'"I''m Alice"' "#
+            conn.bind(r#""I'm Alice""#).actual_sql(),
+            r#"'"I''m Alice"'"#
         );
         assert_eq!(
-            conn.actual_sql(r#""I''m Alice""#).unwrap(),
-            r#"'"I''''m Alice"' "#
+            conn.bind(r#""I''m Alice""#).actual_sql(),
+            r#"'"I''''m Alice"'"#
         );
     }
 
@@ -168,8 +168,8 @@ mod sqlite {
     fn single_quotaion_inside_double_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql(r#"'.ow("inside str") -> String'"#).unwrap(),
-            r#"'''.ow("inside str") -> String''' "#
+            conn.bind(r#"'.ow("inside str") -> String'"#).actual_sql(),
+            r#"'''.ow("inside str") -> String'''"#
         );
     }
 
@@ -177,8 +177,8 @@ mod sqlite {
     fn single_quotaion_inside_sigle_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql("'I''m Alice'").unwrap(),
-            r#"'''I''''m Alice''' "#
+            conn.bind("'I''m Alice'").actual_sql(),
+            r#"'''I''''m Alice'''"#
         );
     }
 
@@ -186,8 +186,8 @@ mod sqlite {
     fn non_quotaion_inside_sigle_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql("foo'bar'foo").unwrap(),
-            r#"'foo''bar''foo' "#
+            conn.bind("foo'bar'foo").actual_sql(),
+            r#"'foo''bar''foo'"#
         );
     }
 
@@ -195,8 +195,8 @@ mod sqlite {
     fn non_quotaion_inside_double_quote() {
         let conn = prepare();
         assert_eq!(
-            conn.actual_sql("foo\"bar\"foo").unwrap(),
-            r#"'foo"bar"foo' "#
+            conn.bind("foo\"bar\"foo").actual_sql(),
+            r#"'foo"bar"foo'"#
         );
     }
 
@@ -204,10 +204,10 @@ mod sqlite {
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
-        let sql = conn.ow("select age from users where name = ") + name + &conn.ow("");
+        let sql = conn.prepare("select age from users where name = ") + conn.bind(name) + &conn.prepare("");
         assert_eq!(
-            conn.actual_sql(name).unwrap(),
-            r#"'''Alice''; DROP TABLE users; --' "#
+            conn.bind(name).actual_sql(),
+            r#"'''Alice''; DROP TABLE users; --'"#
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -215,69 +215,19 @@ mod sqlite {
     #[test]
     fn whitespace() {
         let conn = prepare();
-        let sql = conn.ow("select\n*\rfrom\nusers;");
+        let sql = conn.prepare("select\n*\rfrom\nusers;");
 
         conn.iterate(&sql, |_| { true }).unwrap();
-    }
-
-    #[test]
-    fn whitespace_around() {
-        let conn = prepare();
-
-        assert_eq!(
-            conn.actual_sql("   foo   ").unwrap(),
-            "'foo' ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   bar   ")).unwrap(),
-            "'   bar   ' ");
-        assert_eq!(
-            conn.actual_sql("    foo   ".to_owned() + "   bar   ").unwrap(),
-            "'foo      bar' ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   foo   ") + "   bar   ").unwrap(),
-            "'   foo      bar' ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   foo   ") + &conn.whitespace_around("   bar   ")).unwrap(),
-            "'   foo      bar   ' ");
-        assert_eq!(
-            conn.actual_sql("   foo   ".to_owned() + &conn.whitespace_around("   bar   ")).unwrap(),
-            "'foo      bar   ' ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   foo   ") + "bar" +  &conn.whitespace_around("   baz   ")).unwrap(),
-            "'   foo   bar   baz   ' ");
-        assert_eq!(
-            conn.actual_sql("   foo   ".to_owned() + &conn.ow("   bar   ")).unwrap(),
-            "'foo'    bar    ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   foo   ") + &conn.ow("   bar   ")).unwrap(),
-            "'   foo   '    bar    ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   foo   ") + "bar" +  &conn.ow("   baz   ")).unwrap(),
-            "'   foo   bar'    baz    ");
-        assert_eq!(
-            conn.actual_sql(conn.whitespace_around("   'foo'   ") + "'" +  &conn.whitespace_around("   bar'   ")).unwrap(),
-            "'   ''foo''   ''   bar''   ' ");
     }
 
     #[test]
     fn sqli_eq_nonquote() {
         let conn = prepare();
         let name = "Alice' or '1'='1";
-        let sql = conn.ow("select age from users where name =") + name + &conn.ow(";");
+        let sql = conn.prepare("select age from users where name =") + conn.bind(name) + &conn.prepare(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
-    }
-
-    #[test]
-    fn allowlist() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.add_allowlist(params![42, "foo"]);
-        conn.add_allowlist(&[&21, &"bar"]);
-        assert_eq!(conn.actual_sql(conn.allowlist(21)), Ok("'21' ".into()));
-        assert_eq!(conn.actual_sql(conn.allowlist(42)), Ok("'42' ".into()));
-        assert_eq!(conn.actual_sql(conn.allowlist("foo")), Ok("'foo' ".into()));
-        assert_eq!(conn.actual_sql(conn.allowlist("bar")), Ok("'bar' ".into()));
     }
 
     #[test]
@@ -298,13 +248,13 @@ mod sqlite {
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
-        let sql = conn.ow("INSERT INTO users VALUES(") + name + &conn.ow(", 12345);");
+        let sql = conn.prepare("INSERT INTO users VALUES(") + conn.bind(name) + &conn.prepare(", 12345);");
 
         conn.execute(&sql).unwrap();
 
-        conn.rows(conn.ow("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+        conn.rows(conn.prepare("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
-                owsql::html_special_chars(&row.get("name").unwrap()),
+                exowsql::html_special_chars(&row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
             );
             true
@@ -313,159 +263,112 @@ mod sqlite {
 
     #[test]
     fn error_level() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
-        conn.error_level(OwsqlErrorLevel::Release).unwrap();
-        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
-        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::AlwaysOk);
+        conn.error_level(OwsqlErrorLevel::Release);
+        conn.error_level(OwsqlErrorLevel::Develop);
+        conn.error_level(OwsqlErrorLevel::Debug);
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::AlwaysOk).unwrap();
-        let single_quote = conn.ow("'");
-        conn.add_allowlist(params!["Alice"]);
-        let name = conn.allowlist("Bob");
-        let integer = conn.int("50 or 1=1; --");
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::AlwaysOk);
+        let invalid_sql = conn.bind("INVALID SQL");
+        let endless = conn.bind("'endless");
 
-        assert_eq!(conn.execute("INVALID SQL"),                     Ok(()));
-        assert_eq!(conn.execute("'endless"),                        Ok(()));
-        assert_eq!(conn.execute(&single_quote),                     Ok(()));
-        assert_eq!(conn.execute(&name),                             Ok(()));
-        assert_eq!(conn.execute(&integer),                          Ok(()));
-        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&name,         |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), Ok(()));
-        assert_eq!(conn.rows("INVALID SQL"),                        Ok(vec![]));
-        assert_eq!(conn.rows("'endless"),                           Ok(vec![]));
-        assert_eq!(conn.rows(&single_quote),                        Ok(vec![]));
-        assert_eq!(conn.rows(&name),                                Ok(vec![]));
-        assert_eq!(conn.rows(&integer),                             Ok(vec![]));
+        assert_eq!(conn.execute(&invalid_sql),                      Ok(()));
+        assert_eq!(conn.execute(&endless),                          Ok(()));
+        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), Ok(()));
+        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), Ok(()));
+        assert_eq!(conn.rows(&invalid_sql),                         Ok(vec![]));
+        assert_eq!(conn.rows(&endless),                             Ok(vec![]));
     }
 
     #[test]
     fn error_level_release() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Release).unwrap();
-        let single_quote = conn.ow("'");
-        conn.add_allowlist(params!["Alice"]);
-        let name = conn.allowlist("Bob");
-        let integer = conn.int("50 or 1=1; --");
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Release);
+        let invalid_sql = conn.bind("INVALID SQL");
+        let endless = conn.bind("'endless");
 
-        assert_eq!(conn.execute("INVALID SQL"),                     err!());
-        assert_eq!(conn.execute("'endless"),                        err!());
-        assert_eq!(conn.execute(&single_quote),                     err!());
-        assert_eq!(conn.execute(&name),                             err!());
-        assert_eq!(conn.execute(&integer),                          err!());
-        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), err!());
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&name,         |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), err!());
-        assert_eq!(conn.rows("INVALID SQL"),                        err!());
-        assert_eq!(conn.rows("'endless"),                           err!());
-        assert_eq!(conn.rows(&single_quote),                        err!());
-        assert_eq!(conn.rows(&name),                                err!());
-        assert_eq!(conn.rows(&integer),                             err!());
+        assert_eq!(conn.execute(&invalid_sql),                      err!());
+        assert_eq!(conn.execute(&endless),                          err!());
+        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!());
+        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!());
+        assert_eq!(conn.rows(&invalid_sql),                         err!());
+        assert_eq!(conn.rows(&endless),                             err!());
     }
 
     #[test]
     fn error_level_develop() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Develop).unwrap();
-        let single_quote = conn.ow("'");
-        conn.add_allowlist(params!["Alice"]);
-        let name = conn.allowlist("Bob");
-        let integer = conn.int("50 or 1=1; --");
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Develop);
+        let invalid_sql = conn.bind("INVALID SQL");
+        let endless = conn.bind("'endless");
 
-        assert_eq!(conn.execute("INVALID SQL"),                     err!("exec error"));
-        assert_eq!(conn.execute("'endless"),                        err!("exec error"));
-        assert_eq!(conn.execute(&single_quote),                     err!("invalid literal"));
-        assert_eq!(conn.execute(&name),                             err!("deny value"));
-        assert_eq!(conn.execute(&integer),                          err!("non integer"));
-        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), err!("invalid literal"));
-        assert_eq!(conn.iterate(&name,         |_| unreachable!()), err!("deny value"));
-        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), err!("non integer"));
-        assert_eq!(conn.rows("INVALID SQL"),                        err!("exec error"));
-        assert_eq!(conn.rows("'endless"),                           err!("exec error"));
-        assert_eq!(conn.rows(&single_quote),                        err!("invalid literal"));
-        assert_eq!(conn.rows(&name),                                err!("deny value"));
-        assert_eq!(conn.rows(&integer),                             err!("non integer"));
+        assert_eq!(conn.execute(&invalid_sql),                      err!("exec error"));
+        assert_eq!(conn.execute(&endless),                          err!("exec error"));
+        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!("exec error"));
+        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!("exec error"));
+        assert_eq!(conn.rows(&invalid_sql),                         err!("exec error"));
+        assert_eq!(conn.rows(&endless),                             err!("exec error"));
     }
 
     #[test]
     fn error_level_debug() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.error_level(OwsqlErrorLevel::Debug).unwrap();
-        let single_quote = conn.ow("'");
-        conn.add_allowlist(params!["Alice"]);
-        let name = conn.allowlist("Bob");
-        let integer = conn.int("50 or 1=1; --");
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(OwsqlErrorLevel::Debug);
+        let invalid_sql = conn.bind("INVALID SQL");
+        let endless = conn.bind("'endless");
 
-        assert_eq!(conn.execute("INVALID SQL"),
+        assert_eq!(conn.execute(&invalid_sql),
             err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.execute("'endless"),
+        assert_eq!(conn.execute(&endless),
             err!("exec error: near \"\'\'\'endless\'\": syntax error"));
-        assert_eq!(conn.execute(&single_quote),                     err!("invalid literal: '"));
-        assert_eq!(conn.execute(&name),                             err!("deny value: Bob"));
-        assert_eq!(conn.execute(&integer),                          err!("non integer: 50 or 1=1; --"));
-        assert_eq!(conn.iterate("INVALID SQL", |_| unreachable!()),
+        assert_eq!(conn.iterate(&invalid_sql, |_| unreachable!()),
             err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.iterate("'endless",    |_| unreachable!()),
+        assert_eq!(conn.iterate(&endless,     |_| unreachable!()),
             err!("exec error: near \"\'\'\'endless\'\": syntax error"));
-        assert_eq!(conn.iterate(&single_quote, |_| unreachable!()), err!("invalid literal: '"));
-        assert_eq!(conn.iterate(&name,         |_| unreachable!()), err!("deny value: Bob"));
-        assert_eq!(conn.iterate(&integer,      |_| unreachable!()), err!("non integer: 50 or 1=1; --"));
-        assert_eq!(conn.rows("INVALID SQL"),
+        assert_eq!(conn.rows(&invalid_sql),
             err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.rows("'endless"),
+        assert_eq!(conn.rows(&endless),
             err!("exec error: near \"\'\'\'endless\'\": syntax error"));
-        assert_eq!(conn.rows(&single_quote),                        err!("invalid literal: '"));
-        assert_eq!(conn.rows(&name),                                err!("deny value: Bob"));
-        assert_eq!(conn.rows(&integer),                             err!("non integer: 50 or 1=1; --"));
     }
 
     #[test]
     fn integer() {
-        let conn = prepare();
-        let age = 50;
-        let sql = conn.ow("select name from users where age <") + &conn.int(age);
-
-        for row in conn.rows(&sql).unwrap().iter() {
-            assert_eq!(row.get("name").unwrap(), "Alice");
-        }
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        assert!(conn.int(42).is_ok());
+        assert!(conn.int("42").is_ok());
+        assert!(conn.int("xxx").is_err());
     }
 
     #[test]
     fn ow_into_execute() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.execute(conn.ow("SELECT") + &conn.int(1)).unwrap();
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.execute(conn.prepare("SELECT ") + conn.int(1).unwrap()).unwrap();
     }
 
     #[test]
     fn ow_into_iterate() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.iterate(conn.ow("SELECT") + &conn.int(1), |_| true ).unwrap();
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        conn.iterate(conn.prepare("SELECT ") + conn.int(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
     fn ow_into_rows() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        for row in conn.rows(conn.ow("SELECT") + &conn.int(1)).unwrap().iter() {
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        for row in conn.rows(conn.prepare("SELECT ") + conn.int(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
 
     #[test]
     fn empty_string() {
-        let conn = owsql::sqlite::open(":memory:").unwrap();
-        assert_eq!(conn.actual_sql(""), Ok("".to_string()));
+        let conn = exowsql::sqlite::open(":memory:").unwrap();
+        assert_eq!(conn.prepare("").actual_sql(), "");
     }
 
     #[test]
@@ -473,8 +376,8 @@ mod sqlite {
         use std::thread;
         use std::sync::{Arc, Mutex};
 
-        let conn = Arc::new(Mutex::new(owsql::sqlite::open(":memory:").unwrap()));
-        let stmt = conn.lock().unwrap().ow(stmt());
+        let conn = Arc::new(Mutex::new(exowsql::sqlite::open(":memory:").unwrap()));
+        let stmt = conn.lock().unwrap().prepare(stmt());
         conn.lock().unwrap().execute(&stmt).unwrap();
 
         let mut handles = vec![];
@@ -483,7 +386,7 @@ mod sqlite {
             let conn_clone = conn.clone();
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
-                let sql = conn.ow("INSERT INTO users VALUES ('Thread', ") + &conn.int(i) + &conn.ow(");");
+                let sql = conn.prepare("INSERT INTO users VALUES ('Thread', ") + conn.int(i).unwrap() + conn.prepare(");");
                 conn.execute(&sql).unwrap();
             });
             handles.push(handle);
@@ -493,38 +396,10 @@ mod sqlite {
 
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
-            conn.iterate(conn.ow("SELECT age FROM users WHERE age = ") + &conn.int(i), |pairs| {
+            conn.iterate(conn.prepare("SELECT age FROM users WHERE age = ") + &conn.int(i).unwrap(), |pairs| {
                 pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());
-    }
-
-    #[test]
-    #[allow(clippy::int_plus_one, clippy::reversed_empty_ranges)]
-    fn range() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
-        conn.set_ow_len(1);
-        assert_eq!(1+5+32+1+1, conn.ow("0").len());
-        conn.set_ow_len(42);
-        assert_eq!(1+5+42+1+1, conn.ow("1").len());
-        conn.set_ow_len(0..32);
-        assert_eq!(1+5+32+1+1, conn.ow("2").len());
-        conn.set_ow_len(0..=32);
-        assert_eq!(1+5+32+1+1, conn.ow("3").len());
-        conn.set_ow_len(64..64);
-        assert_eq!(1+5+64+1+1, conn.ow("4").len());
-        conn.set_ow_len(64..=64);
-        assert_eq!(1+5+64+1+1, conn.ow("5").len());
-        conn.set_ow_len(64..32);
-        assert!(1+5+33+1+1 <= conn.ow("6").len() && conn.ow("6").len() <= 1+5+64+1+1);
-        conn.set_ow_len(64..=32);
-        assert!(1+5+32+1+1 <= conn.ow("7").len() && conn.ow("7").len() <= 1+5+64+1+1);
-        conn.set_ow_len(100..110);
-        assert!(1+5+100+1+1 <= conn.ow("8").len() && conn.ow("8").len() <= 1+5+109+1+1);
-        conn.set_ow_len(..64);
-        assert!(1+5+32+1+1 <= conn.ow("9").len() && conn.ow("9").len() <= 1+5+63+1+1);
-        conn.set_ow_len(..=64);
-        assert!(1+5+32+2+1 <= conn.ow("10").len() && conn.ow("10").len() <= 1+5+64+2+1);
     }
 
     #[test]
@@ -532,7 +407,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A%";
-        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + name + &conn.ow(";");
+        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE") + conn.bind(name) + conn.prepare(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -543,18 +418,18 @@ mod sqlite {
         assert!(executed);
 
         let name = "A";
-        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + name + "%";
-        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%A%' ");
+        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + name + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
-        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + &owsql::sanitize_like!(name) + "%";
-        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%' ");
+        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + &sanitize_like!(name) + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
-        let sql = conn.ow("SELECT * FROM users WHERE name LIKE") + "%" + &owsql::sanitize_like!(name, '$') + "%";
-        assert_eq!(conn.actual_sql(&sql).unwrap(), "SELECT * FROM users WHERE name LIKE '%$%A$%%' ");
+        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + &sanitize_like!(name, '$') + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
 
@@ -563,7 +438,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A?['i]*";
-        let sql = conn.ow("SELECT * FROM users WHERE name GLOB") + name + &conn.ow(";");
+        let sql = conn.prepare("SELECT * FROM users WHERE name GLOB") + conn.bind(name) + conn.prepare(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -575,18 +450,17 @@ mod sqlite {
     }
 
     mod should_panic {
-        use owsql::params;
         use super::stmt;
 
         #[test]
         #[should_panic = "exec error"]
         fn literal() {
-            let conn = owsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.ow(stmt());
+            let conn = exowsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.prepare(stmt());
 
             conn.execute(&stmt).unwrap();
 
-            let sql = "select * from users;";
+            let sql = conn.bind("select * from users;");
 
             conn.iterate(&sql, |_| { true }).unwrap();
         }
@@ -594,26 +468,12 @@ mod sqlite {
         #[test]
         #[should_panic = "invalid literal"]
         fn sqli_eq_quote() {
-            let conn = owsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.ow(stmt());
+            let conn = exowsql::sqlite::open(":memory:").unwrap();
+            let stmt = conn.prepare(stmt());
             conn.execute(&stmt).unwrap();
 
             let name = "OR TRUE; DROP TABLE users; --";
-            let sql = conn.ow("select age from users where name = '") + name + &conn.ow("';");
-
-            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
-        }
-
-        #[test]
-        #[should_panic = "deny value"]
-        fn allowlist_deny_value() {
-            let mut conn = owsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.ow(stmt());
-            conn.execute(&stmt).unwrap();
-
-            conn.add_allowlist(params!["Alice", "Bob"]);
-            let name = "Alice OR 1=1; --";
-            let sql = conn.ow("select age from users where name =") + &conn.allowlist(name) + &conn.ow(";");
+            let sql = conn.prepare("select age from users where name = '") + conn.bind(name) + &conn.prepare("';");
 
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }
@@ -623,11 +483,11 @@ mod sqlite {
 #[cfg(feature = "sqlite")]
 #[cfg(not(debug_assertions))]
 mod sqlite_release_build {
-    use owsql::error::*;
+    use exowsql::error::*;
 
     #[test]
     fn error_level_debug_when_release_build() {
-        let mut conn = owsql::sqlite::open(":memory:").unwrap();
+        let mut conn = exowsql::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.error_level(OwsqlErrorLevel::Debug),
             Err("OwsqlErrorLevel::Debug cannot be set during release build")

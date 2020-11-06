@@ -1,15 +1,5 @@
 use crate::Result;
-use crate::bidimap::BidiMap;
-use crate::connection::Connection;
 use crate::error::{OwsqlError, OwsqlErrorLevel};
-use crate::token::TokenType;
-
-pub fn escape_for_allowlist(value: &str) -> String {
-    let error_level = OwsqlErrorLevel::default();
-    let value = format!("'{}'", value);
-    let mut parser = Parser::new(&value, &error_level);
-    parser.consume_string('\'').unwrap_or_default()
-}
 
 /// Convert special characters to HTML entities.
 ///
@@ -26,7 +16,7 @@ pub fn escape_for_allowlist(value: &str) -> String {
 /// # Examples
 ///
 /// ```
-/// let encoded = owsql::html_special_chars("<a href='test'>Test</a>");
+/// let encoded = exowsql::html_special_chars("<a href='test'>Test</a>");
 /// assert_eq!(&encoded, "&lt;a href=&#39;test&#39;&gt;Test&lt;/a&gt;");
 /// ```
 pub fn html_special_chars(input: &str) -> String {
@@ -50,13 +40,13 @@ pub fn html_special_chars(input: &str) -> String {
 /// # Examples
 ///
 /// ```
-/// assert_eq!(owsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
-/// assert_eq!(owsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
+/// assert_eq!(exowsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
+/// assert_eq!(exowsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {
-    ($pattern:tt) =>             { owsql::_sanitize_like($pattern, '\\') };
-    ($pattern:tt, $escape:tt) => { owsql::_sanitize_like($pattern, $escape) };
+    ($pattern:tt) =>             { exowsql::_sanitize_like($pattern, '\\') };
+    ($pattern:tt, $escape:tt) => { exowsql::_sanitize_like($pattern, $escape) };
 }
 #[doc(hidden)]
 pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: char) -> String {
@@ -81,8 +71,7 @@ where
         }
         escaped.push(c);
     }
-    debug_assert!(!escaped.is_empty());
-    escaped
+    format!("'{}'", escaped)
 }
 
 pub struct Parser<'a> {
@@ -204,11 +193,11 @@ impl<'a> Parser<'a> {
 }
 
 // I want to write with const fn
-fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
+pub(crate) fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     let err_msg = "invalid literal";
     let mut parser = Parser::new(&s, &error_level);
     while !parser.eof() {
-        parser.consume_while(|c| c != '"' && c != '\'').ok();
+        parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
                 return OwsqlError::new(error_level, err_msg, &s);
@@ -223,141 +212,9 @@ fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
     Ok(())
 }
 
-fn convert_to_valid_syntax(
-    stmt:                   &str,
-    must_escape:            &dyn Fn(char) -> bool,
-    conn_overwrite:         &BidiMap<String, String>,
-    conn_whitespace_around: &BidiMap<String, String>,
-    conn_error_msg:         &BidiMap<OwsqlError, String>,
-    error_level:            &OwsqlErrorLevel,
-) -> Result<String> {
-
-    let mut query = String::new();
-    let tokens = tokenize(stmt, must_escape, conn_overwrite, conn_whitespace_around, conn_error_msg, error_level)?;
-
-    for token in tokens {
-        match token {
-            TokenType::ErrOverwrite(e) =>
-                return Err(conn_error_msg.get_reverse(&e).unwrap().clone()),
-            TokenType::Overwrite(original) =>
-                query.push_str(conn_overwrite.get_reverse(&original).unwrap()),
-            other => query.push_str(&other.unwrap()),
-        }
-
-        query.push(' ');
-    }
-
-    Ok(query)
-}
-
-fn tokenize(
-    stmt:                   &str,
-    must_escape:            &dyn Fn(char) -> bool,
-    conn_overwrite:         &BidiMap<String, String>,
-    conn_whitespace_around: &BidiMap<String, String>,
-    conn_error_msg:         &BidiMap<OwsqlError, String>,
-    error_level:            &OwsqlErrorLevel,
-) -> Result<Vec<TokenType>> {
-
-    let mut parser = Parser::new(&stmt, &error_level);
-    let mut tokens = Vec::new();
-
-    while !parser.eof() {
-        parser.skip_whitespace().ok();
-
-        if parser.next_char().is_ok() {
-            let mut string = parser.consume_except_whitespace()?;
-            if conn_overwrite.contain_reverse(&string) {
-                tokens.push(TokenType::Overwrite(string));
-            } else if conn_error_msg.contain_reverse(&string) {
-                tokens.push(TokenType::ErrOverwrite(string));
-            } else {
-                let starts_with_whitespace_around = conn_whitespace_around.contain_reverse(&string);
-                if starts_with_whitespace_around {
-                    string = conn_whitespace_around.get_reverse(&string).unwrap().to_string();
-                }
-                let mut overwrite = TokenType::None;
-                'untilow: while !parser.eof() {
-                    let mut whitespace = parser.consume_whitespace().unwrap_or_default();
-                    if starts_with_whitespace_around {
-                        whitespace.remove(0);
-                    }
-                    while let Ok(s) = parser.consume_except_whitespace() {
-                        if conn_overwrite.contain_reverse(&s) {
-                            overwrite = TokenType::Overwrite(s);
-                            break 'untilow;
-                        } else if conn_error_msg.contain_reverse(&s) {
-                            overwrite = TokenType::ErrOverwrite(s);
-                            break 'untilow;
-                        } else if let Some(s) = conn_whitespace_around.get_reverse(&s) {
-                            string.push_str(&whitespace[..whitespace.len()-1]);
-                            string.push_str(&s);
-                        } else {
-                            string.push_str(&whitespace);
-                            string.push_str(&s);
-                        }
-                        whitespace = parser.consume_whitespace().unwrap_or_default();
-                    }
-                }
-                tokens.push(TokenType::String(format!("'{}'", escape_string(&string, must_escape))));
-                if !overwrite.is_none() {
-                    tokens.push(overwrite);
-                }
-            }
-        }
-    }
-
-    Ok(tokens)
-}
-
-impl Connection {
-    #[inline]
-    pub(crate) fn check_valid_literal(&self, s: &str) -> Result<()> {
-        check_valid_literal(&s, &self.error_level)
-    }
-
-    #[inline]
-    pub(crate) fn convert_to_valid_syntax(&self, stmt: &str, must_escape: Box<dyn Fn(char) -> bool>) -> Result<String> {
-        convert_to_valid_syntax(
-            &stmt,
-            &must_escape,
-            &self.overwrite.borrow(),
-            &self.whitespace_around.borrow(),
-            &self.error_msg.borrow(),
-            &self.error_level)
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use crate::error::*;
-
-    #[test]
-    #[cfg(features = "sqlite")]
-    fn check_valid_literals_sqlite() {
-        let conn = crate::sqlite::open(":memory:").unwrap();
-        assert_eq!(conn.check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("'O\"Reilly'"),    Ok(()));
-        assert_eq!(conn.check_valid_literal("'O''Reilly'"),    Ok(()));
-        assert_eq!(conn.check_valid_literal("\"O'Reilly\""),   Ok(()));
-        assert_eq!(conn.check_valid_literal("'Alice', 'Bob'"), Ok(()));
-    }
-
-    #[test]
-    #[cfg(features = "mysql")]
-    fn check_valid_literals_mysql() {
-        let conn = owsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        assert_eq!(conn.check_valid_literal("O'Reilly"),   Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("O\"Reilly"),  Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("'O'Reilly'"), Err(OwsqlError::Message("invalid literal".to_string())));
-        assert_eq!(conn.check_valid_literal("'O\"Reilly'"),    Ok(()));
-        assert_eq!(conn.check_valid_literal("'O''Reilly'"),    Ok(()));
-        assert_eq!(conn.check_valid_literal("\"O'Reilly\""),   Ok(()));
-        assert_eq!(conn.check_valid_literal("'Alice', 'Bob'"), Ok(()));
-    }
 
     #[test]
     fn html_special_chars() {
@@ -376,9 +233,9 @@ mod tests {
 
     #[test]
     fn escape_string() {
-        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\''),            "O''Reilly");
-        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\''),            "O\\''Reilly");
-        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\'' || c=='\\'), "O''Reilly");
-        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\'' || c=='\\'), "O\\\\''Reilly");
+        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\''),            "'O''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\''),            "'O\\''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\'' || c=='\\'), "'O''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\'' || c=='\\'), "'O\\\\''Reilly'");
     }
 }
