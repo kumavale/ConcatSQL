@@ -6,6 +6,7 @@ pub struct WrapString {
 }
 
 impl WrapString {
+    #[doc(hidden)]
     pub fn new<T: ?Sized + std::string::ToString>(s: &T) -> Self {
         Self {
             query: s.to_string(),
@@ -33,22 +34,12 @@ impl<'a> Add<&'a WrapString> for WrapString {
     }
 }
 
-impl Add<String> for WrapString {
+impl<T: Sized + ToString> Add<T> for WrapString {
     type Output = WrapString;
 
-    fn add(self, other: String) -> WrapString {
+    fn add(self, other: T) -> WrapString {
         WrapString {
-            query: self.query + &crate::parser::escape_string(&other, |c| c == '\''),
-        }
-    }
-}
-
-impl Add<&str> for WrapString {
-    type Output = WrapString;
-
-    fn add(self, other: &str) -> WrapString {
-        WrapString {
-            query: self.query + &crate::parser::escape_string(other, |c| c == '\''),
+            query: self.query + &crate::parser::escape_string(&other.to_string(), |c| c == '\''),
         }
     }
 }
