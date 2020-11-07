@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
   
 
-ExOverwriteSQL(`exowsql`) is a secure SQL database library I'm currently developing as project for my graduation work.  
+ConcatSQL(`concatsql`) is a secure SQL database library I'm currently developing as project for my graduation work.  
 You can use string concatenation to prevent SQL injection.  
 
 Supported databases:
@@ -18,7 +18,7 @@ You can configure the database backend in `Cargo.toml`:
 
 ```toml
 [dependencies]
-exowsql = { git = "https://github.com/kumavale/ExOverwriteSQL", features = ["<postgres|mysql|sqlite>"] }
+concatsql = { git = "https://github.com/kumavale/ExOverwriteSQL", features = ["<postgres|mysql|sqlite>"] }
 ```
 
 ## Examples
@@ -26,12 +26,12 @@ exowsql = { git = "https://github.com/kumavale/ExOverwriteSQL", features = ["<po
 ### Normal value
 
 ```rust
-use exowsql::{prepare, bind};
-let conn = exowsql::sqlite::open(":memory:").unwrap();
+use concatsql::{prepare, bind};
+let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
 let sql = prepare!("SELECT name FROM users WHERE id=") + bind!(&id) + prepare!(" AND passwd=") + bind!(&passwd);
-assert_eq!(exowsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
+assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     assert_eq!(row.get("name").unwrap(), "Alice");
 }
@@ -40,36 +40,36 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 ### Illegal value
 
 ```rust
-use exowsql::{prepare, bind};
-let conn = exowsql::sqlite::open(":memory:").unwrap();
+use concatsql::{prepare, bind};
+let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
 let sql = prepare!("SELECT name FROM users WHERE id=") + bind!(&id) + prepare!(" AND passwd=") + bind!(&passwd);
-assert_eq!(exowsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd=''' or 1=1; --'");
+assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd=''' or 1=1; --'");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     unreachable!();
 }
 ```
 
-### If you did not use the exowsql::prepare macro
+### If you did not use the concatsql::prepare macro
 
 cannot compile
 
 ```rust
-let conn = exowsql::sqlite::open(":memory:").unwrap();
+let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
 let sql = "SELECT name FROM users WHERE id=" + &id + " AND passwd='" + &passwd + "';";
 conn.execute(&sql).unwrap();  // error
 ```
 
-### exowsql::prepare!(\<String\>)
+### concatsql::prepare!(\<String\>)
 
 cannot compile
 
 ```rust
-use exowsql::prepare;
-let conn = exowsql::sqlite::open(":memory:").unwrap();
+use concatsql::prepare;
+let conn = concatsql::sqlite::open(":memory:").unwrap();
 let age = String::from("50 or 1=1; --");
 let sql = prepare!("SELECT name FROM users WHERE age < ") + prepare!(&age);  // error
 ```

@@ -14,12 +14,12 @@ pub(crate) mod connection;
 ///
 /// ```should_panic
 /// // Open a new connection to an in-memory.
-/// let conn = exowsql::sqlite::open(":memory:").unwrap();
+/// let conn = concatsql::sqlite::open(":memory:").unwrap();
 /// // Open a new connection from path of literal.
-/// let conn = exowsql::sqlite::open("/path/to/db").unwrap();
+/// let conn = concatsql::sqlite::open("/path/to/db").unwrap();
 /// // Open a new connection from std::path::Path.
 /// let path = std::path::Path::new("/path/to/db");
-/// let conn = exowsql::sqlite::open(path).unwrap();
+/// let conn = concatsql::sqlite::open(path).unwrap();
 /// ```
 #[inline]
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
@@ -43,9 +43,9 @@ pub fn version() -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate as exowsql;
-    use exowsql::*;
-    use crate::error::{OwsqlError, OwsqlErrorLevel};
+    use crate as concatsql;
+    use concatsql::*;
+    use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
     use temporary::Directory;
 
     #[test]
@@ -78,10 +78,10 @@ mod tests {
             conn.execute(prepare!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         let mut conn = crate::sqlite::open_readonly(path).unwrap();
-        conn.error_level = OwsqlErrorLevel::Debug;
+        conn.error_level = ConcatsqlErrorLevel::Debug;
         assert_eq!(
             conn.execute(prepare!("INSERT INTO users VALUES(42, 'Alice');")),
-            Err(OwsqlError::Message("exec error: attempt to write a readonly database".to_string()))
+            Err(ConcatsqlError::Message("exec error: attempt to write a readonly database".to_string()))
         );
     }
 

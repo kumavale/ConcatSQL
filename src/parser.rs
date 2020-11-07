@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::error::{OwsqlError, OwsqlErrorLevel};
+use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
 
 /// Convert special characters to HTML entities.
 ///
@@ -16,7 +16,7 @@ use crate::error::{OwsqlError, OwsqlErrorLevel};
 /// # Examples
 ///
 /// ```
-/// let encoded = exowsql::html_special_chars("<a href='test'>Test</a>");
+/// let encoded = concatsql::html_special_chars("<a href='test'>Test</a>");
 /// assert_eq!(&encoded, "&lt;a href=&#39;test&#39;&gt;Test&lt;/a&gt;");
 /// ```
 pub fn html_special_chars(input: &str) -> String {
@@ -40,13 +40,13 @@ pub fn html_special_chars(input: &str) -> String {
 /// # Examples
 ///
 /// ```
-/// assert_eq!(exowsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
-/// assert_eq!(exowsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
+/// assert_eq!(concatsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
+/// assert_eq!(concatsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {
-    ($pattern:tt) =>             { exowsql::_sanitize_like($pattern, '\\') };
-    ($pattern:tt, $escape:tt) => { exowsql::_sanitize_like($pattern, $escape) };
+    ($pattern:tt) =>             { concatsql::_sanitize_like($pattern, '\\') };
+    ($pattern:tt, $escape:tt) => { concatsql::_sanitize_like($pattern, $escape) };
 }
 #[doc(hidden)]
 pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: char) -> String {
@@ -77,11 +77,11 @@ where
 pub struct Parser<'a> {
     input:       &'a str,
     pos:         usize,
-    error_level: &'a OwsqlErrorLevel,
+    error_level: &'a ConcatsqlErrorLevel,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, error_level: &'a OwsqlErrorLevel) -> Self {
+    pub fn new(input: &'a str, error_level: &'a ConcatsqlErrorLevel) -> Self {
         Self {
             input,
             pos: 0,
@@ -95,11 +95,11 @@ impl<'a> Parser<'a> {
 
     pub fn next_char(&self) -> Result<char> {
         self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
-            OwsqlErrorLevel::AlwaysOk |
-            OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop  => OwsqlError::Message("error: next_char()".to_string()),
+            ConcatsqlErrorLevel::AlwaysOk |
+            ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
+            ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("error: next_char()".to_string()),
             #[cfg(debug_assertions)]
-            OwsqlErrorLevel::Debug    => OwsqlError::Message("error: next_char(): None".to_string()),
+            ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message("error: next_char(): None".to_string()),
         })
     }
 
@@ -118,11 +118,11 @@ impl<'a> Parser<'a> {
         }
 
         Err( match self.error_level {
-            OwsqlErrorLevel::AlwaysOk |
-            OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop  => OwsqlError::Message("endless".to_string()),
+            ConcatsqlErrorLevel::AlwaysOk |
+            ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
+            ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("endless".to_string()),
             #[cfg(debug_assertions)]
-            OwsqlErrorLevel::Debug    => OwsqlError::Message(format!("endless: {}", s)),
+            ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message(format!("endless: {}", s)),
         })
     }
 
@@ -136,11 +136,11 @@ impl<'a> Parser<'a> {
         }
         if s.is_empty() {
             Err( match self.error_level {
-                OwsqlErrorLevel::AlwaysOk |
-                OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_while()".to_string()),
+                ConcatsqlErrorLevel::AlwaysOk |
+                ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
+                ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("error: consume_while()".to_string()),
                 #[cfg(debug_assertions)]
-                OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_while(): empty".to_string()),
+                ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message("error: consume_while(): empty".to_string()),
             })
         } else {
             Ok(s)
@@ -150,11 +150,11 @@ impl<'a> Parser<'a> {
     pub fn consume_char(&mut self) -> Result<char> {
         let mut iter = self.input[self.pos..].char_indices();
         let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
-            OwsqlErrorLevel::AlwaysOk |
-            OwsqlErrorLevel::Release => OwsqlError::AnyError,
-            OwsqlErrorLevel::Develop => OwsqlError::Message("error: consume_char()".to_string()),
+            ConcatsqlErrorLevel::AlwaysOk |
+            ConcatsqlErrorLevel::Release => ConcatsqlError::AnyError,
+            ConcatsqlErrorLevel::Develop => ConcatsqlError::Message("error: consume_char()".to_string()),
             #[cfg(debug_assertions)]
-            OwsqlErrorLevel::Debug   => OwsqlError::Message("error: consume_char(): None".to_string()),
+            ConcatsqlErrorLevel::Debug   => ConcatsqlError::Message("error: consume_char(): None".to_string()),
         })?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
@@ -166,15 +166,15 @@ impl<'a> Parser<'a> {
 #[doc(hidden)]
 pub fn check_valid_literal(s: &'static str) -> Result<()> {
     let err_msg = "invalid literal";
-    let mut parser = Parser::new(&s, &OwsqlErrorLevel::Debug);
+    let mut parser = Parser::new(&s, &ConcatsqlErrorLevel::Debug);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
-                return OwsqlError::new(&OwsqlErrorLevel::Debug, err_msg, &s);
+                return ConcatsqlError::new(&ConcatsqlErrorLevel::Debug, err_msg, &s);
             },
             Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return OwsqlError::new(&OwsqlErrorLevel::Debug, err_msg, &s);
+                return ConcatsqlError::new(&ConcatsqlErrorLevel::Debug, err_msg, &s);
             },
             _other => (), // Do nothing
         }
@@ -198,8 +198,8 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn consume_char() {
-        let mut p = super::Parser::new("", &OwsqlErrorLevel::Debug);
-        assert_eq!(p.consume_char(), Err(OwsqlError::Message("error: consume_char(): None".into())));
+        let mut p = super::Parser::new("", &ConcatsqlErrorLevel::Debug);
+        assert_eq!(p.consume_char(), Err(ConcatsqlError::Message("error: consume_char(): None".into())));
     }
 
     #[test]

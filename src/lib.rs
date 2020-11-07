@@ -3,8 +3,8 @@
 //! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind};
-//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # use concatsql::{prepare, bind};
+//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
@@ -21,8 +21,8 @@
 //! Open a connection of SQLite, create a table, and insert some rows:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind};
-//! let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # use concatsql::{prepare, bind};
+//! let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
@@ -32,8 +32,8 @@
 //! Select some rows and process them one by one as plain text:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind};
-//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # use concatsql::{prepare, bind};
+//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
@@ -51,8 +51,8 @@
 //! It can be executed after getting all the rows of the query:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind};
-//! # let conn = exowsql::sqlite::open(":memory:").unwrap();
+//! # use concatsql::{prepare, bind};
+//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
@@ -70,7 +70,7 @@ mod connection;
 mod error;
 mod parser;
 mod row;
-mod owstring;
+mod wrapstring;
 
 #[cfg(feature = "sqlite")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
@@ -83,11 +83,34 @@ pub mod mysql;
 pub mod postgres;
 
 pub use crate::connection::Connection;
-pub use crate::error::{OwsqlError, OwsqlErrorLevel};
+pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
 pub use crate::row::Row;
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal};
-pub use crate::owstring::{OwString, _bind};
+pub use crate::wrapstring::WrapString;
 
 /// A typedef of the result returned by many methods.
-pub type Result<T, E = crate::error::OwsqlError> = std::result::Result<T, E>;
+pub type Result<T, E = crate::error::ConcatsqlError> = std::result::Result<T, E>;
+
+/// TODO docs
+#[macro_export]
+macro_rules! prepare {
+    ($query:expr) => {
+        {
+            static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
+            INITIAL_CHECK.call_once(|| concatsql::check_valid_literal($query).unwrap());
+            concatsql::WrapString::new($query)
+        }
+    };
+}
+
+/// TODO docs
+#[macro_export]
+macro_rules! bind {
+    ($value:expr) => { concatsql::_bind($value) };
+}
+#[doc(hidden)]
+pub fn _bind<T: ToString>(value: T) -> WrapString {
+    let escaped = crate::parser::escape_string(&value.to_string(), |c| c == '\'');
+    WrapString::new(&escaped)
+}
 

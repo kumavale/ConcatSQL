@@ -5,9 +5,9 @@ use std::ptr::{self, NonNull};
 use std::path::Path;
 
 use crate::Result;
-use crate::connection::{Connection, OwsqlConn};
-use crate::error::{OwsqlError, OwsqlErrorLevel};
-use crate::owstring::OwString;
+use crate::connection::{Connection, ConcatsqlConn};
+use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
@@ -15,10 +15,10 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
         Some(path) => {
             match CString::new(path) {
                 Ok(string) => string,
-                _ => return Err(OwsqlError::Message(format!("invalid path: {}", path))),
+                _ => return Err(ConcatsqlError::Message(format!("invalid path: {}", path))),
             }
         },
-        _ => return Err(OwsqlError::Message(format!("failed to open path: {:?}", path.as_ref()))),
+        _ => return Err(ConcatsqlError::Message(format!("failed to open path: {:?}", path.as_ref()))),
     };
     let mut conn_ptr = ptr::null_mut();
 
@@ -33,18 +33,18 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
         ffi::SQLITE_OK =>
             Ok(Connection {
                 conn:              Box::new(unsafe { NonNull::new_unchecked(conn_ptr) }),
-                error_level:       OwsqlErrorLevel::default(),
+                error_level:       ConcatsqlErrorLevel::default(),
             }),
-        _ => Err(OwsqlError::Message("failed to connect".into())),
+        _ => Err(ConcatsqlError::Message("failed to connect".into())),
     }
 }
 
-impl OwsqlConn for NonNull<ffi::sqlite3> {
-    fn _execute(&self, s: &OwString, error_level: &OwsqlErrorLevel) -> Result<()> {
+impl ConcatsqlConn for NonNull<ffi::sqlite3> {
+    fn _execute(&self, s: &WrapString, error_level: &ConcatsqlErrorLevel) -> Result<()> {
         let query = s.query.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return OwsqlError::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return ConcatsqlError::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -61,18 +61,18 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
         if err_msg.is_null() {
             Ok(())
         } else {
-            OwsqlError::new(&error_level, "exec error",
+            ConcatsqlError::new(&error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy().into_owned() })
         }
     }
 
-    fn _iterate<'a>(&self, s: &OwString, error_level: &OwsqlErrorLevel,
+    fn _iterate<'a>(&self, s: &WrapString, error_level: &ConcatsqlErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = s.query.as_bytes().to_vec();
         let query = match CString::new(&*query) {
             Ok(string) => string,
-            _ => return OwsqlError::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return ConcatsqlError::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);
@@ -91,7 +91,7 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
         if err_msg.is_null() {
             Ok(())
         } else {
-            OwsqlError::new(&error_level, "exec error",
+            ConcatsqlError::new(&error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy().into_owned() })
         }
     }
@@ -132,8 +132,8 @@ extern "C" fn process_callback(
 
 #[cfg(test)]
 mod tests {
-    use crate as exowsql;
-    use exowsql::*;
+    use crate as concatsql;
+    use concatsql::*;
     use temporary::Directory;
 
     #[test]
@@ -145,7 +145,7 @@ mod tests {
         assert_ne!(crate::sqlite::open(&path), crate::sqlite::open(&path));
         assert_eq!(
             crate::sqlite::open("foo\0bar"),
-            Err(OwsqlError::Message("invalid path: foo\u{0}bar".into()))
+            Err(ConcatsqlError::Message("invalid path: foo\u{0}bar".into()))
         );
     }
 
@@ -155,11 +155,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.execute(prepare!("\0")),
-            Err(OwsqlError::Message("invalid query".into())),
+            Err(ConcatsqlError::Message("invalid query".into())),
         );
         assert_eq!(
             conn.execute(prepare!("invalid query")),
-            Err(OwsqlError::Message("exec error".into())),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
     }
 
@@ -169,11 +169,11 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.iterate(prepare!("\0"), |_| { unreachable!(); }),
-            Err(OwsqlError::Message("invalid query".into())),
+            Err(ConcatsqlError::Message("invalid query".into())),
         );
         assert_eq!(
             conn.iterate(prepare!("invalid query"), |_| { unreachable!(); }),
-            Err(OwsqlError::Message("exec error".into())),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
     }
 

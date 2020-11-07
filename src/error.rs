@@ -1,7 +1,7 @@
 
-/// Enum listing possible errors from owsql.
+/// Enum listing possible errors from concatsql.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum OwsqlError {
+pub enum ConcatsqlError {
     /// The error message.
     Message(String),
     /// An any errors.
@@ -10,7 +10,7 @@ pub enum OwsqlError {
 
 /// Change the output error message.
 #[derive(Debug, PartialEq)]
-pub enum OwsqlErrorLevel {
+pub enum ConcatsqlErrorLevel {
     /// No error message returned, always return Result::Ok(T).
     AlwaysOk,
     /// This is the level that should be set at release.
@@ -24,34 +24,34 @@ pub enum OwsqlErrorLevel {
     Debug,
 }
 
-impl Default for OwsqlErrorLevel {
+impl Default for ConcatsqlErrorLevel {
     fn default() -> Self {
         if cfg!(debug_assertions) {
-            OwsqlErrorLevel::Develop
+            ConcatsqlErrorLevel::Develop
         } else {
-            OwsqlErrorLevel::Release
+            ConcatsqlErrorLevel::Release
         }
     }
 }
 
-impl OwsqlError {
+impl ConcatsqlError {
     #[allow(unused_variables)]
-    pub(crate) fn new(error_level: &OwsqlErrorLevel, err_msg: &str, detail_msg: &str) -> Result<(), OwsqlError> {
+    pub(crate) fn new(error_level: &ConcatsqlErrorLevel, err_msg: &str, detail_msg: &str) -> Result<(), ConcatsqlError> {
         match error_level {
-            OwsqlErrorLevel::AlwaysOk => Ok(()),
-            OwsqlErrorLevel::Release  => Err(OwsqlError::AnyError),
-            OwsqlErrorLevel::Develop  => Err(OwsqlError::Message(err_msg.to_string())),
+            ConcatsqlErrorLevel::AlwaysOk => Ok(()),
+            ConcatsqlErrorLevel::Release  => Err(ConcatsqlError::AnyError),
+            ConcatsqlErrorLevel::Develop  => Err(ConcatsqlError::Message(err_msg.to_string())),
             #[cfg(debug_assertions)]
-            OwsqlErrorLevel::Debug    => Err(OwsqlError::Message(format!("{}: {}", err_msg, detail_msg))),
+            ConcatsqlErrorLevel::Debug    => Err(ConcatsqlError::Message(format!("{}: {}", err_msg, detail_msg))),
         }
     }
 }
 
-impl std::string::ToString for OwsqlError {
+impl std::string::ToString for ConcatsqlError {
     fn to_string(&self) -> String {
         match self {
-            OwsqlError::Message(s) => s.to_string(),
-            OwsqlError::AnyError =>   String::from("AnyError"),
+            ConcatsqlError::Message(s) => s.to_string(),
+            ConcatsqlError::AnyError =>   String::from("AnyError"),
         }
     }
 }
@@ -63,20 +63,20 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn owsql_error() {
-        assert_eq!(OwsqlErrorLevel::default(), OwsqlErrorLevel::Develop);
-        assert_eq!(OwsqlError::Message("test".to_string()).to_string(), "test");
+        assert_eq!(ConcatsqlErrorLevel::default(), ConcatsqlErrorLevel::Develop);
+        assert_eq!(ConcatsqlError::Message("test".to_string()).to_string(), "test");
         assert_eq!(
-            OwsqlError::new(&OwsqlErrorLevel::AlwaysOk, "test", "test"),
+            ConcatsqlError::new(&ConcatsqlErrorLevel::AlwaysOk, "test", "test"),
             Ok(()));
         assert_eq!(
-            OwsqlError::new(&OwsqlErrorLevel::Release,  "test", "test"),
-            Err(OwsqlError::AnyError));
+            ConcatsqlError::new(&ConcatsqlErrorLevel::Release,  "test", "test"),
+            Err(ConcatsqlError::AnyError));
         assert_eq!(
-            OwsqlError::new(&OwsqlErrorLevel::Develop,  "test", "test"),
-            Err(OwsqlError::Message("test".into())));
+            ConcatsqlError::new(&ConcatsqlErrorLevel::Develop,  "test", "test"),
+            Err(ConcatsqlError::Message("test".into())));
         assert_eq!(
-            OwsqlError::new(&OwsqlErrorLevel::Debug,    "test", "test"),
-            Err(OwsqlError::Message("test: test".into())));
+            ConcatsqlError::new(&ConcatsqlErrorLevel::Debug,    "test", "test"),
+            Err(ConcatsqlError::Message("test: test".into())));
     }
 }
 
