@@ -88,6 +88,27 @@ pub use crate::row::Row;
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal};
 pub use crate::wrapstring::{WrapString, Wrap};
 
+pub mod prelude {
+    //! Re-exports important traits and types.
+
+    #[cfg(feature = "sqlite")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+    pub use crate::sqlite;
+    #[cfg(feature = "mysql")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "mysql")))]
+    pub use crate::mysql;
+    #[cfg(feature = "postgres")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
+    pub use crate::postgres;
+
+    pub use crate::connection::Connection;
+    pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+    pub use crate::row::Row;
+    pub use crate::prepare;
+    pub use crate::sanitize_like;
+    pub use crate::{WrapString, Wrap};
+}
+
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::ConcatsqlError> = std::result::Result<T, E>;
 

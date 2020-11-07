@@ -2,7 +2,7 @@
 #[cfg(feature = "sqlite")]
 #[cfg(debug_assertions)]
 mod sqlite {
-    use concatsql::*;
+    use concatsql::prelude::*;
 
     macro_rules! err {
         () => { Err(concatsql::ConcatsqlError::AnyError) };
@@ -444,12 +444,12 @@ mod sqlite {
 
     #[test]
     fn concat_anything_type() {
-        let sql = prepare!("A") + "B" + &"C" + String::from("D") + &String::from("E") + 42;
-        assert_eq!(sql.actual_sql(), "A'B''C''D''E''42'");
+        let sql = prepare!("A") + "B" + &"C" + String::from("D") + &String::from("E") + &prepare!("F") + 42;
+        assert_eq!(sql.actual_sql(), "A'B''C''D''E'F'42'");
     }
 
     mod should_panic {
-        use concatsql::*;
+        use concatsql::prelude::*;
         use super::stmt;
 
         #[test]
@@ -483,8 +483,7 @@ mod sqlite {
 #[cfg(feature = "sqlite")]
 #[cfg(not(debug_assertions))]
 mod sqlite_release_build {
-    use concatsql::*;
-    use concatsql::error::*;
+    use concatsql::prelude::*;
 
     #[test]
     fn error_level_debug_when_release_build() {
