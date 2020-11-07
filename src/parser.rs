@@ -103,36 +103,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn skip_whitespace(&mut self) -> Result<()> {
-        self.consume_while(char::is_whitespace).and(Ok(()))
-    }
-
-    pub fn consume_whitespace(&mut self) -> Result<String> {
-        self.consume_while(char::is_whitespace)
-    }
-
-    pub fn consume_except_whitespace(&mut self) -> Result<String> {
-        let mut s = String::new();
-        while !self.eof() {
-            let c = self.next_char()?;
-            if c.is_whitespace() {
-                break;
-            }
-            s.push(self.consume_char()?);
-        }
-        if s.is_empty() {
-            Err( match self.error_level {
-                OwsqlErrorLevel::AlwaysOk |
-                OwsqlErrorLevel::Release  => OwsqlError::AnyError,
-                OwsqlErrorLevel::Develop  => OwsqlError::Message("error: consume_except_whitespace()".to_string()),
-                #[cfg(debug_assertions)]
-                OwsqlErrorLevel::Debug    => OwsqlError::Message("error: consume_except_whitespace(): empty".to_string()),
-            })
-        } else {
-            Ok(s)
-        }
-    }
-
     pub fn consume_string(&mut self, quote: char) -> Result<String> {
         let mut s = quote.to_string();
         self.consume_char()?;

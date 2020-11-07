@@ -57,11 +57,9 @@ impl<'a> Add<&'a OwString> for OwString {
 macro_rules! prepare {
     ($query:expr) => {
         {
-            use std::sync::Once;
-            use exowsql::{OwString, check_valid_literal};
-            static START: Once = Once::new();
-            START.call_once(|| check_valid_literal($query).unwrap());
-            OwString::new($query)
+            static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
+            INITIAL_CHECK.call_once(|| exowsql::check_valid_literal($query).unwrap());
+            exowsql::OwString::new($query)
         }
     };
 }

@@ -3,7 +3,7 @@
 //! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind, OwString, check_valid_literal};
+//! # use exowsql::{prepare, bind};
 //! # let conn = exowsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -21,7 +21,7 @@
 //! Open a connection of SQLite, create a table, and insert some rows:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind, OwString, check_valid_literal};
+//! # use exowsql::{prepare, bind};
 //! let conn = exowsql::sqlite::open(":memory:").unwrap();
 //! let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -32,7 +32,7 @@
 //! Select some rows and process them one by one as plain text:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind, OwString, check_valid_literal};
+//! # use exowsql::{prepare, bind};
 //! # let conn = exowsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -51,7 +51,7 @@
 //! It can be executed after getting all the rows of the query:
 //!
 //! ```rust
-//! # use exowsql::{prepare, bind, OwString, check_valid_literal};
+//! # use exowsql::{prepare, bind};
 //! # let conn = exowsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
