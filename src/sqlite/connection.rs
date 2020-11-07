@@ -181,8 +181,8 @@ mod tests {
     #[cfg(debug_assertions)]
     fn actual_sql() {
         assert_eq!(prepare!("SELECT").actual_sql(), "SELECT");
-        assert_eq!(_bind("SELECT").actual_sql(), "'SELECT'");
-        assert_eq!(_bind("O'Reilly").actual_sql(), "'O''Reilly'");
+        assert_eq!("SELECT".actual_sql(), "'SELECT'");
+        assert_eq!("O'Reilly".actual_sql(), "'O''Reilly'");
         assert_eq!(prepare!("O''Reilly").actual_sql(), "O''Reilly");
 
         //crate::prepare!("O'Reilly").actual_sql();      // panic

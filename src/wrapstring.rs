@@ -11,23 +11,6 @@ impl WrapString {
             query: s.to_string(),
         }
     }
-
-    /// Return the actual SQL statement.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use concatsql::{prepare, bind};
-    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// assert_eq!(prepare!("SELECT").actual_sql(),   "SELECT");
-    /// assert_eq!(bind!("SELECT").actual_sql(),      "'SELECT'");
-    /// assert_eq!(bind!("O'Reilly").actual_sql(),    "'O''Reilly'");
-    /// //prepare!("O'Reilly").actual_sql();  // panic
-    /// ```
-    #[inline]
-    pub fn actual_sql(&self) -> &str {
-        &self.query
-    }
 }
 
 impl Add for WrapString {
@@ -47,6 +30,64 @@ impl<'a> Add<&'a WrapString> for WrapString {
         WrapString {
             query: self.query + &other.query.clone(),
         }
+    }
+}
+
+impl Add<String> for WrapString {
+    type Output = WrapString;
+
+    fn add(self, other: String) -> WrapString {
+        WrapString {
+            query: self.query + &crate::parser::escape_string(&other, |c| c == '\''),
+        }
+    }
+}
+
+impl Add<&str> for WrapString {
+    type Output = WrapString;
+
+    fn add(self, other: &str) -> WrapString {
+        WrapString {
+            query: self.query + &crate::parser::escape_string(other, |c| c == '\''),
+        }
+    }
+}
+
+pub trait Wrap {
+    fn to_wrapstring(&self) -> WrapString;
+    fn actual_sql(&self) -> String;
+}
+
+impl Wrap for WrapString {
+    fn to_wrapstring(&self) -> WrapString {
+        WrapString::new(&self.query)
+    }
+
+    /// Return the actual SQL statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use concatsql::{prepare, Wrap};
+    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+    /// assert_eq!(prepare!("SELECT").actual_sql(), "SELECT");
+    /// assert_eq!("SELECT".actual_sql(),           "'SELECT'");
+    /// assert_eq!("O'Reilly".actual_sql(),         "'O''Reilly'");
+    /// //prepare!("O'Reilly").actual_sql();  // panic
+    /// ```
+    #[inline]
+    fn actual_sql(&self) -> String {
+        self.query.clone()
+    }
+}
+
+impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
+    fn to_wrapstring(&self) -> WrapString {
+        WrapString::new(&crate::parser::escape_string(&self.to_string(), |c| c == '\''))
+    }
+
+    fn actual_sql(&self) -> String {
+        crate::parser::escape_string(&self.to_string(), |c| c == '\'')
     }
 }
 

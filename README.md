@@ -26,11 +26,11 @@ concatsql = { git = "https://github.com/kumavale/ConcatSQL", features = ["<postg
 ### Normal value
 
 ```rust
-use concatsql::{prepare, bind};
+use concatsql::prepare;
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
-let sql = prepare!("SELECT name FROM users WHERE id=") + bind!(&id) + prepare!(" AND passwd=") + bind!(&passwd);
+let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
 assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     assert_eq!(row.get("name").unwrap(), "Alice");
@@ -40,11 +40,11 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 ### Illegal value
 
 ```rust
-use concatsql::{prepare, bind};
+use concatsql::prepare;
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
-let sql = prepare!("SELECT name FROM users WHERE id=") + bind!(&id) + prepare!(" AND passwd=") + bind!(&passwd);
+let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
 assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd=''' or 1=1; --'");
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     unreachable!();

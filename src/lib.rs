@@ -3,14 +3,14 @@
 //! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
 //! ```rust
-//! # use concatsql::{prepare, bind};
+//! # use concatsql::prepare;
 //! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
 //! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let id_input = "42 OR 1=1; --";
-//! let sql = prepare!("SELECT name FROM users WHERE id = ") + bind!(id_input);
+//! let sql = prepare!("SELECT name FROM users WHERE id = ") + id_input;
 //! // At runtime it will be transformed into a query like
 //! // "SELECT name FROM users WHERE id = '42 OR 1=1; --'".
 //! # conn.iterate(&sql, |_| { true }).unwrap();
@@ -21,7 +21,7 @@
 //! Open a connection of SQLite, create a table, and insert some rows:
 //!
 //! ```rust
-//! # use concatsql::{prepare, bind};
+//! # use concatsql::prepare;
 //! let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //!               INSERT INTO users (name, age) VALUES ('Alice', 42);
@@ -32,14 +32,14 @@
 //! Select some rows and process them one by one as plain text:
 //!
 //! ```rust
-//! # use concatsql::{prepare, bind};
+//! # use concatsql::prepare;
 //! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
-//! let sql = prepare!("SELECT * FROM users WHERE age > ") + bind!(age);
+//! let sql = prepare!("SELECT * FROM users WHERE age > ") + age;
 //! conn.iterate(&sql, |pairs| {
 //!     for &(column, value) in pairs.iter() {
 //!         println!("{} = {}", column, value.unwrap());
@@ -51,14 +51,14 @@
 //! It can be executed after getting all the rows of the query:
 //!
 //! ```rust
-//! # use concatsql::{prepare, bind};
+//! # use concatsql::prepare;
 //! # let conn = concatsql::sqlite::open(":memory:").unwrap();
 //! # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
 //! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
 //! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
 //! # conn.execute(stmt).unwrap();
 //! let age = "50";
-//! let sql = prepare!("SELECT * FROM users WHERE age > ") + bind!(age);
+//! let sql = prepare!("SELECT * FROM users WHERE age > ") + age;
 //! let rows = conn.rows(&sql).unwrap();
 //! for row in rows.iter() {
 //!     println!("name = {}", row.get("name").unwrap_or("NULL"));
@@ -86,7 +86,7 @@ pub use crate::connection::Connection;
 pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
 pub use crate::row::Row;
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal};
-pub use crate::wrapstring::WrapString;
+pub use crate::wrapstring::{WrapString, Wrap};
 
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::ConcatsqlError> = std::result::Result<T, E>;
@@ -101,16 +101,5 @@ macro_rules! prepare {
             concatsql::WrapString::new($query)
         }
     };
-}
-
-/// TODO docs
-#[macro_export]
-macro_rules! bind {
-    ($value:expr) => { concatsql::_bind($value) };
-}
-#[doc(hidden)]
-pub fn _bind<T: ToString>(value: T) -> WrapString {
-    let escaped = crate::parser::escape_string(&value.to_string(), |c| c == '\'');
-    WrapString::new(&escaped)
 }
 

@@ -48,7 +48,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::{prepare, bind};
+    /// # use concatsql::prepare;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -70,7 +70,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::{prepare, bind};
+    /// # use concatsql::prepare;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -97,7 +97,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::{prepare, bind};
+    /// # use concatsql::prepare;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
@@ -130,7 +130,7 @@ impl Connection {
     /// # Danger
     ///
     /// ```
-    /// # use concatsql::{prepare, bind};
+    /// # use concatsql::{prepare, Wrap};
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
     /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
