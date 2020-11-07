@@ -1,6 +1,6 @@
-# ExOverwriteSQL
+# ConcatSQL
 
-[![Actions Status](https://github.com/kumavale/ExOverwriteSQL/workflows/CI/badge.svg)](https://github.com/kumavale/ExOverwriteSQL/actions)
+[![Actions Status](https://github.com/kumavale/ConcatSQL/workflows/CI/badge.svg)](https://github.com/kumavale/ConcatSQL/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
   
 
@@ -18,7 +18,7 @@ You can configure the database backend in `Cargo.toml`:
 
 ```toml
 [dependencies]
-concatsql = { git = "https://github.com/kumavale/ExOverwriteSQL", features = ["<postgres|mysql|sqlite>"] }
+concatsql = { git = "https://github.com/kumavale/ConcatSQL", features = ["<postgres|mysql|sqlite>"] }
 ```
 
 ## Examples
