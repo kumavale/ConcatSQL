@@ -95,10 +95,6 @@ impl OwsqlConn for NonNull<ffi::sqlite3> {
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy().into_owned() })
         }
     }
-
-    fn must_escape(&self) -> Box<dyn Fn(char) -> bool> {
-        Box::new(|c| c == '\'')
-    }
 }
 
 extern "C" fn process_callback(
@@ -136,7 +132,8 @@ extern "C" fn process_callback(
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate as exowsql;
+    use exowsql::*;
     use temporary::Directory;
 
     #[test]
@@ -157,11 +154,11 @@ mod tests {
     fn execute() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
-            conn.execute(conn.prepare("\0")),
+            conn.execute(prepare!("\0")),
             Err(OwsqlError::Message("invalid query".into())),
         );
         assert_eq!(
-            conn.execute(conn.prepare("invalid query")),
+            conn.execute(prepare!("invalid query")),
             Err(OwsqlError::Message("exec error".into())),
         );
     }
@@ -171,11 +168,11 @@ mod tests {
     fn iterate() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
-            conn.iterate(conn.prepare("\0"), |_| { unreachable!(); }),
+            conn.iterate(prepare!("\0"), |_| { unreachable!(); }),
             Err(OwsqlError::Message("invalid query".into())),
         );
         assert_eq!(
-            conn.iterate(conn.prepare("invalid query"), |_| { unreachable!(); }),
+            conn.iterate(prepare!("invalid query"), |_| { unreachable!(); }),
             Err(OwsqlError::Message("exec error".into())),
         );
     }
@@ -183,13 +180,13 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn actual_sql() {
-        let conn = crate::sqlite::open(":memory:").unwrap();
-        assert_eq!(conn.prepare("SELECT").actual_sql(), "SELECT");
-        assert_eq!(conn.bind("SELECT").actual_sql(), "'SELECT'");
-        //assert_eq!(conn.prepare("O'Reilly").actual_sql(), "O''Reilly"); // panic
-        assert_eq!(conn.bind("O'Reilly").actual_sql(), "'O''Reilly'");
-        assert_eq!(conn.prepare("O''Reilly").actual_sql(), "O''Reilly");
-        //assert_eq!(conn.prepare("\"O'Reilly\"").actual_sql(), "\"O'Reilly\""); // panic
+        assert_eq!(prepare!("SELECT").actual_sql(), "SELECT");
+        assert_eq!(_bind("SELECT").actual_sql(), "'SELECT'");
+        assert_eq!(_bind("O'Reilly").actual_sql(), "'O''Reilly'");
+        assert_eq!(prepare!("O''Reilly").actual_sql(), "O''Reilly");
+
+        //crate::prepare!("O'Reilly").actual_sql();      // panic
+        //crate::prepare!("\"O'Reilly\"").actual_sql();  // panic
     }
 
     #[test]

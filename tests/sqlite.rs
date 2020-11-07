@@ -11,7 +11,7 @@ mod sqlite {
 
     fn prepare() -> exowsql::Connection {
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.prepare(stmt());
+        let stmt = prepare!(stmt());
         conn.execute(&stmt).unwrap();
         conn
     }
@@ -45,7 +45,7 @@ mod sqlite {
         )}
 
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.prepare(stmt());
+        let stmt = prepare!(stmt());
         conn.execute(&stmt).unwrap();
         static_strings! {
             select = "SELECT ";
@@ -54,13 +54,13 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(conn.prepare(sql).actual_sql(), "SELECT name FROM users");
+        assert_eq!(prepare!(sql).actual_sql(), "SELECT name FROM users");
     }
 
     #[test]
     fn execute() {
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        let stmt = conn.prepare(stmt());
+        let stmt = prepare!(stmt());
         conn.execute(&stmt).unwrap();
     }
 
@@ -68,7 +68,7 @@ mod sqlite {
     fn iterate() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol"];
-        let sql = conn.prepare("SELECT name FROM users;");
+        let sql = prepare!("SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -84,7 +84,7 @@ mod sqlite {
     fn iterate_2sets() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol", "Alice", "Bob", "Carol"];
-        let sql = conn.prepare("SELECT name FROM users; SELECT name FROM users;");
+        let sql = prepare!("SELECT name FROM users; SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -101,8 +101,8 @@ mod sqlite {
         let conn = prepare();
         let expects = ["Alice", "Bob"];
         let age = "50";
-        let sql = conn.prepare("SELECT name FROM users WHERE ") +
-            &conn.prepare("age < ") + conn.bind(age) + &conn.prepare(" OR ") + conn.bind(age) + &conn.prepare(" < age");
+        let sql = prepare!("SELECT name FROM users WHERE ") +
+            &prepare!("age < ") + bind!(age) + &prepare!(" OR ") + bind!(age) + &prepare!(" < age");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -118,7 +118,7 @@ mod sqlite {
     fn rows() {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
-        let sql = conn.prepare("SELECT * FROM users;");
+        let sql = prepare!("SELECT * FROM users;");
 
         let rows = conn.rows(&sql).unwrap();
         for (i, row) in rows.iter().enumerate() {
@@ -132,7 +132,7 @@ mod sqlite {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
 
-        conn.rows(&conn.prepare("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+        conn.rows(&prepare!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         });
@@ -140,62 +140,56 @@ mod sqlite {
 
     #[test]
     fn double_quotaion_inside_double_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind(r#"".ow(""inside str"") -> String""#).actual_sql(),
+            bind!(r#"".ow(""inside str"") -> String""#).actual_sql(),
             r#"'".ow(""inside str"") -> String"'"#
         );
         assert_eq!(
-            conn.bind(r#"".ow("inside str") -> String""#).actual_sql(),
+            bind!(r#"".ow("inside str") -> String""#).actual_sql(),
             r#"'".ow("inside str") -> String"'"#
         );
     }
 
     #[test]
     fn double_quotaion_inside_sigle_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind(r#""I'm Alice""#).actual_sql(),
+            bind!(r#""I'm Alice""#).actual_sql(),
             r#"'"I''m Alice"'"#
         );
         assert_eq!(
-            conn.bind(r#""I''m Alice""#).actual_sql(),
+            bind!(r#""I''m Alice""#).actual_sql(),
             r#"'"I''''m Alice"'"#
         );
     }
 
     #[test]
     fn single_quotaion_inside_double_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind(r#"'.ow("inside str") -> String'"#).actual_sql(),
+            bind!(r#"'.ow("inside str") -> String'"#).actual_sql(),
             r#"'''.ow("inside str") -> String'''"#
         );
     }
 
     #[test]
     fn single_quotaion_inside_sigle_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind("'I''m Alice'").actual_sql(),
+            bind!("'I''m Alice'").actual_sql(),
             r#"'''I''''m Alice'''"#
         );
     }
 
     #[test]
     fn non_quotaion_inside_sigle_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind("foo'bar'foo").actual_sql(),
+            bind!("foo'bar'foo").actual_sql(),
             r#"'foo''bar''foo'"#
         );
     }
 
     #[test]
     fn non_quotaion_inside_double_quote() {
-        let conn = prepare();
         assert_eq!(
-            conn.bind("foo\"bar\"foo").actual_sql(),
+            bind!("foo\"bar\"foo").actual_sql(),
             r#"'foo"bar"foo'"#
         );
     }
@@ -204,9 +198,9 @@ mod sqlite {
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
-        let sql = conn.prepare("select age from users where name = ") + conn.bind(name) + &conn.prepare("");
+        let sql = prepare!("select age from users where name = ") + bind!(name) + &prepare!("");
         assert_eq!(
-            conn.bind(name).actual_sql(),
+            bind!(name).actual_sql(),
             r#"'''Alice''; DROP TABLE users; --'"#
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -215,7 +209,7 @@ mod sqlite {
     #[test]
     fn whitespace() {
         let conn = prepare();
-        let sql = conn.prepare("select\n*\rfrom\nusers;");
+        let sql = prepare!("select\n*\rfrom\nusers;");
 
         conn.iterate(&sql, |_| { true }).unwrap();
     }
@@ -224,7 +218,7 @@ mod sqlite {
     fn sqli_eq_nonquote() {
         let conn = prepare();
         let name = "Alice' or '1'='1";
-        let sql = conn.prepare("select age from users where name =") + conn.bind(name) + &conn.prepare(";");
+        let sql = prepare!("select age from users where name =") + bind!(name) + &prepare!(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -248,11 +242,11 @@ mod sqlite {
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
-        let sql = conn.prepare("INSERT INTO users VALUES(") + conn.bind(name) + &conn.prepare(", 12345);");
+        let sql = prepare!("INSERT INTO users VALUES(") + bind!(name) + &prepare!(", 12345);");
 
         conn.execute(&sql).unwrap();
 
-        conn.rows(conn.prepare("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+        conn.rows(prepare!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
                 exowsql::html_special_chars(&row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
@@ -275,8 +269,8 @@ mod sqlite {
     fn error_level_AlwaysOk() {
         let mut conn = exowsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::AlwaysOk);
-        let invalid_sql = conn.bind("INVALID SQL");
-        let endless = conn.bind("'endless");
+        let invalid_sql = bind!("INVALID SQL");
+        let endless = bind!("'endless");
 
         assert_eq!(conn.execute(&invalid_sql),                      Ok(()));
         assert_eq!(conn.execute(&endless),                          Ok(()));
@@ -290,8 +284,8 @@ mod sqlite {
     fn error_level_release() {
         let mut conn = exowsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Release);
-        let invalid_sql = conn.bind("INVALID SQL");
-        let endless = conn.bind("'endless");
+        let invalid_sql = bind!("INVALID SQL");
+        let endless = bind!("'endless");
 
         assert_eq!(conn.execute(&invalid_sql),                      err!());
         assert_eq!(conn.execute(&endless),                          err!());
@@ -305,8 +299,8 @@ mod sqlite {
     fn error_level_develop() {
         let mut conn = exowsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Develop);
-        let invalid_sql = conn.bind("INVALID SQL");
-        let endless = conn.bind("'endless");
+        let invalid_sql = bind!("INVALID SQL");
+        let endless = bind!("'endless");
 
         assert_eq!(conn.execute(&invalid_sql),                      err!("exec error"));
         assert_eq!(conn.execute(&endless),                          err!("exec error"));
@@ -320,8 +314,8 @@ mod sqlite {
     fn error_level_debug() {
         let mut conn = exowsql::sqlite::open(":memory:").unwrap();
         conn.error_level(OwsqlErrorLevel::Debug);
-        let invalid_sql = conn.bind("INVALID SQL");
-        let endless = conn.bind("'endless");
+        let invalid_sql = bind!("INVALID SQL");
+        let endless = bind!("'endless");
 
         assert_eq!(conn.execute(&invalid_sql),
             err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
@@ -348,27 +342,26 @@ mod sqlite {
     #[test]
     fn ow_into_execute() {
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        conn.execute(conn.prepare("SELECT ") + conn.int(1).unwrap()).unwrap();
+        conn.execute(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap();
     }
 
     #[test]
     fn ow_into_iterate() {
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        conn.iterate(conn.prepare("SELECT ") + conn.int(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prepare!("SELECT ") + conn.int(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
     fn ow_into_rows() {
         let conn = exowsql::sqlite::open(":memory:").unwrap();
-        for row in conn.rows(conn.prepare("SELECT ") + conn.int(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
 
     #[test]
     fn empty_string() {
-        let conn = exowsql::sqlite::open(":memory:").unwrap();
-        assert_eq!(conn.prepare("").actual_sql(), "");
+        assert_eq!(prepare!("").actual_sql(), "");
     }
 
     #[test]
@@ -377,7 +370,7 @@ mod sqlite {
         use std::sync::{Arc, Mutex};
 
         let conn = Arc::new(Mutex::new(exowsql::sqlite::open(":memory:").unwrap()));
-        let stmt = conn.lock().unwrap().prepare(stmt());
+        let stmt = prepare!(stmt());
         conn.lock().unwrap().execute(&stmt).unwrap();
 
         let mut handles = vec![];
@@ -386,7 +379,7 @@ mod sqlite {
             let conn_clone = conn.clone();
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
-                let sql = conn.prepare("INSERT INTO users VALUES ('Thread', ") + conn.int(i).unwrap() + conn.prepare(");");
+                let sql = prepare!("INSERT INTO users VALUES ('Thread', ") + conn.int(i).unwrap() + prepare!(");");
                 conn.execute(&sql).unwrap();
             });
             handles.push(handle);
@@ -396,7 +389,7 @@ mod sqlite {
 
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
-            conn.iterate(conn.prepare("SELECT age FROM users WHERE age = ") + &conn.int(i).unwrap(), |pairs| {
+            conn.iterate(prepare!("SELECT age FROM users WHERE age = ") + &conn.int(i).unwrap(), |pairs| {
                 pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());
@@ -407,7 +400,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A%";
-        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE") + conn.bind(name) + conn.prepare(";");
+        let sql = prepare!("SELECT * FROM users WHERE name LIKE") + bind!(name) + prepare!(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -418,17 +411,17 @@ mod sqlite {
         assert!(executed);
 
         let name = "A";
-        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + name + "%");
+        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + bind!("%".to_owned() + name + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
-        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + &sanitize_like!(name) + "%");
+        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + bind!("%".to_owned() + &sanitize_like!(name) + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
-        let sql = conn.prepare("SELECT * FROM users WHERE name LIKE ") + conn.bind("%".to_owned() + &sanitize_like!(name, '$') + "%");
+        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + bind!("%".to_owned() + &sanitize_like!(name, '$') + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
@@ -438,7 +431,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A?['i]*";
-        let sql = conn.prepare("SELECT * FROM users WHERE name GLOB") + conn.bind(name) + conn.prepare(";");
+        let sql = prepare!("SELECT * FROM users WHERE name GLOB") + bind!(name) + prepare!(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -450,17 +443,18 @@ mod sqlite {
     }
 
     mod should_panic {
+        use exowsql::*;
         use super::stmt;
 
         #[test]
         #[should_panic = "exec error"]
         fn literal() {
             let conn = exowsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.prepare(stmt());
+            let stmt = prepare!(stmt());
 
             conn.execute(&stmt).unwrap();
 
-            let sql = conn.bind("select * from users;");
+            let sql = bind!("select * from users;");
 
             conn.iterate(&sql, |_| { true }).unwrap();
         }
@@ -469,11 +463,11 @@ mod sqlite {
         #[should_panic = "invalid literal"]
         fn sqli_eq_quote() {
             let conn = exowsql::sqlite::open(":memory:").unwrap();
-            let stmt = conn.prepare(stmt());
+            let stmt = prepare!(stmt());
             conn.execute(&stmt).unwrap();
 
             let name = "OR TRUE; DROP TABLE users; --";
-            let sql = conn.prepare("select age from users where name = '") + conn.bind(name) + &conn.prepare("';");
+            let sql = prepare!("select age from users where name = '") + bind!(name) + &prepare!("';");
 
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }
@@ -483,6 +477,7 @@ mod sqlite {
 #[cfg(feature = "sqlite")]
 #[cfg(not(debug_assertions))]
 mod sqlite_release_build {
+    use exowsql::*;
     use exowsql::error::*;
 
     #[test]

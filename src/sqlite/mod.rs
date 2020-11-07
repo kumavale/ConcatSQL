@@ -43,6 +43,8 @@ pub fn version() -> usize {
 
 #[cfg(test)]
 mod tests {
+    use crate as exowsql;
+    use exowsql::*;
     use crate::error::{OwsqlError, OwsqlErrorLevel};
     use temporary::Directory;
 
@@ -62,7 +64,7 @@ mod tests {
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(conn.prepare("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(prepare!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         crate::sqlite::open_readonly(path).unwrap();
     }
@@ -73,12 +75,12 @@ mod tests {
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(conn.prepare("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(prepare!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         let mut conn = crate::sqlite::open_readonly(path).unwrap();
         conn.error_level = OwsqlErrorLevel::Debug;
         assert_eq!(
-            conn.execute(conn.prepare("INSERT INTO users VALUES(42, 'Alice');")),
+            conn.execute(prepare!("INSERT INTO users VALUES(42, 'Alice');")),
             Err(OwsqlError::Message("exec error: attempt to write a readonly database".to_string()))
         );
     }

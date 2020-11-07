@@ -193,17 +193,18 @@ impl<'a> Parser<'a> {
 }
 
 // I want to write with const fn
-pub(crate) fn check_valid_literal(s: &str, error_level: &OwsqlErrorLevel) -> Result<()> {
+#[doc(hidden)]
+pub fn check_valid_literal(s: &'static str) -> Result<()> {
     let err_msg = "invalid literal";
-    let mut parser = Parser::new(&s, &error_level);
+    let mut parser = Parser::new(&s, &OwsqlErrorLevel::Debug);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
-                return OwsqlError::new(error_level, err_msg, &s);
+                return OwsqlError::new(&OwsqlErrorLevel::Debug, err_msg, &s);
             },
             Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return OwsqlError::new(error_level, err_msg, &s);
+                return OwsqlError::new(&OwsqlErrorLevel::Debug, err_msg, &s);
             },
             _other => (), // Do nothing
         }

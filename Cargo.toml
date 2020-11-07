@@ -14,7 +14,6 @@ postgres = ["postgres-sys"]
 
 
 [dependencies]
-rand = "0.7"
 
 [dependencies.sqlite3-sys]
 version = "0.12"
