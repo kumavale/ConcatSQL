@@ -6,8 +6,13 @@ pub struct WrapString {
 }
 
 impl WrapString {
-    #[doc(hidden)]
-    pub fn new<T: ?Sized + std::string::ToString>(s: &T) -> Self {
+    pub fn init(s: &'static str) -> Self {
+        Self {
+            query: s.to_string(),
+        }
+    }
+
+    pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
             query: s.to_string(),
         }

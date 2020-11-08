@@ -112,14 +112,34 @@ pub mod prelude {
 /// A typedef of the result returned by many methods.
 pub type Result<T, E = crate::error::ConcatsqlError> = std::result::Result<T, E>;
 
-/// TODO docs
+/// Prepare a SQL statement for execution.
+///
+/// # Examples
+///
+/// ```
+/// use concatsql::prepare;
+/// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+/// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+/// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+/// # conn.execute(stmt).unwrap();
+/// for name in ["Alice", "Bob"].iter() {
+///     let stmt = prepare!("INSERT INTO users (name) VALUES (") + &name + prepare!(")");
+///     conn.execute(stmt).unwrap();
+/// }
+/// ```
+///
+/// # Failure
+///
+/// If you take a value other than `&'static str` as an argument, it will fail.
 #[macro_export]
 macro_rules! prepare {
+    () => { concatsql::WrapString::init("") };
     ($query:expr) => {
         {
             static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
             INITIAL_CHECK.call_once(|| concatsql::check_valid_literal($query).unwrap());
-            concatsql::WrapString::new($query)
+            concatsql::WrapString::init($query)
         }
     };
 }
