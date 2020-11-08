@@ -361,6 +361,7 @@ mod sqlite {
 
     #[test]
     fn empty_string() {
+        assert_eq!("".actual_sql(),           "");
         assert_eq!(prepare!("").actual_sql(), "");
     }
 

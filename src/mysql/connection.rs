@@ -2,87 +2,61 @@ extern crate mysql_sys as mysql;
 use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
-use std::collections::HashSet;
 use std::cell::RefCell;
 
 use crate::Result;
-use crate::connection::{Connection, OwsqlConn};
-use crate::bidimap::BidiMap;
-use crate::error::{OwsqlError, OwsqlErrorLevel};
-use crate::constants::OW_MINIMUM_LENGTH;
-use crate::serial::SerialNumber;
-use crate::parser::escape_string;
+use crate::connection::{Connection, ConcatsqlConn};
+use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
     let opts = match Opts::from_url(&url) {
         Ok(opts) => opts,
-        Err(e) => return Err(OwsqlError::Message(format!("failed to open: {}", e))),
+        Err(e) => return Err(ConcatsqlError::Message(format!("failed to open: {}", e))),
     };
 
     let conn = match Conn::new(opts) {
         Ok(conn) => conn,
-        Err(e) => return Err(OwsqlError::Message(format!("failed to open: {}", e))),
+        Err(e) => return Err(ConcatsqlError::Message(format!("failed to open: {}", e))),
     };
 
     Ok(Connection {
-        conn:              Box::new(RefCell::new(conn)),
-        allowlist:         HashSet::new(),
-        serial_number:     RefCell::new(SerialNumber::default()),
-        ow_len_range:      (OW_MINIMUM_LENGTH, OW_MINIMUM_LENGTH),
-        overwrite:         RefCell::new(BidiMap::new()),
-        whitespace_around: RefCell::new(BidiMap::new()),
-        error_msg:         RefCell::new(BidiMap::new()),
-        error_level:       OwsqlErrorLevel::default(),
+        conn:        Box::new(RefCell::new(conn)),
+        error_level: ConcatsqlErrorLevel::default(),
     })
 }
 
-impl OwsqlConn for RefCell<mysql::Conn> {
-    fn _execute(&self, query: Result<String>, error_level: &OwsqlErrorLevel) -> Result<()> {
-        let query = match query {
-            Ok(query) => query,
-            Err(e) => if *error_level == OwsqlErrorLevel::AlwaysOk {
-                return Ok(());
-            } else {
-                return Err(e);
-            },
-        };
-
+impl ConcatsqlConn for RefCell<mysql::Conn> {
+    fn _execute(&self, s: &WrapString, error_level: &ConcatsqlErrorLevel) -> Result<()> {
+        let query = &s.query;
         match self.borrow_mut().query_drop(&query) {
             Ok(_) => Ok(()),
-            Err(e) => OwsqlError::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => ConcatsqlError::new(&error_level, "exec error", &e.to_string()),
         }
     }
 
-    fn _iterate(&self, query: Result<String>, error_level: &OwsqlErrorLevel,
+    fn _iterate(&self, s: &WrapString, error_level: &ConcatsqlErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = match query {
-            Ok(query) => query,
-            Err(e) => if *error_level == OwsqlErrorLevel::AlwaysOk {
-                return Ok(());
-            } else {
-                return Err(e);
-            },
-        };
-
+        let query = &s.query;
         let mut conn = self.borrow_mut();
         let mut result = match conn.query_iter(&query) {
             Ok(result) => result,
-            Err(e) => return OwsqlError::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => return ConcatsqlError::new(&error_level, "exec error", &e.to_string()),
         };
 
         while let Some(result_set) = result.next_set() {
             let result_set = match result_set {
                 Ok(result_set) => result_set,
-                Err(e) => return OwsqlError::new(&error_level, "exec error", &e.to_string()),
+                Err(e) => return ConcatsqlError::new(&error_level, "exec error", &e.to_string()),
             };
             let mut pairs: Vec<(String, Option<String>)> = Vec::with_capacity(result_set.affected_rows() as usize);
 
             for row in result_set {
                 let row = match row {
                     Ok(row) => row,
-                    Err(e) => return OwsqlError::new(&error_level, "exec error", &e.to_string()),
+                    Err(e) => return ConcatsqlError::new(&error_level, "exec error", &e.to_string()),
                 };
 
                 for (i, col) in row.columns().iter().enumerate() {
@@ -93,36 +67,29 @@ impl OwsqlConn for RefCell<mysql::Conn> {
 
             let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (&*p.0, p.1.as_deref())).collect();
             if !pairs.is_empty() && !callback(&pairs) {
-                return OwsqlError::new(&error_level, "exec error", "query aborted");
+                return ConcatsqlError::new(&error_level, "exec error", "query aborted");
             }
         }
 
         Ok(())
     }
-
-    fn must_escape(&self) -> Box<dyn Fn(char) -> bool> {
-        Box::new(|c| c == '\'' || c == '\\')
-    }
-
-    fn literal_escape(&self, s: &str) -> String {
-        escape_string(&s, self.must_escape())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::*;
+    use crate as concatsql;
+    use concatsql::prelude::*;
 
     #[test]
     fn open() {
         assert!(crate::mysql::open("mysql://localhost:3306/test").is_ok());
         assert_eq!(
             crate::mysql::open(""),
-            Err(OwsqlError::Message("failed to open: URL ParseError { relative URL without a base }".into()))
+            Err(ConcatsqlError::Message("failed to open: URL ParseError { relative URL without a base }".into()))
         );
         assert_eq!(
             crate::mysql::open("foo\0bar"),
-            Err(OwsqlError::Message("failed to open: URL ParseError { relative URL without a base }".into()))
+            Err(ConcatsqlError::Message("failed to open: URL ParseError { relative URL without a base }".into()))
         );
     }
 
@@ -137,12 +104,12 @@ mod tests {
     fn execute() {
         let conn = crate::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(
-            conn.execute("\0"),
-            Err(OwsqlError::Message("exec error".into())),
+            conn.execute(prepare!("\0")),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
         assert_eq!(
-            conn.execute("invalid query"),
-            Err(OwsqlError::Message("exec error".into())),
+            conn.execute(prepare!("invalid query")),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
     }
 
@@ -151,12 +118,12 @@ mod tests {
     fn iterate() {
         let conn = crate::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(
-            conn.iterate("\0", |_| { unreachable!(); }),
-            Err(OwsqlError::Message("exec error".into())),
+            conn.iterate(prepare!("\0"), |_| { unreachable!(); }),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
         assert_eq!(
-            conn.iterate("invalid query", |_| { unreachable!(); }),
-            Err(OwsqlError::Message("exec error".into())),
+            conn.iterate(prepare!("invalid query"), |_| { unreachable!(); }),
+            Err(ConcatsqlError::Message("exec error".into())),
         );
     }
 }

@@ -14,7 +14,7 @@ use crate::connection::Connection;
 ///
 /// ```rust
 /// let url = "mysql://user:password@localhost:3306/db_name";
-/// let conn = owsql::mysql::open(&url).unwrap();
+/// let conn = concatsql::mysql::open(&url).unwrap();
 /// ```
 #[inline]
 pub fn open(url: &str) -> Result<Connection> {

@@ -83,7 +83,12 @@ impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
     }
 
     fn actual_sql(&self) -> String {
-        crate::parser::escape_string(&self.to_string(), |c| c == '\'')
+        let s = &self.to_string();
+        if s.is_empty() {
+            String::new()
+        } else {
+            crate::parser::escape_string(&s, |c| c == '\'')
+        }
     }
 }
 
