@@ -92,3 +92,23 @@ impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate as concatsql;
+    use concatsql::prelude::*;
+
+    #[test]
+    fn concat_anything_type() {
+        let sql = prepare!("A") + prepare!("B") + "C" + String::from("D") + &String::from("E") + &prepare!("F") + 42;
+        assert_eq!(sql.actual_sql(), "AB'C''D''E'F'42'");
+    }
+
+    #[test]
+    fn to_wrapstring() {
+        assert_eq!("A".to_wrapstring().actual_sql(), "'A'");
+        assert_eq!('A'.to_wrapstring().actual_sql(), "'A'");
+        assert_eq!("ABC".to_wrapstring().actual_sql(), "'ABC'");
+        assert_eq!(42.to_wrapstring().actual_sql(), "'42'");
+        assert_eq!("O'Reilly".to_wrapstring().actual_sql(), "'O''Reilly'");
+    }
+}

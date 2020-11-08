@@ -443,12 +443,6 @@ mod sqlite {
         assert!(executed);
     }
 
-    #[test]
-    fn concat_anything_type() {
-        let sql = prepare!("A") + "B" + &"C" + String::from("D") + &String::from("E") + &prepare!("F") + 42;
-        assert_eq!(sql.actual_sql(), "A'B''C''D''E'F'42'");
-    }
-
     mod should_panic {
         use concatsql::prelude::*;
         use super::stmt;
