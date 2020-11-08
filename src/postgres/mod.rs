@@ -13,7 +13,7 @@ use crate::connection::Connection;
 ///
 /// ```rust
 /// let params = "host=localhost user=postgres password=postgres";
-/// let conn = owsql::postgres::open(&params).unwrap();
+/// let conn = concatsql::postgres::open(&params).unwrap();
 /// ```
 #[inline]
 pub fn open(params: &str) -> Result<Connection> {
