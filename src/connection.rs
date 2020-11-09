@@ -48,13 +48,13 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::prepare;
+    /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
     /// # conn.execute(stmt).unwrap();
-    /// let sql = prepare!("SELECT * FROM users;");
+    /// let sql = prep!("SELECT * FROM users;");
     /// conn.execute(&sql).unwrap();
     /// ```
     #[inline]
@@ -70,13 +70,13 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::prepare;
+    /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
     /// # conn.execute(stmt).unwrap();
-    /// let sql = prepare!("SELECT * FROM users;");
+    /// let sql = prep!("SELECT * FROM users;");
     /// conn.iterate(&sql, |pairs| {
     ///     for &(column, value) in pairs.iter() {
     ///         println!("{} = {}", column, value.unwrap());
@@ -97,13 +97,13 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::prepare;
+    /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
     /// # conn.execute(stmt).unwrap();
-    /// let sql = prepare!("SELECT name FROM users;");
+    /// let sql = prep!("SELECT name FROM users;");
     /// let rows = conn.rows(&sql).unwrap();
     /// for row in rows.iter() {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
@@ -130,14 +130,14 @@ impl Connection {
     /// # Danger
     ///
     /// ```
-    /// # use concatsql::{prepare, Wrap};
+    /// # use concatsql::{prep, Wrap};
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prepare!(r#"CREATE TABLE users (name TEXT, age INTEGER);
+    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
     /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
     /// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#);
     /// # conn.execute(stmt).unwrap();
     /// let age = String::from("42 or 1=1; --");  // input by attcker
-    /// let sql = prepare!("SELECT name FROM users WHERE age < ") + unsafe { conn.without_escape(&age) };
+    /// let sql = prep!("SELECT name FROM users WHERE age < ") + unsafe { conn.without_escape(&age) };
     /// assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age < 42 or 1=1; --");
     /// assert!(conn.rows(&sql).is_ok());
     /// ```

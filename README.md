@@ -12,9 +12,9 @@ You can use string concatenation to prevent SQL injection.
 **[Documentation](https://docs.rs/concatsql/)**  
 
 Supported databases:
-- PostgreSQL
-- MySQL
-- SQLite
+- [PostgreSQL](https://www.postgresql.org/)
+- [MySQL](https://www.mysql.com/)
+- [SQLite](https://sqlite.com/)
 
 You can configure the database backend in `Cargo.toml`:
 
@@ -33,7 +33,7 @@ let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
 
-let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
+let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
 assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
@@ -49,7 +49,7 @@ let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("'' or 1=1; --");
 
-let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
+let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
 assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
@@ -57,7 +57,7 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 }
 ```
 
-### If you did not use the `prepare` macro
+### If you did not use the `prep` macro
 
 cannot compile ... secure!
 
@@ -65,19 +65,19 @@ cannot compile ... secure!
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
-let sql = "SELECT name FROM users WHERE id=" + &id + " AND passwd='" + &passwd + "';";
+let sql = "SELECT name FROM users WHERE id=".to_string() + &id + " AND passwd='" + &passwd + "';";
 conn.execute(&sql).unwrap();  // error
 ```
 
-### When using `prepare!(\<String\>)`
+### When using `prep!(<String>)`
 
 cannot compile ... secure!
 
 ```rust
-use concatsql::prepare;
+use concatsql::prep;
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let age = String::from("50 or 1=1; --");
-let sql = prepare!("SELECT name FROM users WHERE age < ") + prepare!(&age);  // error
+let sql = prep!("SELECT name FROM users WHERE age < ") + prep!(&age);  // error
 ```
 
 ## License

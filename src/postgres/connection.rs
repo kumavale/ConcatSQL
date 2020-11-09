@@ -101,11 +101,11 @@ mod tests {
     fn execute() {
         let conn = crate::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         assert_eq!(
-            conn.execute(prepare!("\0")),
+            conn.execute(prep!("\0")),
             Err(Error::Message("exec error".into())),
         );
         assert_eq!(
-            conn.execute(prepare!("invalid query")),
+            conn.execute(prep!("invalid query")),
             Err(Error::Message("exec error".into())),
         );
     }
@@ -115,11 +115,11 @@ mod tests {
     fn iterate() {
         let conn = crate::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         assert_eq!(
-            conn.iterate(prepare!("\0"), |_| { unreachable!(); }),
+            conn.iterate(prep!("\0"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
         assert_eq!(
-            conn.iterate(prepare!("invalid query"), |_| { unreachable!(); }),
+            conn.iterate(prep!("invalid query"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
     }

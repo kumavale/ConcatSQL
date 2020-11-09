@@ -155,11 +155,11 @@ mod tests {
     fn execute() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
-            conn.execute(prepare!("\0")),
+            conn.execute(prep!("\0")),
             Err(Error::Message("invalid query".into())),
         );
         assert_eq!(
-            conn.execute(prepare!("invalid query")),
+            conn.execute(prep!("invalid query")),
             Err(Error::Message("exec error".into())),
         );
     }
@@ -169,11 +169,11 @@ mod tests {
     fn iterate() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(
-            conn.iterate(prepare!("\0"), |_| { unreachable!(); }),
+            conn.iterate(prep!("\0"), |_| { unreachable!(); }),
             Err(Error::Message("invalid query".into())),
         );
         assert_eq!(
-            conn.iterate(prepare!("invalid query"), |_| { unreachable!(); }),
+            conn.iterate(prep!("invalid query"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
     }
@@ -181,13 +181,13 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn actual_sql() {
-        assert_eq!(prepare!("SELECT").actual_sql(), "SELECT");
+        assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
         assert_eq!("SELECT".actual_sql(), "'SELECT'");
         assert_eq!("O'Reilly".actual_sql(), "'O''Reilly'");
-        assert_eq!(prepare!("O''Reilly").actual_sql(), "O''Reilly");
+        assert_eq!(prep!("O''Reilly").actual_sql(), "O''Reilly");
 
-        //crate::prepare!("O'Reilly").actual_sql();      // panic
-        //crate::prepare!("\"O'Reilly\"").actual_sql();  // panic
+        //crate::prep!("O'Reilly").actual_sql();      // panic
+        //crate::prep!("\"O'Reilly\"").actual_sql();  // panic
     }
 
     #[test]

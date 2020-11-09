@@ -12,7 +12,7 @@ mod sqlite {
 
     fn prepare() -> concatsql::Connection {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn
     }
@@ -46,7 +46,7 @@ mod sqlite {
         )}
 
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         static_strings! {
             select = "SELECT ";
@@ -55,13 +55,13 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(prepare!(sql).actual_sql(), "SELECT name FROM users");
+        assert_eq!(prep!(sql).actual_sql(), "SELECT name FROM users");
     }
 
     #[test]
     fn execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
     }
 
@@ -69,7 +69,7 @@ mod sqlite {
     fn iterate() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol"];
-        let sql = prepare!("SELECT name FROM users;");
+        let sql = prep!("SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -85,7 +85,7 @@ mod sqlite {
     fn iterate_2sets() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol", "Alice", "Bob", "Carol"];
-        let sql = prepare!("SELECT name FROM users; SELECT name FROM users;");
+        let sql = prep!("SELECT name FROM users; SELECT name FROM users;");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -102,8 +102,8 @@ mod sqlite {
         let conn = prepare();
         let expects = ["Alice", "Bob"];
         let age = "50";
-        let sql = prepare!("SELECT name FROM users WHERE ") +
-            &prepare!("age < ") + age + &prepare!(" OR ") + age + &prepare!(" < age");
+        let sql = prep!("SELECT name FROM users WHERE ") +
+            &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -119,7 +119,7 @@ mod sqlite {
     fn rows() {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
-        let sql = prepare!("SELECT * FROM users;");
+        let sql = prep!("SELECT * FROM users;");
 
         let rows = conn.rows(&sql).unwrap();
         for (i, row) in rows.iter().enumerate() {
@@ -133,7 +133,7 @@ mod sqlite {
         let conn = prepare();
         let expects = [("Alice", 42), ("Bob", 69), ("Carol", 50)];
 
-        conn.rows(&prepare!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+        conn.rows(&prep!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         });
@@ -199,7 +199,7 @@ mod sqlite {
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
-        let sql = prepare!("select age from users where name = ") + name + &prepare!("");
+        let sql = prep!("select age from users where name = ") + name + &prep!("");
         assert_eq!(
             name.actual_sql(),
             r#"'''Alice''; DROP TABLE users; --'"#
@@ -210,7 +210,7 @@ mod sqlite {
     #[test]
     fn whitespace() {
         let conn = prepare();
-        let sql = prepare!("select\n*\rfrom\nusers;");
+        let sql = prep!("select\n*\rfrom\nusers;");
 
         conn.iterate(&sql, |_| { true }).unwrap();
     }
@@ -219,7 +219,7 @@ mod sqlite {
     fn sqli_eq_nonquote() {
         let conn = prepare();
         let name = "Alice' or '1'='1";
-        let sql = prepare!("select age from users where name =") + name + &prepare!(";");
+        let sql = prep!("select age from users where name =") + name + &prep!(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -240,11 +240,11 @@ mod sqlite {
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
-        let sql = prepare!("INSERT INTO users VALUES(") + name + &prepare!(", 12345);");
+        let sql = prep!("INSERT INTO users VALUES(") + name + &prep!(", 12345);");
 
         conn.execute(&sql).unwrap();
 
-        conn.rows(prepare!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+        conn.rows(prep!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
                 concatsql::html_special_chars(&row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
@@ -337,21 +337,21 @@ mod sqlite {
     }
 
     #[test]
-    fn prepare_into_execute() {
+    fn prep_into_execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.execute(prepare!("SELECT ") + int!(1).unwrap()).unwrap();
+        conn.execute(prep!("SELECT ") + int!(1).unwrap()).unwrap();
     }
 
     #[test]
-    fn prepare_into_iterate() {
+    fn prep_into_iterate() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.iterate(prepare!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prep!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
-    fn prepare_into_rows() {
+    fn prep_into_rows() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        for row in conn.rows(prepare!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
@@ -359,7 +359,7 @@ mod sqlite {
     #[test]
     fn empty_string() {
         assert_eq!("".actual_sql(),           "");
-        assert_eq!(prepare!("").actual_sql(), "");
+        assert_eq!(prep!("").actual_sql(), "");
     }
 
     #[test]
@@ -368,7 +368,7 @@ mod sqlite {
         use std::sync::{Arc, Mutex};
 
         let conn = Arc::new(Mutex::new(concatsql::sqlite::open(":memory:").unwrap()));
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.lock().unwrap().execute(&stmt).unwrap();
 
         let mut handles = vec![];
@@ -377,7 +377,7 @@ mod sqlite {
             let conn_clone = conn.clone();
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
-                let sql = prepare!("INSERT INTO users VALUES ('Thread', ") + int!(i).unwrap() + prepare!(");");
+                let sql = prep!("INSERT INTO users VALUES ('Thread', ") + int!(i).unwrap() + prep!(");");
                 conn.execute(&sql).unwrap();
             });
             handles.push(handle);
@@ -387,7 +387,7 @@ mod sqlite {
 
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
-            conn.iterate(prepare!("SELECT age FROM users WHERE age = ") + int!(i).unwrap(), |pairs| {
+            conn.iterate(prep!("SELECT age FROM users WHERE age = ") + int!(i).unwrap(), |pairs| {
                 pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());
@@ -398,7 +398,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A%";
-        let sql = prepare!("SELECT * FROM users WHERE name LIKE") + name + prepare!(";");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE") + name + prep!(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -409,17 +409,17 @@ mod sqlite {
         assert!(executed);
 
         let name = "A";
-        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
-        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
-        let sql = prepare!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
@@ -429,7 +429,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A?['i]*";
-        let sql = prepare!("SELECT * FROM users WHERE name GLOB") + name + prepare!(";");
+        let sql = prep!("SELECT * FROM users WHERE name GLOB") + name + prep!(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -448,7 +448,7 @@ mod sqlite {
         #[should_panic = "exec error"]
         fn literal() {
             let conn = concatsql::sqlite::open(":memory:").unwrap();
-            let stmt = prepare!(stmt());
+            let stmt = prep!(stmt());
 
             conn.execute(&stmt).unwrap();
 
@@ -461,11 +461,11 @@ mod sqlite {
         #[should_panic = "invalid literal"]
         fn sqli_eq_quote() {
             let conn = concatsql::sqlite::open(":memory:").unwrap();
-            let stmt = prepare!(stmt());
+            let stmt = prep!(stmt());
             conn.execute(&stmt).unwrap();
 
             let name = "OR TRUE; DROP TABLE users; --";
-            let sql = prepare!("select age from users where name = '") + name + &prepare!("';");
+            let sql = prep!("select age from users where name = '") + name + &prep!("';");
 
             conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
         }

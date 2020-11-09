@@ -73,12 +73,12 @@ impl Wrap for WrapString {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::{prepare, Wrap};
+    /// # use concatsql::{prep, Wrap};
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// assert_eq!(prepare!("SELECT").actual_sql(), "SELECT");
+    /// assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
     /// assert_eq!("SELECT".actual_sql(),           "'SELECT'");
     /// assert_eq!("O'Reilly".actual_sql(),         "'O''Reilly'");
-    /// //prepare!("O'Reilly").actual_sql();  // panic
+    /// //prep!("O'Reilly").actual_sql();  // panic
     /// ```
     #[inline]
     fn actual_sql(&self) -> String {
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn concat_anything_type() {
-        let sql = prepare!("A") + prepare!("B") + "C" + String::from("D") + &String::from("E") + &prepare!("F") + 42;
+        let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42;
         assert_eq!(sql.actual_sql(), "AB'C''D''E'F'42'");
     }
 

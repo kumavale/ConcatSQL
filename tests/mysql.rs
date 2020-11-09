@@ -11,7 +11,7 @@ mod mysql {
 
     fn prepare() -> concatsql::Connection {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn
     }
@@ -31,7 +31,7 @@ mod mysql {
     #[test]
     fn execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        let stmt = prepare!(stmt());
+        let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
     }
 
@@ -46,7 +46,7 @@ mod mysql {
     fn iterate() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol"];
-        let sql = prepare!("SELECT name FROM users;");
+        let sql = prep!("SELECT name FROM users;");
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
@@ -60,7 +60,7 @@ mod mysql {
     fn iterate_2sets() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol", "Alice", "Bob", "Carol"];
-        let sql = prepare!("SELECT name FROM users; SELECT name FROM users;");
+        let sql = prep!("SELECT name FROM users; SELECT name FROM users;");
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
@@ -75,8 +75,8 @@ mod mysql {
         let conn = prepare();
         let expects = ["Alice", "Bob"];
         let age = "50";
-        let sql = prepare!("SELECT name FROM users WHERE ") +
-            &prepare!("age < ") + age + &prepare!(" OR ") + age + &prepare!(" < age");
+        let sql = prep!("SELECT name FROM users WHERE ") +
+            &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
 
         conn.iterate(&sql, |pairs| {
             for (i, (_, value)) in pairs.iter().enumerate() {
@@ -90,7 +90,7 @@ mod mysql {
     fn rows() {
         let conn = prepare();
         let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
-        let sql = prepare!("SELECT * FROM users;");
+        let sql = prep!("SELECT * FROM users;");
 
         let rows = conn.rows(&sql).unwrap();
         for (i, row) in rows.iter().enumerate() {
@@ -104,7 +104,7 @@ mod mysql {
         let conn = prepare();
         let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
 
-        conn.rows(&prepare!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+        conn.rows(&prep!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         });
@@ -170,7 +170,7 @@ mod mysql {
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
-        let sql = prepare!("select age from users where name = ") + name + &prepare!("");
+        let sql = prep!("select age from users where name = ") + name + &prep!("");
         assert_eq!(
             name.actual_sql(),
             r#"'''Alice''; DROP TABLE users; --'"#
@@ -181,7 +181,7 @@ mod mysql {
     #[test]
     fn whitespace() {
         let conn = prepare();
-        let sql = prepare!("select\n*\rfrom\nusers;");
+        let sql = prep!("select\n*\rfrom\nusers;");
 
         conn.iterate(&sql, |_| { true }).unwrap();
     }
@@ -190,7 +190,7 @@ mod mysql {
     fn sqli_eq_nonquote() {
         let conn = prepare();
         let name = "Alice' or '1'='1";
-        let sql = prepare!("select age from users where name =") + name + &prepare!(";");
+        let sql = prep!("select age from users where name =") + name + &prep!(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -200,11 +200,11 @@ mod mysql {
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
-        let sql = prepare!("INSERT INTO users VALUES(") + name + &prepare!(", 12345);");
+        let sql = prep!("INSERT INTO users VALUES(") + name + &prep!(", 12345);");
 
         conn.execute(&sql).unwrap();
 
-        conn.rows(prepare!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
+        conn.rows(prep!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
                 concatsql::html_special_chars(row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
@@ -293,7 +293,7 @@ mod mysql {
     fn integer() {
         let conn = prepare();
         let age = 50;
-        let sql = prepare!("select name from users where age <") + int!(age).unwrap();
+        let sql = prep!("select name from users where age <") + int!(age).unwrap();
 
         for row in conn.rows(&sql).unwrap().iter() {
             assert_eq!(row.get("name").unwrap(), "Alice");
@@ -303,19 +303,19 @@ mod mysql {
     #[test]
     fn ow_into_execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.execute(prepare!("SELECT ") + int!(1).unwrap()).unwrap();
+        conn.execute(prep!("SELECT ") + int!(1).unwrap()).unwrap();
     }
 
     #[test]
     fn ow_into_iterate() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.iterate(prepare!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prep!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
     fn ow_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        for row in conn.rows(prepare!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
@@ -323,15 +323,15 @@ mod mysql {
     #[test]
     fn empty_string() {
         assert_eq!("".actual_sql(),           "");
-        assert_eq!(prepare!("").actual_sql(), "");
+        assert_eq!(prep!("").actual_sql(), "");
     }
 
     #[test]
     fn executable_comment_syntax() {
         let conn = prepare();
         let sqls = vec![
-            (prepare!("SELECT 1 ") + "/*! +1 */", "SELECT 1 '/*! +1 */'", "1"),
-            (prepare!("SELECT 1 /*! +1 */"),      "SELECT 1 /*! +1 */",   "2"),
+            (prep!("SELECT 1 ") + "/*! +1 */", "SELECT 1 '/*! +1 */'", "1"),
+            (prep!("SELECT 1 /*! +1 */"),      "SELECT 1 /*! +1 */",   "2"),
         ];
 
         for (sql, actual_sql, result) in sqls {
