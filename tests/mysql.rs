@@ -196,20 +196,6 @@ mod mysql {
     }
 
     #[test]
-    fn int() {
-        let conn = prepare();
-        let invalid = conn.int("invalid");
-
-        assert_ne!(&invalid, &conn.int(42));
-        assert_ne!(&invalid, &conn.int("42"));
-        assert_ne!(&invalid, &conn.int("42".to_string()));
-        assert_ne!(&invalid, &conn.int(&"42".to_string()));
-        assert_eq!(&invalid, &conn.int(std::f64::consts::PI));
-        assert_eq!(&invalid, &conn.int('A'));
-        assert_eq!(&invalid, &conn.int("str"));
-    }
-
-    #[test]
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
@@ -306,7 +292,7 @@ mod mysql {
     fn integer() {
         let conn = prepare();
         let age = 50;
-        let sql = prepare!("select name from users where age <") + conn.int(age).unwrap();
+        let sql = prepare!("select name from users where age <") + int!(age).unwrap();
 
         for row in conn.rows(&sql).unwrap().iter() {
             assert_eq!(row.get("name").unwrap(), "Alice");
@@ -316,19 +302,19 @@ mod mysql {
     #[test]
     fn ow_into_execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.execute(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap();
+        conn.execute(prepare!("SELECT ") + int!(1).unwrap()).unwrap();
     }
 
     #[test]
     fn ow_into_iterate() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.iterate(prepare!("SELECT ") + conn.int(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prepare!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
     fn ow_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        for row in conn.rows(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prepare!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }

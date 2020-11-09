@@ -1,6 +1,6 @@
 //! # ConcatSQL
-//! `concatsql` is a secure library for PostgreSQL, MySQL and SQLite.  
-//! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
+//! `concatsql` is a secure library for PostgreSQL, MySQL and SQLite.
+//! Unlike other libraries, you can use string concatenation to prevent SQL injection.
 //!
 //! ```rust
 //! # use concatsql::prepare;
@@ -104,8 +104,7 @@ pub mod prelude {
     pub use crate::connection::Connection;
     pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
     pub use crate::row::Row;
-    pub use crate::prepare;
-    pub use crate::sanitize_like;
+    pub use crate::{sanitize_like, prepare, int};
     pub use crate::{WrapString, Wrap};
 }
 
@@ -142,5 +141,21 @@ macro_rules! prepare {
             concatsql::WrapString::init($query)
         }
     };
+}
+
+/// It is guaranteed to be a signed 64-bit integer without quotation.
+///
+/// # Examples
+///
+/// ```
+/// use concatsql::int;
+/// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// assert!(int!(42).is_ok());
+/// assert!(int!("42").is_ok());
+/// assert!(int!("42 or 1=1; --").is_err());
+/// ```
+#[macro_export]
+macro_rules! int {
+    ($query:expr) => { concatsql::WrapString::int($query) };
 }
 

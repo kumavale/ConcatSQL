@@ -226,16 +226,13 @@ mod sqlite {
 
     #[test]
     fn int() {
-        let conn = prepare();
-        let invalid = conn.int("invalid");
-
-        assert_ne!(&invalid, &conn.int(42));
-        assert_ne!(&invalid, &conn.int("42"));
-        assert_ne!(&invalid, &conn.int("42".to_string()));
-        assert_ne!(&invalid, &conn.int(&"42".to_string()));
-        assert_eq!(&invalid, &conn.int(std::f64::consts::PI));
-        assert_eq!(&invalid, &conn.int('A'));
-        assert_eq!(&invalid, &conn.int("str"));
+        assert!(int!(42).is_ok());
+        assert!(int!("42").is_ok());
+        assert!(int!("42".to_string()).is_ok());
+        assert!(int!(&"42".to_string()).is_ok());
+        assert!(int!(std::f64::consts::PI).is_err());
+        assert!(int!('A').is_err());
+        assert!(int!("str").is_err());
     }
 
     #[test]
@@ -333,28 +330,27 @@ mod sqlite {
 
     #[test]
     fn integer() {
-        let conn = concatsql::sqlite::open(":memory:").unwrap();
-        assert!(conn.int(42).is_ok());
-        assert!(conn.int("42").is_ok());
-        assert!(conn.int("xxx").is_err());
+        assert!(int!(42).is_ok());
+        assert!(int!("42").is_ok());
+        assert!(int!("xxx").is_err());
     }
 
     #[test]
-    fn ow_into_execute() {
+    fn prepare_into_execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.execute(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap();
+        conn.execute(prepare!("SELECT ") + int!(1).unwrap()).unwrap();
     }
 
     #[test]
-    fn ow_into_iterate() {
+    fn prepare_into_iterate() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.iterate(prepare!("SELECT ") + conn.int(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prepare!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
-    fn ow_into_rows() {
+    fn prepare_into_rows() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        for row in conn.rows(prepare!("SELECT ") + conn.int(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prepare!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
@@ -380,7 +376,7 @@ mod sqlite {
             let conn_clone = conn.clone();
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
-                let sql = prepare!("INSERT INTO users VALUES ('Thread', ") + conn.int(i).unwrap() + prepare!(");");
+                let sql = prepare!("INSERT INTO users VALUES ('Thread', ") + int!(i).unwrap() + prepare!(");");
                 conn.execute(&sql).unwrap();
             });
             handles.push(handle);
@@ -390,7 +386,7 @@ mod sqlite {
 
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
-            conn.iterate(prepare!("SELECT age FROM users WHERE age = ") + &conn.int(i).unwrap(), |pairs| {
+            conn.iterate(prepare!("SELECT age FROM users WHERE age = ") + int!(i).unwrap(), |pairs| {
                 pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());

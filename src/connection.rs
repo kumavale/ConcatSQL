@@ -150,25 +150,6 @@ impl Connection {
         WrapString::new(query)
     }
 
-    /// It is guaranteed to be a signed 64-bit integer without quotation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// conn.int(42);              // ok
-    /// conn.int("42");            // ok
-    /// conn.int("42 or 1=1; --"); // error
-    /// ```
-    pub fn int<T: Clone + ToString>(&self, value: T) -> Result<WrapString, &str> {
-        let value = value.to_string();
-        if value.parse::<i64>().is_ok() {
-            Ok(WrapString::new(&value))
-        } else {
-            Err("not integer")
-        }
-    }
-
     /// Sets the error level.  
     /// The default value is [ConcatsqlErrorLevel](./enum.ConcatsqlErrorLevel.html)::Develop for debug builds and [ConcatsqlErrorLevel](./enum.ConcatsqlErrorLevel.html)::Release for release builds.
     ///
