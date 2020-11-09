@@ -41,10 +41,9 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
 
 impl ConcatsqlConn for NonNull<ffi::sqlite3> {
     fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = s.query.as_bytes().to_vec();
-        let query = match CString::new(&*query) {
+        let query = match CString::new(&*s.query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return Error::new(&error_level, "invalid query", &s.query),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -69,10 +68,9 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
     fn _iterate<'a>(&self, s: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = s.query.as_bytes().to_vec();
-        let query = match CString::new(&*query) {
+        let query = match CString::new(&*s.query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", &String::from_utf8(query).unwrap_or_default()),
+            _ => return Error::new(&error_level, "invalid query", &s.query),
         };
         let mut err_msg = ptr::null_mut();
         let callback = Box::new(callback);

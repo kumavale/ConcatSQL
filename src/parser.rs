@@ -166,15 +166,15 @@ impl<'a> Parser<'a> {
 #[doc(hidden)]
 pub fn check_valid_literal(s: &'static str) -> Result<()> {
     let err_msg = "invalid literal";
-    let mut parser = Parser::new(&s, &ErrorLevel::Debug);
+    let mut parser = Parser::new(&s, &ErrorLevel::Develop);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
-                return Error::new(&ErrorLevel::Debug, err_msg, &s);
+                return Error::new(&ErrorLevel::Develop, &format!("{}: {}", err_msg, &s), "");
             },
             Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return Error::new(&ErrorLevel::Debug, err_msg, &s);
+                return Error::new(&ErrorLevel::Develop, &format!("{}: {}", err_msg, &s), "");
             },
             _other => (), // Do nothing
         }
