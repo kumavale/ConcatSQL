@@ -130,6 +130,35 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// # Failure
 ///
 /// If you take a value other than `&'static str` as an argument, it will fail.
+///
+/// ```compile_fail
+/// # use concatsql::prepare;
+/// let passwd = String::from("'' or 1=1; --");
+/// prepare!("SELECT * FROM users WHERE passwd=") + prepare!(&passwd); // shouldn't compile!
+/// ```
+///
+/// # Panics
+///
+/// Panic if you have incomplete single or double quotes.
+///
+/// panics:
+///
+/// ```should_panic
+/// # use concatsql::prepare;
+/// # let id = 42;
+/// prepare!("SELECT * FROM users WHERE id='") + id + prepare!("'");
+/// prepare!("INSERT INTO msg VALUES ('I'm cat.')");
+/// ```
+///
+/// correct:
+///
+/// ```
+/// # use concatsql::prepare;
+/// # let id = 42;
+/// prepare!("SELECT * FROM users WHERE id=") + id;
+/// prepare!("INSERT INTO msg VALUES ('I''m cat.')");
+/// prepare!("INSERT INTO msg VALUES (\"I'm cat.\")");
+/// ```
 #[macro_export]
 macro_rules! prepare {
     () => { concatsql::WrapString::init("") };
