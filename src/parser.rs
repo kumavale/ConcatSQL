@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+use crate::error::{Error, ErrorLevel};
 
 /// Convert special characters to HTML entities.
 ///
@@ -77,11 +77,11 @@ where
 pub struct Parser<'a> {
     input:       &'a str,
     pos:         usize,
-    error_level: &'a ConcatsqlErrorLevel,
+    error_level: &'a ErrorLevel,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, error_level: &'a ConcatsqlErrorLevel) -> Self {
+    pub fn new(input: &'a str, error_level: &'a ErrorLevel) -> Self {
         Self {
             input,
             pos: 0,
@@ -95,11 +95,11 @@ impl<'a> Parser<'a> {
 
     pub fn next_char(&self) -> Result<char> {
         self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
-            ConcatsqlErrorLevel::AlwaysOk |
-            ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
-            ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("error: next_char()".to_string()),
+            ErrorLevel::AlwaysOk |
+            ErrorLevel::Release  => Error::AnyError,
+            ErrorLevel::Develop  => Error::Message("error: next_char()".to_string()),
             #[cfg(debug_assertions)]
-            ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message("error: next_char(): None".to_string()),
+            ErrorLevel::Debug    => Error::Message("error: next_char(): None".to_string()),
         })
     }
 
@@ -118,11 +118,11 @@ impl<'a> Parser<'a> {
         }
 
         Err( match self.error_level {
-            ConcatsqlErrorLevel::AlwaysOk |
-            ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
-            ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("endless".to_string()),
+            ErrorLevel::AlwaysOk |
+            ErrorLevel::Release  => Error::AnyError,
+            ErrorLevel::Develop  => Error::Message("endless".to_string()),
             #[cfg(debug_assertions)]
-            ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message(format!("endless: {}", s)),
+            ErrorLevel::Debug    => Error::Message(format!("endless: {}", s)),
         })
     }
 
@@ -136,11 +136,11 @@ impl<'a> Parser<'a> {
         }
         if s.is_empty() {
             Err( match self.error_level {
-                ConcatsqlErrorLevel::AlwaysOk |
-                ConcatsqlErrorLevel::Release  => ConcatsqlError::AnyError,
-                ConcatsqlErrorLevel::Develop  => ConcatsqlError::Message("error: consume_while()".to_string()),
+                ErrorLevel::AlwaysOk |
+                ErrorLevel::Release  => Error::AnyError,
+                ErrorLevel::Develop  => Error::Message("error: consume_while()".to_string()),
                 #[cfg(debug_assertions)]
-                ConcatsqlErrorLevel::Debug    => ConcatsqlError::Message("error: consume_while(): empty".to_string()),
+                ErrorLevel::Debug    => Error::Message("error: consume_while(): empty".to_string()),
             })
         } else {
             Ok(s)
@@ -150,11 +150,11 @@ impl<'a> Parser<'a> {
     pub fn consume_char(&mut self) -> Result<char> {
         let mut iter = self.input[self.pos..].char_indices();
         let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
-            ConcatsqlErrorLevel::AlwaysOk |
-            ConcatsqlErrorLevel::Release => ConcatsqlError::AnyError,
-            ConcatsqlErrorLevel::Develop => ConcatsqlError::Message("error: consume_char()".to_string()),
+            ErrorLevel::AlwaysOk |
+            ErrorLevel::Release => Error::AnyError,
+            ErrorLevel::Develop => Error::Message("error: consume_char()".to_string()),
             #[cfg(debug_assertions)]
-            ConcatsqlErrorLevel::Debug   => ConcatsqlError::Message("error: consume_char(): None".to_string()),
+            ErrorLevel::Debug   => Error::Message("error: consume_char(): None".to_string()),
         })?;
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
         self.pos += next_pos;
@@ -166,15 +166,15 @@ impl<'a> Parser<'a> {
 #[doc(hidden)]
 pub fn check_valid_literal(s: &'static str) -> Result<()> {
     let err_msg = "invalid literal";
-    let mut parser = Parser::new(&s, &ConcatsqlErrorLevel::Debug);
+    let mut parser = Parser::new(&s, &ErrorLevel::Debug);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
             Ok('"')  => if parser.consume_string('"').is_err() {
-                return ConcatsqlError::new(&ConcatsqlErrorLevel::Debug, err_msg, &s);
+                return Error::new(&ErrorLevel::Debug, err_msg, &s);
             },
             Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return ConcatsqlError::new(&ConcatsqlErrorLevel::Debug, err_msg, &s);
+                return Error::new(&ErrorLevel::Debug, err_msg, &s);
             },
             _other => (), // Do nothing
         }
@@ -198,8 +198,8 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn consume_char() {
-        let mut p = super::Parser::new("", &ConcatsqlErrorLevel::Debug);
-        assert_eq!(p.consume_char(), Err(ConcatsqlError::Message("error: consume_char(): None".into())));
+        let mut p = super::Parser::new("", &ErrorLevel::Debug);
+        assert_eq!(p.consume_char(), Err(Error::Message("error: consume_char(): None".into())));
     }
 
     #[test]

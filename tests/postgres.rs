@@ -2,10 +2,11 @@
 #[cfg(debug_assertions)]
 mod postgres {
     use concatsql::prelude::*;
+    use concatsql::{Error, ErrorLevel};
 
     macro_rules! err {
-        () => { Err(concatsql::ConcatsqlError::AnyError) };
-        ($msg:expr) => { Err(concatsql::ConcatsqlError::Message($msg.to_string())) };
+        () => { Err(Error::AnyError) };
+        ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
     fn prepare() -> concatsql::Connection {
@@ -215,17 +216,17 @@ mod postgres {
     #[test]
     fn error_level() {
         let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.error_level(ConcatsqlErrorLevel::AlwaysOk);
-        conn.error_level(ConcatsqlErrorLevel::Release);
-        conn.error_level(ConcatsqlErrorLevel::Develop);
-        conn.error_level(ConcatsqlErrorLevel::Debug);
+        conn.error_level(ErrorLevel::AlwaysOk);
+        conn.error_level(ErrorLevel::Release);
+        conn.error_level(ErrorLevel::Develop);
+        conn.error_level(ErrorLevel::Debug);
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
         let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.error_level(ConcatsqlErrorLevel::AlwaysOk);
+        conn.error_level(ErrorLevel::AlwaysOk);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
 
@@ -240,7 +241,7 @@ mod postgres {
     #[test]
     fn error_level_release() {
         let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.error_level(ConcatsqlErrorLevel::Release);
+        conn.error_level(ErrorLevel::Release);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
 
@@ -255,7 +256,7 @@ mod postgres {
     #[test]
     fn error_level_develop() {
         let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.error_level(ConcatsqlErrorLevel::Develop);
+        conn.error_level(ErrorLevel::Develop);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
 
@@ -270,7 +271,7 @@ mod postgres {
     #[test]
     fn error_level_debug() {
         let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.error_level(ConcatsqlErrorLevel::Debug);
+        conn.error_level(ErrorLevel::Debug);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
 

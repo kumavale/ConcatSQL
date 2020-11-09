@@ -1,20 +1,20 @@
 use std::fmt;
 
 use crate::Result;
-use crate::ConcatsqlErrorLevel;
+use crate::ErrorLevel;
 use crate::row::Row;
 use crate::wrapstring::WrapString;
 
 pub(crate) trait ConcatsqlConn {
-    fn _execute(&self, query: &WrapString, error_level: &crate::ConcatsqlErrorLevel) -> Result<()>;
-    fn _iterate(&self, query: &WrapString, error_level: &crate::ConcatsqlErrorLevel,
+    fn _execute(&self, query: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
+    fn _iterate(&self, query: &WrapString, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
 }
 
 /// A database connection.
 pub struct Connection {
     pub(crate) conn:        Box<dyn ConcatsqlConn>,
-    pub(crate) error_level: ConcatsqlErrorLevel,
+    pub(crate) error_level: ErrorLevel,
 }
 
 unsafe impl Send for Connection {}
@@ -151,16 +151,16 @@ impl Connection {
     }
 
     /// Sets the error level.  
-    /// The default value is [ConcatsqlErrorLevel](./enum.ConcatsqlErrorLevel.html)::Develop for debug builds and [ConcatsqlErrorLevel](./enum.ConcatsqlErrorLevel.html)::Release for release builds.
+    /// The default value is [ErrorLevel](./enum.ErrorLevel.html)::Develop for debug builds and [ErrorLevel](./enum.ErrorLevel.html)::Release for release builds.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::ConcatsqlErrorLevel;
+    /// # use concatsql::ErrorLevel;
     /// # let mut conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// conn.error_level(ConcatsqlErrorLevel::Debug);
+    /// conn.error_level(ErrorLevel::Debug);
     /// ```
-    pub fn error_level(&mut self, level: ConcatsqlErrorLevel) {
+    pub fn error_level(&mut self, level: ErrorLevel) {
         self.error_level = level;
     }
 }

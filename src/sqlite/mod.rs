@@ -45,7 +45,7 @@ pub fn version() -> usize {
 mod tests {
     use crate as concatsql;
     use concatsql::*;
-    use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+    use crate::error::*;
     use temporary::Directory;
 
     #[test]
@@ -78,10 +78,10 @@ mod tests {
             conn.execute(prepare!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
         let mut conn = crate::sqlite::open_readonly(path).unwrap();
-        conn.error_level = ConcatsqlErrorLevel::Debug;
+        conn.error_level = ErrorLevel::Debug;
         assert_eq!(
             conn.execute(prepare!("INSERT INTO users VALUES(42, 'Alice');")),
-            Err(ConcatsqlError::Message("exec error: attempt to write a readonly database".to_string()))
+            Err(Error::Message("exec error: attempt to write a readonly database".to_string()))
         );
     }
 

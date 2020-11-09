@@ -83,7 +83,7 @@ pub mod mysql;
 pub mod postgres;
 
 pub use crate::connection::Connection;
-pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
+pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::Row;
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal};
 pub use crate::wrapstring::{WrapString, Wrap};
@@ -102,14 +102,13 @@ pub mod prelude {
     pub use crate::postgres;
 
     pub use crate::connection::Connection;
-    pub use crate::error::{ConcatsqlError, ConcatsqlErrorLevel};
     pub use crate::row::Row;
     pub use crate::{sanitize_like, prepare, int};
     pub use crate::{WrapString, Wrap};
 }
 
 /// A typedef of the result returned by many methods.
-pub type Result<T, E = crate::error::ConcatsqlError> = std::result::Result<T, E>;
+pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 
 /// Prepare a SQL statement for execution.
 ///
