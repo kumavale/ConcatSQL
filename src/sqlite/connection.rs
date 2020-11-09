@@ -127,6 +127,16 @@ extern "C" fn process_callback(
     }
 }
 
+impl Drop for Connection {
+    fn drop(&mut self) {
+        let close_result = unsafe { ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3) };
+        if close_result != ffi::SQLITE_OK {
+            dbg!(close_result);
+            eprintln!("error closing SQLite connection");
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
