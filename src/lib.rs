@@ -1,70 +1,33 @@
 //! # ConcatSQL
-//! `concatsql` is a secure library for PostgreSQL, MySQL and SQLite.
-//! Unlike other libraries, you can use string concatenation to prevent SQL injection.
+//!
+//! `concatsql` is a secure library for PostgreSQL, MySQL and SQLite.  
+//! Unlike other libraries, you can use string concatenation to prevent SQL injection.  
 //!
 //! ```rust
-//! # use concatsql::prep;
-//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
-//! #               INSERT INTO users (name, id) VALUES ('Alice', 42);
-//! #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
-//! # conn.execute(stmt).unwrap();
-//! let id_input = "42 OR 1=1; --";
-//! let sql = prep!("SELECT name FROM users WHERE id = ") + id_input;
-//! // At runtime it will be transformed into a query like
-//! // "SELECT name FROM users WHERE id = '42 OR 1=1; --'".
-//! # conn.iterate(&sql, |_| { true }).unwrap();
-//! ```
+//! use concatsql::prelude::*;
 //!
-//! ## Example
+//! fn main() {
+//!     let conn = concatsql::sqlite::open(":memory:").unwrap();
+//!     let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
+//!                   INSERT INTO users (name, age) VALUES ('Alice', 42);
+//!                   INSERT INTO users (name, age) VALUES ('Bob',   69);"#);
+//!     conn.execute(stmt).unwrap();
 //!
-//! Open a connection of SQLite, create a table, and insert some rows:
-//!
-//! ```rust
-//! # use concatsql::prep;
-//! let conn = concatsql::sqlite::open(":memory:").unwrap();
-//! let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
-//!               INSERT INTO users (name, age) VALUES ('Alice', 42);
-//!               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
-//! conn.execute(&stmt).unwrap();
-//! ```
-//!
-//! Select some rows and process them one by one as plain text:
-//!
-//! ```rust
-//! # use concatsql::prep;
-//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
-//! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
-//! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
-//! # conn.execute(stmt).unwrap();
-//! let age = "50";
-//! let sql = prep!("SELECT * FROM users WHERE age > ") + age;
-//! conn.iterate(&sql, |pairs| {
-//!     for &(column, value) in pairs.iter() {
-//!         println!("{} = {}", column, value.unwrap());
+//!     let age = String::from("42");  // user input
+//!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
+//!     // At runtime it will be transformed into a query like
+//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42'");
+//!     for row in conn.rows(&sql).unwrap().iter() {
+//!         assert_eq!(row.get("name").unwrap(), "Alice");
 //!     }
-//!     true
-//! }).unwrap();
-//! ```
 //!
-//! It can be executed after getting all the rows of the query:
-//!
-//! ```rust
-//! # use concatsql::prep;
-//! # let conn = concatsql::sqlite::open(":memory:").unwrap();
-//! # let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
-//! #               INSERT INTO users (name, age) VALUES ('Alice', 42);
-//! #               INSERT INTO users (name, age) VALUES ('Bob', 69);"#);
-//! # conn.execute(stmt).unwrap();
-//! let age = "50";
-//! let sql = prep!("SELECT * FROM users WHERE age > ") + age;
-//! let rows = conn.rows(&sql).unwrap();
-//! for row in rows.iter() {
-//!     println!("name = {}", row.get("name").unwrap_or("NULL"));
+//!     let age = String::from("42 OR 1=1; --");  // user input
+//!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
+//!     // At runtime it will be transformed into a query like
+//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
+//!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
 //! }
 //! ```
-
 
 mod connection;
 mod error;
@@ -176,11 +139,15 @@ macro_rules! prep {
 /// # Examples
 ///
 /// ```
-/// use concatsql::int;
-/// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// # use concatsql::prelude::*;
 /// assert!(int!(42).is_ok());
 /// assert!(int!("42").is_ok());
 /// assert!(int!("42 or 1=1; --").is_err());
+/// ```
+/// ```
+/// # use concatsql::prelude::*;
+/// assert_eq!((prep!("id=") +      42          ).actual_sql(), "id='42'");
+/// assert_eq!((prep!("id=") + int!(42).unwrap()).actual_sql(), "id=42");
 /// ```
 #[macro_export]
 macro_rules! int {
