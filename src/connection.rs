@@ -1,4 +1,5 @@
 use std::fmt;
+//use std::pin::Pin;
 
 use crate::Result;
 use crate::ErrorLevel;
@@ -12,21 +13,22 @@ pub(crate) trait ConcatsqlConn {
 }
 
 /// A database connection.
-pub struct Connection {
-    pub(crate) conn:        Box<dyn ConcatsqlConn>,
+pub struct Connection<'a> {
+    //pub(crate) conn:        Pin<&'a dyn ConcatsqlConn>,
+    pub(crate) conn:        &'a dyn ConcatsqlConn,
     pub(crate) error_level: ErrorLevel,
 }
 
-unsafe impl Send for Connection {}
-unsafe impl Sync for Connection {}
+unsafe impl<'a> Send for Connection<'a> {}
+unsafe impl<'a> Sync for Connection<'a> {}
 
-impl PartialEq for Connection {
+impl<'a> PartialEq for Connection<'a> {
     fn eq(&self, other: &Self) -> bool {
         (&self.conn as *const _) == (&other.conn as *const _)
     }
 }
 
-impl fmt::Debug for Connection {
+impl<'a> fmt::Debug for Connection<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("conn", &(&self.conn as *const _))
@@ -42,7 +44,7 @@ impl AsRef<WrapString> for WrapString {
     }
 }
 
-impl Connection {
+impl<'a> Connection<'a> {
     /// Execute a statement without processing the resulting rows if any.
     ///
     /// # Examples
@@ -59,6 +61,7 @@ impl Connection {
     /// ```
     #[inline]
     pub fn execute<T: AsRef<WrapString>>(&self, query: T) -> Result<()> {
+        //self.conn.as_ref()._execute(query.as_ref(), &self.error_level)
         self.conn._execute(query.as_ref(), &self.error_level)
     }
 
@@ -89,6 +92,7 @@ impl Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
+        //self.conn.as_ref()._iterate(query.as_ref(), &self.error_level, &mut callback)
         self.conn._iterate(query.as_ref(), &self.error_level, &mut callback)
     }
 

@@ -9,7 +9,7 @@ mod mysql {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    fn prepare() -> concatsql::Connection {
+    fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();

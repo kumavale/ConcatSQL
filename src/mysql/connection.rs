@@ -3,6 +3,7 @@ use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
 use std::cell::RefCell;
+//use std::pin::Pin;
 
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn};
@@ -16,13 +17,28 @@ pub fn open(url: &str) -> Result<Connection> {
         Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
     };
 
+    //let mut conn_ptr = std::ptr::null_mut();
+    //let conn = match Conn::new(opts) {
+    //    Ok(mut conn) => &mut conn,
+    //    Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
+    //};
     let conn = match Conn::new(opts) {
         Ok(conn) => conn,
         Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
     };
+    //conn_ptr = match Conn::new(opts) {
+    //    Ok(conn) => &conn as *const _ as *mut mysql::Conn,
+    //    Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
+    //};
+    //conn_ptr = &mut RefCell::new(conn);
 
     Ok(Connection {
-        conn:        Box::new(RefCell::new(conn)),
+        //conn:        Box::new(RefCell::new(conn)),
+        //conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
+        conn:        &*Box::leak(Box::new(RefCell::new(conn))),
+        //conn:        unsafe { Pin::new_unchecked(&*RefCell::new(conn).as_ptr()) },
+        //conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
+        //conn:        unsafe { Pin::new_unchecked(&Box::new(RefCell::new(&*conn_ptr))) },
         error_level: ErrorLevel::default(),
     })
 }
@@ -30,7 +46,10 @@ pub fn open(url: &str) -> Result<Connection> {
 impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let query = &s.query;
-        match self.borrow_mut().query_drop(&query) {
+        let conn = &mut *self.borrow_mut();
+        match conn.query_drop(&query) {
+        //let conn = &self as *const _ as *mut mysql::Conn;
+        //match conn.as_mut().unwrap().query_drop(&query) {
             Ok(_) => Ok(()),
             Err(e) => Error::new(&error_level, "exec error", &e.to_string()),
         }
@@ -40,7 +59,9 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = &s.query;
-        let mut conn = self.borrow_mut();
+        let conn = &mut *self.borrow_mut();
+        //let mut conn = &self as *const _ as *mut mysql::Conn;
+        //let mut result = unsafe { match conn.as_mut().unwrap().query_iter(&query) {
         let mut result = match conn.query_iter(&query) {
             Ok(result) => result,
             Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),

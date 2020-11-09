@@ -1,8 +1,9 @@
 extern crate sqlite3_sys as ffi;
 
 use std::ffi::{CStr, CString, c_void};
-use std::ptr::{self, NonNull};
+use std::ptr;
 use std::path::Path;
+//use std::pin::Pin;
 
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn};
@@ -10,7 +11,7 @@ use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
-pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
+pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a>> {
     let path = match path.as_ref().to_str() {
         Some(path) => {
             match CString::new(path) {
@@ -32,14 +33,15 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
     match open_result {
         ffi::SQLITE_OK =>
             Ok(Connection {
-                conn:        Box::new(unsafe { NonNull::new_unchecked(conn_ptr) }),
+                //conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
+                conn:        unsafe { &*conn_ptr },
                 error_level: ErrorLevel::default(),
             }),
         _ => Err(Error::Message("failed to connect".into())),
     }
 }
 
-impl ConcatsqlConn for NonNull<ffi::sqlite3> {
+impl ConcatsqlConn for ffi::sqlite3 {
     fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let query = match CString::new(&*s.query.as_bytes()) {
             Ok(string) => string,
@@ -49,7 +51,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
         unsafe {
             ffi::sqlite3_exec(
-                self.as_ptr(),
+                self as *const _ as *mut _,
                 query.as_ptr(),
                 None,             // callback fn
                 ptr::null_mut(),  // callback arg
@@ -61,11 +63,11 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
             Ok(())
         } else {
             Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy().into_owned() })
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
         }
     }
 
-    fn _iterate<'a>(&self, s: &WrapString, error_level: &ErrorLevel,
+    fn _iterate(&self, s: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = match CString::new(&*s.query.as_bytes()) {
@@ -78,7 +80,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
         unsafe {
             ffi::sqlite3_exec(
-                self.as_ptr(),
+                self as *const _ as *mut _,
                 query.as_ptr(),
                 Some(process_callback),
                 &*callback as *const F as *mut F as *mut c_void,
@@ -90,7 +92,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
             Ok(())
         } else {
             Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy().into_owned() })
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
         }
     }
 }
@@ -127,7 +129,7 @@ extern "C" fn process_callback(
     }
 }
 
-impl Drop for Connection {
+impl<'a> Drop for Connection<'a> {
     fn drop(&mut self) {
         let close_result = unsafe { ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3) };
         if close_result != ffi::SQLITE_OK {

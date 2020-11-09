@@ -3,6 +3,7 @@ extern crate postgres_sys as postgres;
 use postgres::{Client, NoTls};
 
 use std::cell::RefCell;
+//use std::pin::Pin;
 
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn};
@@ -17,7 +18,9 @@ pub fn open(params: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:        Box::new(RefCell::new(conn)),
+        //conn:        Box::new(RefCell::new(conn)),
+        //conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
+        conn:        &*Box::leak(Box::new(RefCell::new(conn))),
         error_level: ErrorLevel::default(),
     })
 }
