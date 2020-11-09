@@ -28,12 +28,14 @@ concatsql = { version = "<version>", features = ["<postgres|mysql|sqlite>"] }
 ### Normal value
 
 ```rust
-use concatsql::prepare;
+use concatsql::prelude::*;
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("pass");
+
 let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
-assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
+assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
+
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     assert_eq!(row.get("name").unwrap(), "Alice");
 }
@@ -42,20 +44,22 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 ### Illegal value
 
 ```rust
-use concatsql::prepare;
+use concatsql::prelude::*;
 let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("'' or 1=1; --");
+
 let sql = prepare!("SELECT name FROM users WHERE id=") + &id + prepare!(" AND passwd=") + &passwd;
-assert_eq!(concatsql::actual_sql(&sql), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
+assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
+
 for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
     unreachable!();
 }
 ```
 
-### If you did not use the concatsql::prepare macro
+### If you did not use the `prepare` macro
 
-cannot compile
+cannot compile ... secure!
 
 ```rust
 let conn = concatsql::sqlite::open(":memory:").unwrap();
@@ -65,9 +69,9 @@ let sql = "SELECT name FROM users WHERE id=" + &id + " AND passwd='" + &passwd +
 conn.execute(&sql).unwrap();  // error
 ```
 
-### concatsql::prepare!(\<String\>)
+### When using `prepare!(\<String\>)`
 
-cannot compile
+cannot compile ... secure!
 
 ```rust
 use concatsql::prepare;
