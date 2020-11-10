@@ -1,5 +1,5 @@
 use std::fmt;
-//use std::pin::Pin;
+use std::pin::Pin;
 
 use crate::Result;
 use crate::ErrorLevel;
@@ -14,8 +14,7 @@ pub(crate) trait ConcatsqlConn {
 
 /// A database connection.
 pub struct Connection<'a> {
-    //pub(crate) conn:        Pin<&'a dyn ConcatsqlConn>,
-    pub(crate) conn:        &'a dyn ConcatsqlConn,
+    pub(crate) conn:        Pin<&'a dyn ConcatsqlConn>,
     pub(crate) error_level: ErrorLevel,
 }
 

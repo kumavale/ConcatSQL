@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     #[cfg(debug_assertions)]
-    fn owsql_error() {
+    fn errors() {
         assert_eq!(ErrorLevel::default(), ErrorLevel::Develop);
         assert_eq!(Error::Message("test".to_string()).to_string(), "test");
         assert_eq!(

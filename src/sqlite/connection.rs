@@ -3,7 +3,7 @@ extern crate sqlite3_sys as ffi;
 use std::ffi::{CStr, CString, c_void};
 use std::ptr;
 use std::path::Path;
-//use std::pin::Pin;
+use std::pin::Pin;
 
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn};
@@ -33,8 +33,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
     match open_result {
         ffi::SQLITE_OK =>
             Ok(Connection {
-                //conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
-                conn:        unsafe { &*conn_ptr },
+                conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
                 error_level: ErrorLevel::default(),
             }),
         _ => Err(Error::Message("failed to connect".into())),
@@ -132,6 +131,7 @@ extern "C" fn process_callback(
 impl<'a> Drop for Connection<'a> {
     fn drop(&mut self) {
         let close_result = unsafe { ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3) };
+        unsafe { std::ptr::drop_in_place(&*self.conn as *const _ as *mut ffi::sqlite3); }
         if close_result != ffi::SQLITE_OK {
             dbg!(close_result);
             eprintln!("error closing SQLite connection");
