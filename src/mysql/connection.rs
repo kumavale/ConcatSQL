@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 use crate::Result;
-use crate::connection::{Connection, ConcatsqlConn};
+use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
 
@@ -31,8 +31,7 @@ pub fn open(url: &str) -> Result<Connection> {
 impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let query = &s.query;
-        //let mut conn = self.borrow_mut();
-        let conn = &mut *self.borrow_mut();
+        let mut conn = self.borrow_mut();
         match conn.query_drop(&query) {
             Ok(_) => Ok(()),
             Err(e) => Error::new(&error_level, "exec error", &e.to_string()),
@@ -43,8 +42,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = &s.query;
-        //let mut conn = self.borrow_mut();
-        let conn = &mut *self.borrow_mut();
+        let mut conn = self.borrow_mut();
         let mut result = match conn.query_iter(&query) {
             Ok(result) => result,
             Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
@@ -76,6 +74,10 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         Ok(())
+    }
+
+    fn kind(&self) -> ConnKind {
+        ConnKind::MySQL
     }
 }
 

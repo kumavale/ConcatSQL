@@ -31,6 +31,7 @@ impl WrapString {
 impl Add for WrapString {
     type Output = Self;
 
+    #[inline]
     fn add(self, other: Self) -> Self {
         Self {
             query: self.query + &other.query,
@@ -41,6 +42,7 @@ impl Add for WrapString {
 impl<'a> Add<&'a WrapString> for WrapString {
     type Output = WrapString;
 
+    #[inline]
     fn add(self, other: &'a WrapString) -> WrapString {
         WrapString {
             query: self.query + &other.query,
@@ -51,9 +53,10 @@ impl<'a> Add<&'a WrapString> for WrapString {
 impl<T: Sized + ToString> Add<T> for WrapString {
     type Output = WrapString;
 
+    #[inline]
     fn add(self, other: T) -> WrapString {
         WrapString {
-            query: self.query + &crate::parser::escape_string(&other.to_string(), |c| c == '\''),
+            query: self.query + &crate::parser::escape_string(&other.to_string()),
         }
     }
 }
@@ -88,7 +91,7 @@ impl Wrap for WrapString {
 
 impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
     fn to_wrapstring(&self) -> WrapString {
-        WrapString::new(&crate::parser::escape_string(&self.to_string(), |c| c == '\''))
+        WrapString::new(&crate::parser::escape_string(&self.to_string()))
     }
 
     fn actual_sql(&self) -> String {
@@ -96,7 +99,7 @@ impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
         if s.is_empty() {
             String::new()
         } else {
-            crate::parser::escape_string(&s, |c| c == '\'')
+            crate::parser::escape_string(&s)
         }
     }
 }

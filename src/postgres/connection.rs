@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 use crate::Result;
-use crate::connection::{Connection, ConcatsqlConn};
+use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
 
@@ -69,6 +69,10 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         }
 
         Ok(())
+    }
+
+    fn kind(&self) -> ConnKind {
+        ConnKind::PostgreSQL
     }
 }
 

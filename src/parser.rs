@@ -60,18 +60,17 @@ pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: ch
     escaped_str
 }
 
-pub(crate) fn escape_string<F>(s: &str, is_escape_char: F) -> String
-where
-    F: Fn(char) -> bool,
-{
+pub(crate) fn escape_string(s: &str) -> String {
     let mut escaped = String::new();
+    escaped.push('\'');
     for c in s.chars() {
-        if is_escape_char(c) {
+        if c == '\'' {
             escaped.push(c);
         }
         escaped.push(c);
     }
-    format!("'{}'", escaped)
+    escaped.push('\'');
+    escaped
 }
 
 pub struct Parser<'a> {
@@ -204,9 +203,9 @@ mod tests {
 
     #[test]
     fn escape_string() {
-        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\''),            "'O''Reilly'");
-        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\''),            "'O\\''Reilly'");
-        assert_eq!(super::escape_string("O'Reilly",   |c| c=='\'' || c=='\\'), "'O''Reilly'");
-        assert_eq!(super::escape_string("O\\'Reilly", |c| c=='\'' || c=='\\'), "'O\\\\''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
     }
 }

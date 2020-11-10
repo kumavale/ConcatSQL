@@ -6,7 +6,7 @@ use std::path::Path;
 use std::pin::Pin;
 
 use crate::Result;
-use crate::connection::{Connection, ConcatsqlConn};
+use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
 
@@ -42,7 +42,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 
 impl ConcatsqlConn for ffi::sqlite3 {
     fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = match CString::new(&*s.query.as_bytes()) {
+        let query = match CString::new(s.query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", &s.query),
         };
@@ -69,12 +69,11 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn _iterate(&self, s: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = match CString::new(&*s.query.as_bytes()) {
+        let query = match CString::new(s.query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", &s.query),
         };
         let mut err_msg = ptr::null_mut();
-        let callback = Box::new(callback);
         type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&str>)]) -> bool;
 
         unsafe {
@@ -82,7 +81,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                 self as *const _ as *mut _,
                 query.as_ptr(),
                 Some(process_callback),
-                &*callback as *const F as *mut F as *mut c_void,
+                &callback as *const F as *mut F as *mut c_void,
                 &mut err_msg,
             );
         }
@@ -93,6 +92,10 @@ impl ConcatsqlConn for ffi::sqlite3 {
             Error::new(&error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
         }
+    }
+
+    fn kind(&self) -> ConnKind {
+        ConnKind::SQLite
     }
 }
 
@@ -125,17 +128,6 @@ extern "C" fn process_callback(
         0
     } else {
         1
-    }
-}
-
-impl<'a> Drop for Connection<'a> {
-    fn drop(&mut self) {
-        let close_result = unsafe { ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3) };
-        unsafe { std::ptr::drop_in_place(&*self.conn as *const _ as *mut ffi::sqlite3); }
-        if close_result != ffi::SQLITE_OK {
-            dbg!(close_result);
-            eprintln!("error closing SQLite connection");
-        }
     }
 }
 

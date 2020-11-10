@@ -10,6 +10,13 @@ pub(crate) trait ConcatsqlConn {
     fn _execute(&self, query: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
     fn _iterate(&self, query: &WrapString, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+    fn kind(&self) -> ConnKind;
+}
+
+pub(crate) enum ConnKind {
+    #[cfg(feature = "sqlite")]   SQLite,
+    #[cfg(feature = "mysql")]    MySQL,
+    #[cfg(feature = "postgres")] PostgreSQL,
 }
 
 /// A database connection.
@@ -60,7 +67,6 @@ impl<'a> Connection<'a> {
     /// ```
     #[inline]
     pub fn execute<T: AsRef<WrapString>>(&self, query: T) -> Result<()> {
-        //self.conn.as_ref()._execute(query.as_ref(), &self.error_level)
         self.conn._execute(query.as_ref(), &self.error_level)
     }
 
@@ -91,7 +97,6 @@ impl<'a> Connection<'a> {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        //self.conn.as_ref()._iterate(query.as_ref(), &self.error_level, &mut callback)
         self.conn._iterate(query.as_ref(), &self.error_level, &mut callback)
     }
 
@@ -118,7 +123,7 @@ impl<'a> Connection<'a> {
         self.iterate(query, |pairs| {
             let mut row = Row::new();
             for (column, value) in pairs.iter() {
-                row.insert((*column).to_string(), value.map(|v| v.to_string()));
+                row.insert(column.to_string(), value.map(|v| v.to_string()));
             }
             rows.push(row);
             true
@@ -165,6 +170,29 @@ impl<'a> Connection<'a> {
     /// ```
     pub fn error_level(&mut self, level: ErrorLevel) {
         self.error_level = level;
+    }
+}
+
+impl<'a> Drop for Connection<'a> {
+    fn drop(&mut self) {
+        match self.conn.kind() {
+            #[cfg(feature = "sqlite")]
+            ConnKind::SQLite => {
+                unsafe {
+                    extern crate sqlite3_sys as ffi;
+                    ffi::sqlite3_busy_handler(&*self.conn as *const _ as *mut ffi::sqlite3, None, std::ptr::null_mut());
+                    let close_result = ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3);
+                    std::ptr::drop_in_place(&*self.conn as *const _ as *mut ffi::sqlite3);
+                    if close_result != ffi::SQLITE_OK {
+                        eprintln!("error closing SQLite connection: {}", close_result);
+                    }
+                }
+            }
+            #[cfg(feature = "mysql")]
+            ConnKind::MySQL => {}
+            #[cfg(feature = "postgres")]
+            ConnKind::PostgreSQL => {}
+        }
     }
 }
 
