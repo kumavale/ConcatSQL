@@ -88,7 +88,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
 /// # conn.execute(stmt).unwrap();
 /// for name in ["Alice", "Bob"].iter() {
-///     let stmt = prep!("INSERT INTO users (name) VALUES (") + &name + prep!(")");
+///     let stmt = prep!("INSERT INTO users (name) VALUES (") + name + prep!(")");
 ///     conn.execute(stmt).unwrap();
 /// }
 /// ```
@@ -149,8 +149,10 @@ macro_rules! prep {
 /// ```
 /// ```
 /// # use concatsql::prelude::*;
-/// assert_eq!((prep!("id=") +      42          ).actual_sql(), "id='42'");
-/// assert_eq!((prep!("id=") + int!(42).unwrap()).actual_sql(), "id=42");
+/// assert_eq!((prep!("id=") +       42           ).actual_sql(), "id=42");
+/// assert_eq!((prep!("id=") +      "42"          ).actual_sql(), "id='42'");
+/// assert_eq!((prep!("id=") + int!( 42 ).unwrap()).actual_sql(), "id=42");
+/// assert_eq!((prep!("id=") + int!("42").unwrap()).actual_sql(), "id=42");
 /// ```
 #[macro_export]
 macro_rules! int {
