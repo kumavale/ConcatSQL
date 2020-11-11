@@ -50,20 +50,38 @@ impl AsRef<WrapString> for WrapString {
     }
 }
 
+/// Hard-coded string or escaped string.
+///
+/// - &'static [str](https://doc.rust-lang.org/std/primitive.str.html)
+/// - [WrapString](./struct.WrapString.html)
+/// - &[WrapString](./struct.WrapString.html)
 pub trait SafeStr {
+    /// Extracts a string slice containing the entire [WrapString](./struct.WrapString.html).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use concatsql::prelude::*;
+    /// let s = prep!("foo");
+    ///
+    /// assert_eq!("foo", s.as_str());
+    /// ```
     fn as_str(&self) -> &str;
 }
 impl SafeStr for &'static str {
+    #[doc(hidden)]
     fn as_str(&self) -> &str {
         self
     }
 }
 impl SafeStr for WrapString {
+    #[doc(hidden)]
     fn as_str(&self) -> &str {
         &self.query
     }
 }
 impl SafeStr for &WrapString {
+    #[doc(hidden)]
     fn as_str(&self) -> &str {
         &self.query
     }

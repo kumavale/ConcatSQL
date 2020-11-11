@@ -34,14 +34,26 @@ pub fn html_special_chars(input: &str) -> String {
     escaped
 }
 
-/// Sanitizes a string so that it is safe to use within an SQL LIKE statement.  
-/// This method uses escape_character to escape all occurrences of '_' and '%'.  
+/// Sanitizes a string so that it is safe to use within an SQL LIKE statement.
+///
+/// This method uses escape_character to escape all occurrences of '_' and '%'.
 ///
 /// # Examples
 ///
 /// ```
-/// assert_eq!(concatsql::sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
-/// assert_eq!(concatsql::sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
+/// # use concatsql::prelude::*;
+/// assert_eq!(sanitize_like!("%foo_bar"),      "\\%foo\\_bar");
+/// assert_eq!(sanitize_like!("%foo_bar", '!'), "!%foo!_bar");
+/// ```
+/// ```
+/// # use concatsql::prelude::*;
+/// let name = "Ali";
+/// let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
+/// assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%Ali%'");
+///
+/// let name = String::from("%Ali%");
+/// let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
+/// assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%Ali$%%'");
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {

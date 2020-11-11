@@ -1,18 +1,21 @@
 use std::ops::Add;
 
+/// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WrapString {
     pub(crate) query: String,
 }
 
 impl WrapString {
+    #[doc(hidden)]
     pub fn init(s: &'static str) -> Self {
         Self {
             query: s.to_string(),
         }
     }
 
-    pub fn int<T: Clone + ToString>(value: T) -> Result<Self, &'static str> {
+    #[doc(hidden)]
+    pub fn int<T: ToString>(value: T) -> Result<Self, &'static str> {
         let value = value.to_string();
         if value.parse::<i64>().is_ok() {
             Ok(WrapString::new(&value))
@@ -84,19 +87,15 @@ impl<T: self::Num> Add<T> for WrapString {
     }
 }
 
+/// Defines a numeric type that can be concatinated with [WrapString](./struct.WrapString.html).
 pub trait Num: ToString {}
 macro_rules! impl_Num { ($($type:ty), *) => ($(impl Num for $type {})*) }
 impl_Num!(usize, u8, u16, u32, u64, u128, isize, i8, i16, i32, i64, i128, f32, f64);
 
+/// Define [WrapString](./struct.WrapString.html) related methods.
 pub trait Wrap {
+    /// Converts the given value to a [WrapString](./struct.WrapString.html).
     fn to_wrapstring(&self) -> WrapString;
-    fn actual_sql(&self) -> String;
-}
-
-impl Wrap for WrapString {
-    fn to_wrapstring(&self) -> WrapString {
-        WrapString::new(&self.query)
-    }
 
     /// Return the actual SQL statement.
     ///
@@ -112,7 +111,14 @@ impl Wrap for WrapString {
     /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
     /// // prep!("O'Reilly").actual_sql();  // panic
     /// ```
-    #[inline]
+    fn actual_sql(&self) -> String;
+}
+
+impl Wrap for WrapString {
+    fn to_wrapstring(&self) -> WrapString {
+        WrapString::new(&self.query)
+    }
+
     fn actual_sql(&self) -> String {
         self.query.clone()
     }
