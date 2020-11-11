@@ -8,7 +8,6 @@ use std::pin::Pin;
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a>> {
@@ -41,10 +40,10 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 }
 
 impl ConcatsqlConn for ffi::sqlite3 {
-    fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = match CString::new(s.query.as_bytes()) {
+    fn _execute(&self, s: &str, error_level: &ErrorLevel) -> Result<()> {
+        let query = match CString::new(s) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", &s.query),
+            _ => return Error::new(&error_level, "invalid query", s),
         };
         let mut err_msg = ptr::null_mut();
 
@@ -66,12 +65,12 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
-    fn _iterate(&self, s: &WrapString, error_level: &ErrorLevel,
+    fn _iterate(&self, s: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = match CString::new(s.query.as_bytes()) {
+        let query = match CString::new(s) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", &s.query),
+            _ => return Error::new(&error_level, "invalid query", s),
         };
         let mut err_msg = ptr::null_mut();
         type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&str>)]) -> bool;
@@ -164,6 +163,7 @@ mod tests {
             conn.execute(prep!("invalid query")),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.execute("SELECT 1").is_ok());
     }
 
     #[test]
@@ -178,6 +178,7 @@ mod tests {
             conn.iterate(prep!("invalid query"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.iterate("SELECT 1", |_|{true}).is_ok());
     }
 
     #[test]

@@ -7,8 +7,8 @@ use crate::row::Row;
 use crate::wrapstring::WrapString;
 
 pub(crate) trait ConcatsqlConn {
-    fn _execute(&self, query: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
-    fn _iterate(&self, query: &WrapString, error_level: &crate::ErrorLevel,
+    fn _execute(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<()>;
+    fn _iterate(&self, query: &str, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
     fn kind(&self) -> ConnKind;
 }
@@ -50,6 +50,25 @@ impl AsRef<WrapString> for WrapString {
     }
 }
 
+pub trait SafeStr {
+    fn as_str(&self) -> &str;
+}
+impl SafeStr for &'static str {
+    fn as_str(&self) -> &str {
+        self
+    }
+}
+impl SafeStr for WrapString {
+    fn as_str(&self) -> &str {
+        &self.query
+    }
+}
+impl SafeStr for &WrapString {
+    fn as_str(&self) -> &str {
+        &self.query
+    }
+}
+
 impl<'a> Connection<'a> {
     /// Execute a statement without processing the resulting rows if any.
     ///
@@ -58,16 +77,16 @@ impl<'a> Connection<'a> {
     /// ```
     /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
-    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#;
     /// # conn.execute(stmt).unwrap();
-    /// let sql = prep!("SELECT * FROM users;");
-    /// conn.execute(&sql).unwrap();
+    /// conn.execute("SELECT * FROM users;").unwrap();
+    /// conn.execute(prep!("SELECT * FROM users;")).unwrap();
     /// ```
     #[inline]
-    pub fn execute<T: AsRef<WrapString>>(&self, query: T) -> Result<()> {
-        self.conn._execute(query.as_ref(), &self.error_level)
+    pub fn execute<T: SafeStr>(&self, query: T) -> Result<()> {
+        self.conn._execute(query.as_str(), &self.error_level)
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -80,9 +99,9 @@ impl<'a> Connection<'a> {
     /// ```
     /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
-    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#;
     /// # conn.execute(stmt).unwrap();
     /// let sql = prep!("SELECT * FROM users;");
     /// conn.iterate(&sql, |pairs| {
@@ -93,11 +112,11 @@ impl<'a> Connection<'a> {
     /// }).unwrap();
     /// ```
     #[inline]
-    pub fn iterate<T: AsRef<WrapString>, F>(&self, query: T, mut callback: F) -> Result<()>
+    pub fn iterate<T: SafeStr, F>(&self, query: T, mut callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn._iterate(query.as_ref(), &self.error_level, &mut callback)
+        self.conn._iterate(query.as_str(), &self.error_level, &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -107,9 +126,9 @@ impl<'a> Connection<'a> {
     /// ```
     /// # use concatsql::prep;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+    /// # let stmt = r#"CREATE TABLE users (name TEXT, id INTEGER);
     /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
-    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+    /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#;
     /// # conn.execute(stmt).unwrap();
     /// let sql = prep!("SELECT name FROM users;");
     /// let rows = conn.rows(&sql).unwrap();
@@ -117,7 +136,7 @@ impl<'a> Connection<'a> {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<T: AsRef<WrapString>>(&self, query: T) -> Result<Vec<Row>> {
+    pub fn rows<T: SafeStr>(&self, query: T) -> Result<Vec<Row>> {
         let mut rows: Vec<Row> = Vec::new();
 
         self.iterate(query, |pairs| {
@@ -140,9 +159,9 @@ impl<'a> Connection<'a> {
     /// ```
     /// # use concatsql::{prep, Wrap};
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
+    /// # let stmt = r#"CREATE TABLE users (name TEXT, age INTEGER);
     /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
-    /// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#);
+    /// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#;
     /// # conn.execute(stmt).unwrap();
     /// let age = String::from("42 or 1=1; --");  // input by attcker
     /// let sql = prep!("SELECT name FROM users WHERE age < ") + unsafe { conn.without_escape(&age) };

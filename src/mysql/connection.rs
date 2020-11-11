@@ -8,7 +8,6 @@ use std::pin::Pin;
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
@@ -29,36 +28,34 @@ pub fn open(url: &str) -> Result<Connection> {
 }
 
 impl ConcatsqlConn for RefCell<mysql::Conn> {
-    fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = &s.query;
+    fn _execute(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
-        match conn.query_drop(&query) {
+        match conn.query_drop(query) {
             Ok(_) => Ok(()),
-            Err(e) => Error::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => Error::new(error_level, "exec error", &e.to_string()),
         }
     }
 
-    fn _iterate(&self, s: &WrapString, error_level: &ErrorLevel,
+    fn _iterate(&self, query: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = &s.query;
         let mut conn = self.borrow_mut();
-        let mut result = match conn.query_iter(&query) {
+        let mut result = match conn.query_iter(query) {
             Ok(result) => result,
-            Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
         };
 
         while let Some(result_set) = result.next_set() {
             let result_set = match result_set {
                 Ok(result_set) => result_set,
-                Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
+                Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
             };
             let mut pairs: Vec<(String, Option<String>)> = Vec::with_capacity(result_set.affected_rows() as usize);
 
             for row in result_set {
                 let row = match row {
                     Ok(row) => row,
-                    Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
+                    Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
                 };
 
                 for (i, col) in row.columns().iter().enumerate() {
@@ -69,7 +66,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 
             let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (&*p.0, p.1.as_deref())).collect();
             if !pairs.is_empty() && !callback(&pairs) {
-                return Error::new(&error_level, "exec error", "query aborted");
+                return Error::new(error_level, "exec error", "query aborted");
             }
         }
 
@@ -119,6 +116,7 @@ mod tests {
             conn.execute(prep!("invalid query")),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.execute("SELECT 1").is_ok());
     }
 
     #[test]
@@ -133,5 +131,6 @@ mod tests {
             conn.iterate(prep!("invalid query"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.iterate("SELECT 1", |_|{true}).is_ok());
     }
 }

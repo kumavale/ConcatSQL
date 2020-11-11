@@ -8,7 +8,6 @@ use std::pin::Pin;
 use crate::Result;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::WrapString;
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(params: &str) -> Result<Connection> {
@@ -24,27 +23,25 @@ pub fn open(params: &str) -> Result<Connection> {
 }
 
 impl ConcatsqlConn for RefCell<postgres::Client> {
-    fn _execute(&self, s: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = &s.query;
-        match self.borrow_mut().batch_execute(&query) {
+    fn _execute(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
+        match self.borrow_mut().batch_execute(query) {
             Ok(_) => Ok(()),
-            Err(e) => Error::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => Error::new(error_level, "exec error", &e.to_string()),
         }
     }
 
-    fn _iterate(&self, s: &WrapString, error_level: &ErrorLevel,
+    fn _iterate(&self, query: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = &s.query;
         let mut conn = self.borrow_mut();
-        let statement = match conn.prepare(&query) {
+        let statement = match conn.prepare(query) {
             Ok(stmt) => stmt,
-            Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
         };
 
         let rows = match conn.query(&statement, &[]) {
             Ok(result) => result,
-            Err(e) => return Error::new(&error_level, "exec error", &e.to_string()),
+            Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
         };
 
         let mut pairs = Vec::new();
@@ -65,7 +62,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
 
         let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (&*p.0, p.1.as_deref())).collect();
         if !pairs.is_empty() && !callback(&pairs) {
-            return Error::new(&error_level, "exec error", "query aborted");
+            return Error::new(error_level, "exec error", "query aborted");
         }
 
         Ok(())
@@ -114,6 +111,7 @@ mod tests {
             conn.execute(prep!("invalid query")),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.execute("SELECT 1").is_ok());
     }
 
     #[test]
@@ -128,5 +126,6 @@ mod tests {
             conn.iterate(prep!("invalid query"), |_| { unreachable!(); }),
             Err(Error::Message("exec error".into())),
         );
+        assert!(conn.iterate("SELECT 1", |_|{true}).is_ok());
     }
 }

@@ -8,10 +8,11 @@
 //!
 //! fn main() {
 //!     let conn = concatsql::sqlite::open(":memory:").unwrap();
-//!     let stmt = prep!(r#"CREATE TABLE users (name TEXT, age INTEGER);
-//!                   INSERT INTO users (name, age) VALUES ('Alice', 42);
-//!                   INSERT INTO users (name, age) VALUES ('Bob',   69);"#);
-//!     conn.execute(stmt).unwrap();
+//!     conn.execute(r#"
+//!             CREATE TABLE users (name TEXT, age INTEGER);
+//!             INSERT INTO users (name, age) VALUES ('Alice', 42);
+//!             INSERT INTO users (name, age) VALUES ('Bob',   69);
+//!     "#).unwrap();
 //!
 //!     let age = String::from("42");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
