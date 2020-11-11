@@ -50,6 +50,12 @@ impl Row {
         self.value.len()
     }
 
+    /// Determines if there are any values in the row.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.value.len() == 0
+    }
+
     /// Get all the column names.  
     /// Column order is not guaranteed.
     #[inline]
@@ -104,6 +110,7 @@ mod tests {
         assert!(row.column_names().contains(&"key2"));
         assert!(row.column_names().contains(&"key3"));
         assert!(!row.column_names().contains(&"key4"));
+        assert!(!row.is_empty());
     }
 }
 
