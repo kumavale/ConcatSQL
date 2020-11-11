@@ -64,9 +64,10 @@ pub(crate) fn escape_string(s: &str) -> String {
     let mut escaped = String::new();
     escaped.push('\'');
     for c in s.chars() {
-        if c == '\'' {
-            escaped.push(c);
-        }
+        #[cfg(feature = "sqlite")]
+        if c == '\'' { escaped.push('\''); }
+        #[cfg(feature = "mysql postgres")]
+        if c == '\\' { escaped.push('\\'); }
         escaped.push(c);
     }
     escaped.push('\'');
