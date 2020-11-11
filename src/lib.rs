@@ -1,4 +1,3 @@
-#![allow(clippy::needless_doctest_main)]
 //! # ConcatSQL
 //!
 //! `concatsql` is a secure library for PostgreSQL, MySQL and SQLite.  
@@ -29,6 +28,9 @@
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
 //! }
 //! ```
+
+#![allow(clippy::needless_doctest_main)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod connection;
 mod error;
