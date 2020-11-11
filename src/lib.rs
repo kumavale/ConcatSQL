@@ -155,3 +155,14 @@ macro_rules! int {
     ($query:expr) => { concatsql::WrapString::int($query) };
 }
 
+const fn preprocessor() {
+    let mut cnt = 0;
+    #[cfg(feature = "sqlite")]   cnt += 1;
+    #[cfg(feature = "mysql")]    cnt += 1;
+    #[cfg(feature = "postgres")] cnt += 1;
+
+    if cnt != 1 {
+        compile_error!("");
+    }
+}
+
