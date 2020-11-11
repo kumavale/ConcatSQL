@@ -65,7 +65,7 @@ pub(crate) fn escape_string(s: &str) -> String {
     escaped.push('\'');
     for c in s.chars() {
         if c == '\'' { escaped.push('\''); }
-        #[cfg(feature = "mysql postgres")]
+        #[cfg(any(feature = "mysql", feature = "postgres"))]
         if c == '\\' { escaped.push('\\'); }
         escaped.push(c);
     }
@@ -202,10 +202,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "sqlite")]
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
+    }
+
+    #[test]
+    #[cfg(feature = "mysql")]
+    fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
-        assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
+    }
+
+    #[test]
+    #[cfg(feature = "postgres")]
+    fn escape_string() {
+        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
     }
 }
