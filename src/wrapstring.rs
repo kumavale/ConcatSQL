@@ -139,9 +139,9 @@ mod tests {
     use concatsql::prelude::*;
 
     #[test]
-    #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op)]
+    #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op, clippy::approx_constant)]
     fn concat_anything_type() {
-        let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + std::f32::consts::PI;
+        let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
         assert_eq!(sql.actual_sql(), "AB'C''D''E'F423.14");
         let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
         assert_eq!(sql.actual_sql(), "'A''B''C''D'");
