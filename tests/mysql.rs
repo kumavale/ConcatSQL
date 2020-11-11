@@ -344,6 +344,37 @@ mod mysql {
             }).unwrap();
         }
     }
+
+    #[test]
+    fn like() {
+        let conn = prepare();
+
+        let name = "A%";
+        let sql = prep!("SELECT * FROM users WHERE name LIKE") + name + prep!(";");
+
+        let mut executed = false;
+        conn.rows(&sql).unwrap().iter().all(|row| {
+            assert_eq!(row.get("name").unwrap(), "Alice");
+            executed = true;
+            true
+        });
+        assert!(executed);
+
+        let name = "A";
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
+        conn.execute(&sql).unwrap();
+
+        let name = "%A%";
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
+        conn.execute(&sql).unwrap();
+
+        let name = String::from("%A%");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
+        conn.execute(&sql).unwrap();
+    }
 }
 
 #[cfg(feature = "mysql")]

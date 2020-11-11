@@ -190,6 +190,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "sqlite")]
+    #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
@@ -197,6 +198,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "mysql")]
+    #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
@@ -204,6 +206,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "postgres")]
+    #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");

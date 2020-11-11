@@ -37,7 +37,8 @@ impl Row {
         T::from_str(self.value.get(key).unwrap_or(&None).as_deref().unwrap_or(""))
     }
 
-    /// Transforms and gets the columns of the result row using index.
+    /// Transforms and gets the columns of the result row using index.  
+    /// &#x26a0;&#xfe0f; If column is not found then execute `T::from_str("")`.
     #[inline]
     pub fn get_into_index<T: FromStr>(&self, index: usize) -> Result<T, <T as std::str::FromStr>::Err> {
         T::from_str(self.value.get_index(index).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))

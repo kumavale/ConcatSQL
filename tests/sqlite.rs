@@ -415,7 +415,11 @@ mod sqlite {
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
+        if cfg!(feature="mysql") || cfg!(feature="postgres") {
+            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
+        } else {
+            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
+        }
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
