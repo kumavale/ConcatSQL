@@ -139,8 +139,9 @@ mod tests {
     use concatsql::prelude::*;
 
     #[test]
+    #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op)]
     fn concat_anything_type() {
-        let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
+        let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + std::f32::consts::PI;
         assert_eq!(sql.actual_sql(), "AB'C''D''E'F423.14");
         let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
         assert_eq!(sql.actual_sql(), "'A''B''C''D'");
@@ -148,6 +149,8 @@ mod tests {
         assert_eq!(sql.actual_sql(), "'A''B''C''D'");
         let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5u128 + 6isize + 7i8 + 8i16 + 9i32 + 0i64 + 1i128 + 2f32 + 3f64;
         assert_eq!(sql.actual_sql(), "01234567890123");
+        let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
+        assert_eq!(sql.actual_sql(), "340282350000000000000000000000000000000infNaN");
     }
 
     #[test]
