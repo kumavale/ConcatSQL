@@ -155,14 +155,10 @@ macro_rules! int {
     ($query:expr) => { concatsql::WrapString::int($query) };
 }
 
-const fn preprocessor() {
-    let mut cnt = 0;
-    #[cfg(feature = "sqlite")]   cnt += 1;
-    #[cfg(feature = "mysql")]    cnt += 1;
-    #[cfg(feature = "postgres")] cnt += 1;
-
-    if cnt != 1 {
-        compile_error!("");
-    }
+#[allow(dead_code)]
+const fn deny_to_use_multiple_database() {
+    #[cfg(all(feature = "sqlite", feature = "mysql"))]    compile_error!("cannot to use multiple database.");
+    #[cfg(all(feature = "sqlite", feature = "postgres"))] compile_error!("cannot to use multiple database.");
+    #[cfg(all(feature = "mysql",  feature = "postgres"))] compile_error!("cannot to use multiple database.");
 }
 
