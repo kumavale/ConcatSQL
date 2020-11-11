@@ -133,17 +133,7 @@ impl<'a> Parser<'a> {
         while !self.eof() && f(self.next_char()?) {
             s.push(self.consume_char()?);
         }
-        if s.is_empty() {
-            Err( match self.error_level {
-                ErrorLevel::AlwaysOk |
-                ErrorLevel::Release  => Error::AnyError,
-                ErrorLevel::Develop  => Error::Message("error: consume_while()".to_string()),
-                #[cfg(debug_assertions)]
-                ErrorLevel::Debug    => Error::Message("error: consume_while(): empty".to_string()),
-            })
-        } else {
-            Ok(s)
-        }
+        Ok(s)
     }
 
     pub fn consume_char(&mut self) -> Result<char> {
@@ -169,12 +159,9 @@ pub fn check_valid_literal(s: &'static str) -> Result<()> {
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
-            Ok('"')  => if parser.consume_string('"').is_err() {
+            Ok(c) => if (c == '"' || c == '\'') && parser.consume_string(c).is_err() {
                 return Error::new(&ErrorLevel::Develop, &format!("{}: {}", err_msg, &s), "");
-            },
-            Ok('\'')  => if parser.consume_string('\'').is_err() {
-                return Error::new(&ErrorLevel::Develop, &format!("{}: {}", err_msg, &s), "");
-            },
+            }
             _other => (), // Do nothing
         }
     }
@@ -220,5 +207,32 @@ mod tests {
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
+    }
+
+    #[test]
+    fn check_valid_literal() {
+        assert!(super::check_valid_literal("foo").is_ok());
+        assert!(super::check_valid_literal("id=").is_ok());
+        assert!(super::check_valid_literal("''").is_ok());
+        assert!(super::check_valid_literal("'\"'").is_ok());
+        assert!(super::check_valid_literal("'\"\"'").is_ok());
+        assert!(super::check_valid_literal("\"\"").is_ok());
+        assert!(super::check_valid_literal("\"'\"").is_ok());
+        assert!(super::check_valid_literal("\"''\"").is_ok());
+        assert!(super::check_valid_literal("'O''Reilly'").is_ok());
+        assert!(super::check_valid_literal("'foo'+'bar'").is_ok());
+        assert!(super::check_valid_literal("").is_ok());
+        assert!(super::check_valid_literal("'\"'''").is_ok());
+
+        assert!(!super::check_valid_literal("O'Reilly").is_ok());
+        assert!(!super::check_valid_literal("'O'Reilly'").is_ok());
+        assert!(!super::check_valid_literal("id='").is_ok());
+        assert!(!super::check_valid_literal("'").is_ok());
+        assert!(!super::check_valid_literal("\"").is_ok());
+        assert!(!super::check_valid_literal("'''").is_ok());
+        assert!(!super::check_valid_literal("\"\"\"").is_ok());
+        assert!(!super::check_valid_literal("' AND ...").is_ok());
+        assert!(!super::check_valid_literal("\\'").is_ok());
+        assert!(!super::check_valid_literal("\\\"").is_ok());
     }
 }
