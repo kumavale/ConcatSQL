@@ -7,9 +7,10 @@ use crate::row::Row;
 use crate::wrapstring::WrapString;
 
 pub(crate) trait ConcatsqlConn {
-    fn _execute(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<()>;
-    fn _iterate(&self, query: &str, error_level: &crate::ErrorLevel,
+    fn execute_inner(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<()>;
+    fn iterate_inner(&self, query: &str, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
+    fn rows_inner(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<Vec<Row>>;
     fn kind(&self) -> ConnKind;
 }
 
@@ -104,7 +105,7 @@ impl<'a> Connection<'a> {
     /// ```
     #[inline]
     pub fn execute<T: SafeStr>(&self, query: T) -> Result<()> {
-        self.conn._execute(query.as_str(), &self.error_level)
+        self.conn.execute_inner(query.as_str(), &self.error_level)
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -134,7 +135,7 @@ impl<'a> Connection<'a> {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn._iterate(query.as_str(), &self.error_level, &mut callback)
+        self.conn.iterate_inner(query.as_str(), &self.error_level, &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -155,18 +156,7 @@ impl<'a> Connection<'a> {
     /// }
     /// ```
     pub fn rows<T: SafeStr>(&self, query: T) -> Result<Vec<Row>> {
-        let mut rows: Vec<Row> = Vec::new();
-
-        self.iterate(query, |pairs| {
-            let mut row = Row::new();
-            for (column, value) in pairs.iter() {
-                row.insert(column.to_string(), value.map(|v| v.to_string()));
-            }
-            rows.push(row);
-            true
-        })?;
-
-        Ok(rows)
+        self.conn.rows_inner(query.as_str(), &self.error_level)
     }
 
     /// Does not escape.  

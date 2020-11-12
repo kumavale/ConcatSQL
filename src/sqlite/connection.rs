@@ -6,6 +6,7 @@ use std::path::Path;
 use std::pin::Pin;
 
 use crate::Result;
+use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 
@@ -40,7 +41,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 }
 
 impl ConcatsqlConn for ffi::sqlite3 {
-    fn _execute(&self, s: &str, error_level: &ErrorLevel) -> Result<()> {
+    fn execute_inner(&self, s: &str, error_level: &ErrorLevel) -> Result<()> {
         let query = match CString::new(s) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", s),
@@ -65,7 +66,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
-    fn _iterate(&self, s: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, s: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = match CString::new(s) {
@@ -91,6 +92,21 @@ impl ConcatsqlConn for ffi::sqlite3 {
             Error::new(&error_level, "exec error",
                 unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
         }
+    }
+
+    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+        let mut rows: Vec<Row> = Vec::new();
+
+        self.iterate_inner(query, error_level, &mut |pairs: &[(&str, Option<&str>)]| {
+            let mut row = Row::new();
+            for (column, value) in pairs.iter() {
+                row.insert(column.to_string(), value.map(|v| v.to_string()));
+            }
+            rows.push(row);
+            true
+        })?;
+
+        Ok(rows)
     }
 
     fn kind(&self) -> ConnKind {

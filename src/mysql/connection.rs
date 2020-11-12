@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 use crate::Result;
+use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 
@@ -28,7 +29,7 @@ pub fn open(url: &str) -> Result<Connection> {
 }
 
 impl ConcatsqlConn for RefCell<mysql::Conn> {
-    fn _execute(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
+    fn execute_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
         match conn.query_drop(query) {
             Ok(_) => Ok(()),
@@ -36,7 +37,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
     }
 
-    fn _iterate(&self, query: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, query: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let mut conn = self.borrow_mut();
@@ -71,6 +72,37 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         Ok(())
+    }
+
+    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+        let mut conn = self.borrow_mut();
+        let mut result = match conn.query_iter(query) {
+            Ok(result) => result,
+            Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+        };
+        let mut rows: Vec<Row> = Vec::new();
+
+        while let Some(result_set) = result.next_set() {
+            let result_set = match result_set {
+                Ok(result_set) => result_set,
+                Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+            };
+
+            for result_row in result_set {
+                let result_row = match result_row {
+                    Ok(row) => row,
+                    Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+                };
+                let mut row = Row::new();
+
+                for (i, col) in result_row.columns().iter().enumerate() {
+                    row.insert(col.name_str().to_string(), result_row.get(i));
+                }
+                rows.push(row);
+            }
+        }
+
+        Ok(rows)
     }
 
     fn kind(&self) -> ConnKind {

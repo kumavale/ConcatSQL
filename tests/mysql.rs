@@ -89,25 +89,31 @@ mod mysql {
     #[test]
     fn rows() {
         let conn = prepare();
-        let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
+        let expects = [ ("Alice", 42), ("Bob", 69), ("Carol", 50) ];
         let sql = prep!("SELECT * FROM users;");
 
+        let mut cnt = 0;
         let rows = conn.rows(&sql).unwrap();
         for (i, row) in rows.iter().enumerate() {
+            cnt += 1;
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         }
+        assert!(cnt == expects.len());
     }
 
     #[test]
     fn rows_foreach() {
         let conn = prepare();
-        let expects = [("Carol", 50), ("Bob", 69), ("Alice", 42),];
+        let expects = [ ("Alice", 42), ("Bob", 69), ("Carol", 50) ];
 
+        let mut cnt = 0;
         conn.rows(&prep!("SELECT * FROM users;")).unwrap().iter().enumerate().for_each(|(i, row)| {
+            cnt += 1;
             assert_eq!(row.get("name").unwrap(), expects[i].0);
             assert_eq!(row.get("age").unwrap(),  expects[i].1.to_string());
         });
+        assert!(cnt == expects.len());
     }
 
     #[test]
@@ -374,6 +380,24 @@ mod mysql {
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
         assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
+    }
+
+    #[test]
+    fn multiple_stmt() {
+        let conn = prepare();
+        let mut cnt = 0;
+        for (i, row) in conn.rows("SELECT 1; SELECT 2;").unwrap().iter().enumerate() {
+            cnt += 1;
+            assert_eq!(row.get_into_index::<i32>(0).unwrap(), [ 1, 2 ][i]);
+        };
+
+        let conn = prepare();
+        for (i, row) in conn.rows("SELECT age FROM users;").unwrap().iter().enumerate() {
+            cnt += 1;
+            assert_eq!(row.get_into_index::<i32>(0).unwrap(), [ 42, 69, 50 ][i]);
+        };
+
+        assert_eq!(cnt, 5);
     }
 }
 
