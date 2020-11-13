@@ -1,23 +1,23 @@
 use std::str::FromStr;
 use indexmap::map::IndexMap;
 
-type IndexMapValue = IndexMap<String, Option<String>>;
+type IndexMapPairs = IndexMap<String, Option<String>>;
 
 /// A single result row of a query.
 #[derive(Debug, PartialEq)]
 pub struct Row {
-    value: IndexMapValue,
+    pairs: IndexMapPairs,
 }
 
 impl Row {
     #[inline]
     pub(crate) fn new() -> Self {
-        Self { value: IndexMap::new() }
+        Self { pairs: IndexMap::new() }
     }
 
     #[inline]
     pub(crate) fn insert(&mut self, key: String, value: Option<String>) {
-        self.value.insert(key, value);
+        self.pairs.insert(key, value);
     }
 
     /// Get the value of a column of the result row.
@@ -33,7 +33,7 @@ impl Row {
     /// }
     /// ```
     pub fn get<T: Get>(&self, key: T) -> Option<&str> {
-        key.get(&self.value)
+        key.get(&self.pairs)
     }
 
     /// Transforms and gets the columns of the result row.  
@@ -57,62 +57,62 @@ impl Row {
     /// ```
     #[inline]
     pub fn get_into<T: Get, U: FromStr>(&self, key: T) -> Result<U, <U as std::str::FromStr>::Err> {
-        key.get_into::<U>(&self.value)
+        key.get_into::<U>(&self.pairs)
     }
 
     /// Return the number of columns.
     #[inline]
     pub fn column_count(&self) -> usize {
-        self.value.len()
+        self.pairs.len()
     }
 
     /// Determines if there are any values in the row.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.value.len() == 0
+        self.pairs.len() == 0
     }
 
     /// Get all the column names.  
     /// Column order is not guaranteed.
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
-        self.value.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
+        self.pairs.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
     }
 }
 
 /// A trait implemented by types that can index into columns of a row.
 pub trait Get {
-    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str>;
-    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err>;
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
+    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err>;
 }
 
 impl Get for str {
-    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
-        value.get(self)?.as_deref()
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        pairs.get(self)?.as_deref()
     }
 
-    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
-        U::from_str(value.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
+    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
+        U::from_str(pairs.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
     }
 }
 
 impl Get for usize {
-    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
-        value.get_index(*self)?.1.as_deref()
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        pairs.get_index(*self)?.1.as_deref()
     }
 
-    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
-        U::from_str(value.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
+    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
+        U::from_str(pairs.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
     }
 }
 
 impl<'b, T> Get for &'b T where T: Get + ?Sized {
-    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
-        T::get(self, &value)
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        T::get(self, &pairs)
     }
 
-    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
-        T::get_into(self, &value)
+    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
+        T::get_into(self, &pairs)
     }
 }
 
