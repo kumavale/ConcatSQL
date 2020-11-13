@@ -28,15 +28,14 @@ concatsql = { version = "<version>", features = ["<postgres|mysql|sqlite>"] }
 ### Normal value
 
 ```rust
-use concatsql::prelude::*;
-let conn = concatsql::sqlite::open(":memory:").unwrap();
-let id     = String::from("42");
-let passwd = String::from("pass");
+let id     = String::from("42");    // User supplied input
+let passwd = String::from("pass");  // User supplied input
 
 let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
 assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 
-for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
+for row in conn.rows(&sql).unwrap() {
+    assert_eq!(row.get(0).unwrap(),      "Alice");
     assert_eq!(row.get("name").unwrap(), "Alice");
 }
 ```
@@ -44,25 +43,22 @@ for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
 ### Illegal value
 
 ```rust
-use concatsql::prelude::*;
-let conn = concatsql::sqlite::open(":memory:").unwrap();
-let id     = String::from("42");
-let passwd = String::from("'' or 1=1; --");
+let id     = String::from("42");             // User supplied input
+let passwd = String::from("'' or 1=1; --");  // User supplied input
 
 let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
 assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
-for (i, row) in conn.rows(&sql).unwrap().iter().enumerate() {
+for row in conn.rows(&sql).unwrap() {
     unreachable!();
 }
 ```
 
 ### If you did not use the `prep` macro
 
-cannot compile ... secure!
+Cannot compile ... secure!
 
 ```rust
-let conn = concatsql::sqlite::open(":memory:").unwrap();
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
 let sql = "SELECT name FROM users WHERE id=".to_string() + &id + " AND passwd='" + &passwd + "';";
@@ -71,14 +67,33 @@ conn.execute(&sql).unwrap();  // error
 
 ### When using `prep!(<String>)`
 
-cannot compile ... secure!
+Cannot compile ... secure!
 
 ```rust
-use concatsql::prep;
-let conn = concatsql::sqlite::open(":memory:").unwrap();
 let age = String::from("50 or 1=1; --");
 let sql = prep!("SELECT name FROM users WHERE age < ") + prep!(&age);  // error
 ```
+
+## Why can this library prevent SQL injection?
+
+This is because it is achieved using [Operator Overloading](https://doc.rust-lang.org/stable/rust-by-example/trait/ops.html) rather than simple string concatenation.  
+The `prep` macro returns the library's own type(`WrapString`).  
+For example, if you combine this `WrapString` type with a `String` type, the escaped `String` type will be combined and a new `WrapString` will be returned.  
+
+```rust
+let foobar: WrapString = prep!("foo") + String::from("bar");
+```
+
+## Is it impossible to implement in other languages?
+
+It seems that it can be implemented in other languages as long as it supports operator overloading.  
+However, if the developer writes the following, the input from the attacker will not be escaped correctly and the attack will be successful.  
+
+```python
+prep("SELECT * FROM users WHERE id=" + id + " AND PASSWORD=" + password)
+```
+
+That is, it can be implemented in any language that can distinguish between hard-coding(`&'static str`) and user input(`String`) at compile time.  
 
 ## License
 
