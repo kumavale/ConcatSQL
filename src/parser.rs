@@ -178,6 +178,10 @@ pub fn check_valid_literal(s: &'static str) -> Result<()> {
             Ok(c) => if c == '"' || c == '\'' {
                 let visible_len = parser.visible_len();
                 if parser.consume_string(c).is_err() {
+                    #[cfg(debug_assertions)]
+                    let err_msg = format!("    {}\n{:<width1$}\x1b[31m{:^<width2$}\x1b[0m",
+                        s, "", "^", width1 = visible_len + 4, width2 = parser.visible_len() - visible_len);
+                    #[cfg(not(debug_assertions))]
                     let err_msg = format!("    {}\n{:<width1$}\x1b[33m{:^<width2$}\x1b[0m",
                         s, "", "^", width1 = visible_len + 4, width2 = parser.visible_len() - visible_len);
                     return Err(Error::Message(err_msg));
@@ -190,13 +194,15 @@ pub fn check_valid_literal(s: &'static str) -> Result<()> {
     Ok(())
 }
 
-pub fn warning_invalid_literal() -> &'static str {
-    "\x1b[33mwarning\x1b[0m: invalid literal\n"
+pub fn invalid_literal() -> &'static str {
+    #[cfg(debug_assertions)]
+    return "\x1b[31merror\x1b[0m: invalid literal\n";
+    #[cfg(not(debug_assertions))]
+    return "\x1b[33mwarning\x1b[0m: invalid literal\n";
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::*;
 
     #[test]
     fn html_special_chars() {
@@ -209,6 +215,7 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn consume_char() {
+        use crate::error::*;
         let mut p = super::Parser::new("", &ErrorLevel::Debug);
         assert_eq!(p.consume_char(), Err(Error::Message("error: consume_char(): None".into())));
     }
@@ -263,10 +270,22 @@ mod tests {
         assert!(!super::check_valid_literal("\\'").is_ok());
         assert!(!super::check_valid_literal("\\\"").is_ok());
 
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            super::check_valid_literal("O'Reilly").unwrap_err().to_string(),
+            "    O'Reilly\n     \x1b[31m^^^^^^^\x1b[0m"
+        );
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            super::check_valid_literal("passwd='").unwrap_err().to_string(),
+            "    passwd='\n           \x1b[31m^\x1b[0m"
+        );
+        #[cfg(not(debug_assertions))]
         assert_eq!(
             super::check_valid_literal("O'Reilly").unwrap_err().to_string(),
             "    O'Reilly\n     \x1b[33m^^^^^^^\x1b[0m"
         );
+        #[cfg(not(debug_assertions))]
         assert_eq!(
             super::check_valid_literal("passwd='").unwrap_err().to_string(),
             "    passwd='\n           \x1b[33m^\x1b[0m"

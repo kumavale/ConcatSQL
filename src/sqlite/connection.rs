@@ -151,9 +151,10 @@ extern "C" fn process_callback(
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
-    use concatsql::*;
     use concatsql::error::*;
     use temporary::Directory;
+    #[cfg(debug_assertions)]
+    use concatsql::prelude::*;
 
     #[test]
     fn open() {

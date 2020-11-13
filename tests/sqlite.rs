@@ -478,13 +478,10 @@ mod sqlite {
 
             conn.iterate(sql.to_wrapstring(), |_| { true }).unwrap();
         }
-    }
-
-    mod warning {
-        use concatsql::prelude::*;
-        use super::stmt;
 
         #[test]
+        #[cfg(debug_assertions)]
+        #[should_panic = "invalid literal"]
         fn sqli_enable() {
             let conn = concatsql::sqlite::open(":memory:").unwrap();
             let stmt = prep!(stmt());
@@ -506,14 +503,17 @@ mod sqlite_release_build {
     use concatsql::prelude::*;
 
     #[test]
-    fn error_level_debug_when_release_build() {
+    fn sqli_enable() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        assert_eq!(
-            conn.error_level(ErrorLevel::Debug),
-            Err("ErrorLevel::Debug cannot be set during release build")
-        );
-    }
+        conn.execute("CREATE TABLE users (name TEXT, age INTEGER);").unwrap();
 
+        let name = "OR 1=2; SELECT 1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
+
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "1");
+        }
+    }
 }
 
 #[cfg(feature = "sqlite")]

@@ -398,18 +398,3 @@ mod mysql {
     }
 }
 
-#[cfg(feature = "mysql")]
-#[cfg(not(debug_assertions))]
-mod mysql_release_build {
-    use concatsql::prelude::*;
-
-    #[test]
-    fn error_level_debug_when_release_build() {
-        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        assert_eq!(
-            conn.error_level(ErrorLevel::Debug),
-            Err("ErrorLevel::Debug cannot be set during release build")
-        );
-    }
-
-}

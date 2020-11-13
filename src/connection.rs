@@ -194,7 +194,7 @@ impl<'a> Connection<'a> {
     /// ```
     /// # use concatsql::ErrorLevel;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// conn.error_level(ErrorLevel::Debug);
+    /// conn.error_level(ErrorLevel::AlwaysOk);
     /// ```
     pub fn error_level(&self, level: ErrorLevel) {
         *self.error_level.borrow_mut() = level;

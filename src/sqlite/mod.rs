@@ -44,8 +44,7 @@ pub fn version() -> usize {
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
-    use concatsql::*;
-    use crate::error::*;
+    use concatsql::prelude::*;
     use temporary::Directory;
 
     #[test]
@@ -70,7 +69,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     fn should_readonly() {
+        use crate::error::*;
         let dir = Directory::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         {

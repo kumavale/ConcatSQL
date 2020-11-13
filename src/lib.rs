@@ -53,7 +53,7 @@ pub mod postgres;
 pub use crate::connection::{Connection, SafeStr};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get};
-pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, warning_invalid_literal};
+pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
 pub use crate::wrapstring::{WrapString, ToWrapString, ActualSQL, Num};
 
 pub mod prelude {
@@ -104,17 +104,21 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// let passwd = String::from("'' or 1=1; --");
 /// prep!("SELECT * FROM users WHERE passwd=") + prep!(&passwd); // shouldn't compile!
 /// ```
-/// **SQL injection successful if you have incomplete single or double quotes.**
 ///
-/// ```
+/// # Panics
+///
+/// **SQL injection successful if you have incomplete single or double quotes.**  
+/// Panic when debug builds and display warning messages when release builds.  
+///
+/// ```should_panic
 /// # use concatsql::prelude::*;
 /// # let id = 42;
 /// prep!("SELECT * FROM users WHERE id='") + id + prep!("'");
 /// prep!("INSERT INTO msg VALUES ('I'm cat.')");
-/// assert_eq!((prep!("passwd='") + " or 1=1; --" + prep!("'")).actual_sql(), "passwd='' or 1=1; --''");
+/// assert_eq!((prep!("WHERE passwd='") + " or 1=1; --" + prep!("'")).actual_sql(), "WHERE passwd='' or 1=1; --''"); // When release builds
 /// ```
 ///
-/// correct:
+/// # Safety
 ///
 /// ```
 /// # use concatsql::prelude::*;
@@ -128,13 +132,15 @@ macro_rules! prep {
     () => { concatsql::WrapString::init("") };
     ($query:expr) => {
         {
+            // I want to make an error at compile time...
             static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
             INITIAL_CHECK.call_once(|| {
-                // I want to make an error at compile time...
                 if let Err(detail) = concatsql::check_valid_literal($query) {
-                    eprintln!("{}{}:{}", concatsql::warning_invalid_literal(), file!(), line!());
+                    eprintln!("{}{}:{}", concatsql::invalid_literal(), file!(), line!());
                     eprintln!("{}", detail.to_string());
-                    //panic!("invalid literal");
+
+                    #[cfg(debug_assertions)]
+                    panic!("invalid literal");
                 }
             });
             concatsql::WrapString::init($query)
