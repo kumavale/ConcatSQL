@@ -512,3 +512,18 @@ mod sqlite_release_build {
     }
 
 }
+
+#[cfg(feature = "sqlite")]
+mod anti_patterns {
+    use concatsql::prelude::*;
+
+    // Although it becomes possible, I do not believe it is less useful
+    // because its real advantage is that it still makes it harder to do the wrong thing.
+    #[test]
+    fn string_to_static_str() {
+        let conn = sqlite::open(":memory:").unwrap();
+        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
+        conn.execute(sql).unwrap();
+    }
+}
+
