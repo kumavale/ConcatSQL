@@ -92,50 +92,53 @@ pub trait Num: ToString {}
 macro_rules! impl_Num { ($($type:ty), *) => ($(impl Num for $type {})*) }
 impl_Num!(usize, u8, u16, u32, u64, u128, isize, i8, i16, i32, i64, i128, f32, f64);
 
-/// Define [WrapString](./struct.WrapString.html) related methods.
-pub trait Wrap {
+/// A trait for converting a value to a [WrapString](./struct.WrapString.html).
+pub trait ToWrapString {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
     fn to_wrapstring(&self) -> WrapString;
+}
 
+impl ToWrapString for WrapString {
+    fn to_wrapstring(&self) -> WrapString {
+        WrapString::new(&self.query)
+    }
+}
+
+impl<T: ?Sized + ToString + std::fmt::Display> ToWrapString for T {
+    fn to_wrapstring(&self) -> WrapString {
+        WrapString::new(&crate::parser::escape_string(&self.to_string()))
+    }
+}
+
+/// A trait for displaying SQL statements that will be executed in the database.
+pub trait ActualSQL {
     /// Return the actual SQL statement.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::{prep, Wrap};
-    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+    /// # use concatsql::prelude::*;
     /// assert_eq!(prep!("SELECT").actual_sql(),       "SELECT");
-    /// assert_eq!("SELECT".actual_sql(),              "'SELECT'");
-    /// assert_eq!("O'Reilly".actual_sql(),            "'O''Reilly'");
+    /// assert_eq!("SELECT".actual_sql(),              "SELECT");
+    /// assert_eq!("O'Reilly".actual_sql(),            "O'Reilly");
     /// assert_eq!(prep!("O''Reilly").actual_sql(),    "O''Reilly");
     /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
-    /// // prep!("O'Reilly").actual_sql();  // panic
+    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "foo'bar'");
+    /// assert_eq!((prep!("foo")+42).actual_sql(),     "foo42");
+    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "foo'42'");
     /// ```
-    fn actual_sql(&self) -> String;
+    fn actual_sql(&self) -> &str;
 }
 
-impl Wrap for WrapString {
-    fn to_wrapstring(&self) -> WrapString {
-        WrapString::new(&self.query)
-    }
-
-    fn actual_sql(&self) -> String {
-        self.query.clone()
+impl ActualSQL for WrapString {
+    fn actual_sql(&self) -> &str {
+        &self.query
     }
 }
 
-impl<T: ?Sized + ToString + std::fmt::Display> Wrap for T {
-    fn to_wrapstring(&self) -> WrapString {
-        WrapString::new(&crate::parser::escape_string(&self.to_string()))
-    }
-
-    fn actual_sql(&self) -> String {
-        let s = &self.to_string();
-        if s.is_empty() {
-            String::new()
-        } else {
-            crate::parser::escape_string(&s)
-        }
+impl ActualSQL for &'static str {
+    fn actual_sql(&self) -> &str {
+        self
     }
 }
 
@@ -166,5 +169,12 @@ mod tests {
         assert_eq!("ABC".to_wrapstring().actual_sql(), "'ABC'");
         assert_eq!(42.to_wrapstring().actual_sql(), "'42'");
         assert_eq!("O'Reilly".to_wrapstring().actual_sql(), "'O''Reilly'");
+    }
+
+    #[test]
+    fn actual_sql() {
+        assert_eq!("foo".actual_sql(), "foo");
+        assert_eq!(prep!("bar").actual_sql(), "bar");
+        assert_eq!((prep!("bar") + "baz").actual_sql(), "bar'baz'");
     }
 }

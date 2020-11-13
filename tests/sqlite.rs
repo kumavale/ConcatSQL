@@ -149,11 +149,11 @@ mod sqlite {
     fn double_quotaion_inside_double_quote() {
         assert_eq!(
             r#"".ow(""inside str"") -> String""#.actual_sql(),
-            r#"'".ow(""inside str"") -> String"'"#
+            r#"".ow(""inside str"") -> String""#
         );
         assert_eq!(
             r#"".ow("inside str") -> String""#.actual_sql(),
-            r#"'".ow("inside str") -> String"'"#
+            r#"".ow("inside str") -> String""#
         );
     }
 
@@ -161,11 +161,11 @@ mod sqlite {
     fn double_quotaion_inside_sigle_quote() {
         assert_eq!(
             r#""I'm Alice""#.actual_sql(),
-            r#"'"I''m Alice"'"#
+            r#""I'm Alice""#
         );
         assert_eq!(
             r#""I''m Alice""#.actual_sql(),
-            r#"'"I''''m Alice"'"#
+            r#""I''m Alice""#
         );
     }
 
@@ -173,7 +173,7 @@ mod sqlite {
     fn single_quotaion_inside_double_quote() {
         assert_eq!(
             r#"'.ow("inside str") -> String'"#.actual_sql(),
-            r#"'''.ow("inside str") -> String'''"#
+            r#"'.ow("inside str") -> String'"#
         );
     }
 
@@ -181,7 +181,7 @@ mod sqlite {
     fn single_quotaion_inside_sigle_quote() {
         assert_eq!(
             "'I''m Alice'".actual_sql(),
-            r#"'''I''''m Alice'''"#
+            "'I''m Alice'"
         );
     }
 
@@ -189,15 +189,15 @@ mod sqlite {
     fn non_quotaion_inside_sigle_quote() {
         assert_eq!(
             "foo'bar'foo".actual_sql(),
-            r#"'foo''bar''foo'"#
+            "foo'bar'foo"
         );
     }
 
     #[test]
     fn non_quotaion_inside_double_quote() {
         assert_eq!(
-            "foo\"bar\"foo".actual_sql(),
-            r#"'foo"bar"foo'"#
+            r#"foo"bar"foo"#.actual_sql(),
+            r#"foo"bar"foo"#
         );
     }
 
@@ -206,10 +206,7 @@ mod sqlite {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
         let sql = prep!("select age from users where name = ") + name + &prep!("");
-        assert_eq!(
-            name.actual_sql(),
-            r#"'''Alice''; DROP TABLE users; --'"#
-        );
+        assert_eq!(name.actual_sql(), name);
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 

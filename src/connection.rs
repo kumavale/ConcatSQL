@@ -165,7 +165,7 @@ impl<'a> Connection<'a> {
     /// # Danger
     ///
     /// ```
-    /// # use concatsql::{prep, Wrap};
+    /// # use concatsql::prelude::*;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// # let stmt = r#"CREATE TABLE users (name TEXT, age INTEGER);
     /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);

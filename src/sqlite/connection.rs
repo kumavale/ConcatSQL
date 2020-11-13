@@ -201,12 +201,12 @@ mod tests {
     #[cfg(debug_assertions)]
     fn actual_sql() {
         assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
-        assert_eq!("SELECT".actual_sql(), "'SELECT'");
-        assert_eq!("O'Reilly".actual_sql(), "'O''Reilly'");
+        assert_eq!("SELECT".actual_sql(), "SELECT");
+        assert_eq!("O'Reilly".actual_sql(), "O'Reilly");
         assert_eq!(prep!("O''Reilly").actual_sql(), "O''Reilly");
+        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
 
         //crate::prep!("O'Reilly").actual_sql();      // panic
-        //crate::prep!("\"O'Reilly\"").actual_sql();  // panic
     }
 
     #[test]
