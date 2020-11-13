@@ -1,10 +1,12 @@
 use std::str::FromStr;
 use indexmap::map::IndexMap;
 
+type IndexMapValue = IndexMap<String, Option<String>>;
+
 /// A single result row of a query.
 #[derive(Debug, PartialEq)]
 pub struct Row {
-    value: IndexMap<String, Option<String>>,
+    value: IndexMapValue,
 }
 
 impl Row {
@@ -19,29 +21,43 @@ impl Row {
     }
 
     /// Get the value of a column of the result row.
-    #[inline]
-    pub fn get(&self, key: &str) -> Option<&str> {
-        self.value.get(key)?.as_deref()
-    }
-
-    /// Get the value of a column of the result row using index.
-    #[inline]
-    pub fn get_index(&self, index: usize) -> Option<&str> {
-        self.value.get_index(index)?.1.as_deref()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use concatsql::prelude::*;
+    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+    /// for row in conn.rows("SELECT 1").unwrap() {
+    ///     assert_eq!(row.get(0).unwrap(),   "1");
+    ///     assert_eq!(row.get("1").unwrap(), "1");
+    /// }
+    /// ```
+    pub fn get<T: Get>(&self, key: T) -> Option<&str> {
+        key.get(&self.value)
     }
 
     /// Transforms and gets the columns of the result row.  
-    /// &#x26a0;&#xfe0f; If column is not found then execute `T::from_str("")`.
+    /// &#x26a0;&#xfe0f; If column is not found then execute `U::from_str("")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use concatsql::prelude::*;
+    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+    /// for row in conn.rows("SELECT 1").unwrap() {
+    ///     assert_eq!(row.get_into::<_, i32>(0).unwrap(),   1);
+    ///     assert_eq!(row.get_into::<_, i32>("1").unwrap(), 1);
+    ///
+    ///     assert_eq!(row.get_into::<_, String>(0).unwrap(),   "1");
+    ///     assert_eq!(row.get_into::<_, String>("1").unwrap(), "1");
+    ///
+    ///     let one: u8 = row.get_into(0).unwrap();
+    ///     assert_eq!(one, 1u8);
+    /// }
+    /// ```
     #[inline]
-    pub fn get_into<T: FromStr>(&self, key: &str) -> Result<T, <T as std::str::FromStr>::Err> {
-        T::from_str(self.value.get(key).unwrap_or(&None).as_deref().unwrap_or(""))
-    }
-
-    /// Transforms and gets the columns of the result row using index.  
-    /// &#x26a0;&#xfe0f; If column is not found then execute `T::from_str("")`.
-    #[inline]
-    pub fn get_into_index<T: FromStr>(&self, index: usize) -> Result<T, <T as std::str::FromStr>::Err> {
-        T::from_str(self.value.get_index(index).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
+    pub fn get_into<T: Get, U: FromStr>(&self, key: T) -> Result<U, <U as std::str::FromStr>::Err> {
+        key.get_into::<U>(&self.value)
     }
 
     /// Return the number of columns.
@@ -64,6 +80,42 @@ impl Row {
     }
 }
 
+/// A trait implemented by types that can index into columns of a row.
+pub trait Get {
+    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str>;
+    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err>;
+}
+
+impl Get for str {
+    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
+        value.get(self)?.as_deref()
+    }
+
+    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
+        U::from_str(value.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
+    }
+}
+
+impl Get for usize {
+    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
+        value.get_index(*self)?.1.as_deref()
+    }
+
+    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
+        U::from_str(value.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
+    }
+}
+
+impl<'b, T> Get for &'b T where T: Get + ?Sized {
+    fn get<'a>(&self, value: &'a IndexMapValue) -> Option<&'a str> {
+        T::get(self, &value)
+    }
+
+    fn get_into<'a, U: FromStr>(&self, value: &'a IndexMapValue) -> Result<U, <U as std::str::FromStr>::Err> {
+        T::get_into(self, &value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,37 +132,67 @@ mod tests {
         assert_eq!(row.get("key2"), None);
         assert_eq!(row.get("key3"), Some("42"));
         assert_eq!(row.get("key4"), None);
-        assert_eq!(row.get_index(0), Some("value"));
-        assert_eq!(row.get_index(0).unwrap(), "value");
-        assert_eq!(row.get_index(1), None);
-        assert_eq!(row.get_index(2), Some("42"));
-        assert_eq!(row.get_index(3), None);
-        assert_eq!(row.column_count(), 3);
-        assert_eq!(row.get_into::<String>("key1"), Ok(String::from("value")));
-        assert_eq!(row.get_into::<i32>("key3"), Ok(42));
-        assert_eq!(row.get_into::<usize>("key3"), Ok(42));
+        assert_eq!(row.get(0), Some("value"));
+        assert_eq!(row.get(0).unwrap(), "value");
+        assert_eq!(row.get(1), None);
+        assert_eq!(row.get(2), Some("42"));
+        assert_eq!(row.get(3), None);
+
+        assert_eq!(row.get_into::<&str, String>("key1"), Ok(String::from("value")));
+        assert_eq!(row.get_into::<&str, i32>("key3"), Ok(42));
+        assert_eq!(row.get_into::<&str, usize>("key3"), Ok(42));
         assert_eq!(row.get_into("key3"), Ok(42));
         assert_eq!(row.get_into("key2"), Ok(String::new()));
         assert_eq!(row.get_into("key1"), Ok(String::from("value")));
-        assert_eq!(row.get_into_index::<String>(0), Ok(String::from("value")));
-        assert_eq!(row.get_into_index::<i32>(2), Ok(42));
-        assert_eq!(row.get_into_index::<usize>(2), Ok(42));
-        assert_eq!(row.get_into_index(2), Ok(42));
-        assert_eq!(row.get_into_index(1), Ok(String::new()));
-        assert_eq!(row.get_into_index(0), Ok(String::from("value")));
-        assert!(row.get_into::<u32>("key1").is_err());
-        assert!(row.get_into::<u32>("key2").is_err());
-        assert!(row.get_into::<u32>("key4").is_err());
-        assert!(!row.get_into::<String>("key4").is_err());  // I want to make result to Err
-        assert!(row.get_into_index::<u32>(0).is_err());
-        assert!(row.get_into_index::<u32>(1).is_err());
-        assert!(row.get_into_index::<u32>(99).is_err());
-        assert!(!row.get_into_index::<String>(99).is_err());  // I want to make result to Err
+        assert_eq!(row.get_into::<usize, String>(0), Ok(String::from("value")));
+        assert_eq!(row.get_into::<usize, i32>(2), Ok(42));
+        assert_eq!(row.get_into::<usize, usize>(2), Ok(42));
+        assert_eq!(row.get_into(2), Ok(42));
+        assert_eq!(row.get_into(1), Ok(String::new()));
+        assert_eq!(row.get_into(0), Ok(String::from("value")));
+        assert!(row.get_into::<&str, u32>("key1").is_err());
+        assert!(row.get_into::<&str, u32>("key2").is_err());
+        assert!(row.get_into::<&str, u32>("key4").is_err());
+        assert!(!row.get_into::<&str, String>("key4").is_err());  // I want to make result to Err
+        assert!(row.get_into::<usize, u32>(0).is_err());
+        assert!(row.get_into::<usize, u32>(1).is_err());
+        assert!(row.get_into::<usize, u32>(99).is_err());
+        assert!(!row.get_into::<usize, String>(99).is_err());  // I want to make result to Err
+
+        assert_eq!(row.get_into::<_, String>("key1"), Ok(String::from("value")));
+        assert_eq!(row.get_into::<_, i32>("key3"), Ok(42));
+        assert_eq!(row.get_into::<_, usize>("key3"), Ok(42));
+        assert_eq!(row.get_into("key3"), Ok(42));
+        assert_eq!(row.get_into("key2"), Ok(String::new()));
+        assert_eq!(row.get_into("key1"), Ok(String::from("value")));
+        assert_eq!(row.get_into::<_, String>(0), Ok(String::from("value")));
+        assert_eq!(row.get_into::<_, i32>(2), Ok(42));
+        assert_eq!(row.get_into::<_, usize>(2), Ok(42));
+        assert_eq!(row.get_into(2), Ok(42));
+        assert_eq!(row.get_into(1), Ok(String::new()));
+        assert_eq!(row.get_into(0), Ok(String::from("value")));
+        assert!(row.get_into::<_, u32>("key1").is_err());
+        assert!(row.get_into::<_, u32>("key2").is_err());
+        assert!(row.get_into::<_, u32>("key4").is_err());
+        assert!(!row.get_into::<_, String>("key4").is_err());  // I want to make result to Err
+        assert!(row.get_into::<_, u32>(0).is_err());
+        assert!(row.get_into::<_, u32>(1).is_err());
+        assert!(row.get_into::<_, u32>(99).is_err());
+        assert!(!row.get_into::<_, String>(99).is_err());  // I want to make result to Err
+
+        assert_eq!(row.column_count(), 3);
+
         assert!(row.column_names().contains(&"key1"));
         assert!(row.column_names().contains(&"key2"));
         assert!(row.column_names().contains(&"key3"));
         assert!(!row.column_names().contains(&"key4"));
+
         assert!(!row.is_empty());
+
+        assert_eq!(row.get(&"key1"), Some("value"));
+        assert_eq!(row.get(&&&&&&&&"key1"), Some("value"));
+        assert_eq!(row.get(&*String::from("key1")), Some("value"));
+        assert_eq!(row.get(&0), Some("value"));
     }
 }
 

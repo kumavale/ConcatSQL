@@ -323,7 +323,7 @@ mod postgres {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
             assert_eq!(row.get("?column?").unwrap(), "1");
-            assert_eq!(row.get_index(0).unwrap(), "1");
+            assert_eq!(row.get(0).unwrap(), "1");
         }
     }
 
@@ -364,12 +364,12 @@ mod postgres {
         let mut cnt = 0;
         for (i, row) in conn.rows("SELECT 1 UNION SELECT 2;").unwrap().iter().enumerate() {
             cnt += 1;
-            assert_eq!(row.get_into_index::<i32>(0).unwrap(), [ 1, 2 ][i]);
+            assert_eq!(row.get_into::<_, i32>(0).unwrap(), [ 1, 2 ][i]);
         };
 
         for (i, row) in conn.rows("SELECT age FROM users;").unwrap().iter().enumerate() {
             cnt += 1;
-            assert_eq!(row.get_into_index::<i32>(0).unwrap(), [ 42, 69, 50 ][i]);
+            assert_eq!(row.get_into::<_, i32>(0).unwrap(), [ 42, 69, 50 ][i]);
         };
 
         assert_eq!(cnt, 5);
