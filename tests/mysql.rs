@@ -218,7 +218,7 @@ mod mysql {
 
     #[test]
     fn error_level() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         conn.error_level(ErrorLevel::Release);
         conn.error_level(ErrorLevel::Develop);
@@ -228,7 +228,7 @@ mod mysql {
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -243,7 +243,7 @@ mod mysql {
 
     #[test]
     fn error_level_release() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Release);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -258,7 +258,7 @@ mod mysql {
 
     #[test]
     fn error_level_develop() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Develop);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -273,7 +273,7 @@ mod mysql {
 
     #[test]
     fn error_level_debug() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -405,7 +405,7 @@ mod mysql_release_build {
 
     #[test]
     fn error_level_debug_when_release_build() {
-        let mut conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         assert_eq!(
             conn.error_level(ErrorLevel::Debug),
             Err("ErrorLevel::Debug cannot be set during release build")

@@ -1,6 +1,6 @@
 
 /// Enum listing possible errors from concatsql.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Error {
     /// The error message.
     Message(String),
@@ -9,7 +9,7 @@ pub enum Error {
 }
 
 /// Change the output error message.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ErrorLevel {
     /// No error message returned, always return Result::Ok(T).
     AlwaysOk,
@@ -77,6 +77,25 @@ mod tests {
         assert_eq!(
             Error::new(&ErrorLevel::Debug,    "test", "test"),
             Err(Error::Message("test: test".into())));
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn error_level() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.error_level(ErrorLevel::Develop);
+        for _ in conn.rows("SELECT 1").unwrap() {
+            conn.error_level(ErrorLevel::Develop);
+        }
+        conn.error_level(ErrorLevel::Develop);
+        conn.execute({
+            conn.error_level(ErrorLevel::Develop);
+            "SELECT 1"
+        }).unwrap();
+        conn.error_level({
+            conn.execute("SELECT 1").unwrap();
+            ErrorLevel::Develop
+        });
     }
 }
 

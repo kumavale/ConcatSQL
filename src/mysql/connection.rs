@@ -24,7 +24,7 @@ pub fn open(url: &str) -> Result<Connection> {
 
     Ok(Connection {
         conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
-        error_level: ErrorLevel::default(),
+        error_level: RefCell::new(ErrorLevel::default()),
     })
 }
 

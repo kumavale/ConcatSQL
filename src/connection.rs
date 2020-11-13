@@ -1,5 +1,6 @@
 use std::fmt;
 use std::pin::Pin;
+use std::cell::RefCell;
 
 use crate::Result;
 use crate::ErrorLevel;
@@ -23,7 +24,7 @@ pub(crate) enum ConnKind {
 /// A database connection.
 pub struct Connection<'a> {
     pub(crate) conn:        Pin<&'a dyn ConcatsqlConn>,
-    pub(crate) error_level: ErrorLevel,
+    pub(crate) error_level: RefCell<ErrorLevel>,
 }
 
 unsafe impl<'a> Send for Connection<'a> {}
@@ -39,7 +40,7 @@ impl<'a> fmt::Debug for Connection<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("conn", &(&self.conn as *const _))
-            .field("error_level", &self.error_level)
+            .field("error_level", &*self.error_level.borrow())
             .finish()
     }
 }
@@ -105,7 +106,7 @@ impl<'a> Connection<'a> {
     /// ```
     #[inline]
     pub fn execute<T: SafeStr>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(query.as_str(), &self.error_level)
+        self.conn.execute_inner(query.as_str(), &*self.error_level.borrow())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -135,7 +136,7 @@ impl<'a> Connection<'a> {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(query.as_str(), &self.error_level, &mut callback)
+        self.conn.iterate_inner(query.as_str(), &*self.error_level.borrow(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -156,7 +157,7 @@ impl<'a> Connection<'a> {
     /// }
     /// ```
     pub fn rows<T: SafeStr>(&self, query: T) -> Result<Vec<Row>> {
-        self.conn.rows_inner(query.as_str(), &self.error_level)
+        self.conn.rows_inner(query.as_str(), &*self.error_level.borrow())
     }
 
     /// Does not escape.  
@@ -192,11 +193,11 @@ impl<'a> Connection<'a> {
     ///
     /// ```
     /// # use concatsql::ErrorLevel;
-    /// # let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
     /// conn.error_level(ErrorLevel::Debug);
     /// ```
-    pub fn error_level(&mut self, level: ErrorLevel) {
-        self.error_level = level;
+    pub fn error_level(&self, level: ErrorLevel) {
+        *self.error_level.borrow_mut() = level;
     }
 }
 

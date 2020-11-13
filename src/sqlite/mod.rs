@@ -77,8 +77,8 @@ mod tests {
             let conn = crate::sqlite::open(&path).unwrap();
             conn.execute(prep!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
         }
-        let mut conn = crate::sqlite::open_readonly(path).unwrap();
-        conn.error_level = ErrorLevel::Debug;
+        let conn = crate::sqlite::open_readonly(path).unwrap();
+        conn.error_level(ErrorLevel::Debug);
         assert_eq!(
             conn.execute(prep!("INSERT INTO users VALUES(42, 'Alice');")),
             Err(Error::Message("exec error: attempt to write a readonly database".to_string()))

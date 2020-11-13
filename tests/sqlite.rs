@@ -258,7 +258,7 @@ mod sqlite {
 
     #[test]
     fn error_level() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         conn.error_level(ErrorLevel::Release);
         conn.error_level(ErrorLevel::Develop);
@@ -268,7 +268,7 @@ mod sqlite {
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -283,7 +283,7 @@ mod sqlite {
 
     #[test]
     fn error_level_release() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Release);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -298,7 +298,7 @@ mod sqlite {
 
     #[test]
     fn error_level_develop() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Develop);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -313,7 +313,7 @@ mod sqlite {
 
     #[test]
     fn error_level_debug() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -501,7 +501,7 @@ mod sqlite_release_build {
 
     #[test]
     fn error_level_debug_when_release_build() {
-        let mut conn = concatsql::sqlite::open(":memory:").unwrap();
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
         assert_eq!(
             conn.error_level(ErrorLevel::Debug),
             Err("ErrorLevel::Debug cannot be set during release build")

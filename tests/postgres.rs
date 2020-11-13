@@ -218,7 +218,7 @@ mod postgres {
 
     #[test]
     fn error_level() {
-        let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         conn.error_level(ErrorLevel::Release);
         conn.error_level(ErrorLevel::Develop);
@@ -228,7 +228,7 @@ mod postgres {
     #[test]
     #[allow(non_snake_case)]
     fn error_level_AlwaysOk() {
-        let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -243,7 +243,7 @@ mod postgres {
 
     #[test]
     fn error_level_release() {
-        let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Release);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -258,7 +258,7 @@ mod postgres {
 
     #[test]
     fn error_level_develop() {
-        let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Develop);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();
@@ -273,7 +273,7 @@ mod postgres {
 
     #[test]
     fn error_level_debug() {
-        let mut conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let invalid_sql = "INVALID SQL".to_wrapstring();
         let endless = "'endless".to_wrapstring();

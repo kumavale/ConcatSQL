@@ -4,6 +4,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::ptr;
 use std::path::Path;
 use std::pin::Pin;
+use std::cell::RefCell;
 
 use crate::Result;
 use crate::row::Row;
@@ -34,7 +35,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
         ffi::SQLITE_OK =>
             Ok(Connection {
                 conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
-                error_level: ErrorLevel::default(),
+                error_level: RefCell::new(ErrorLevel::default()),
             }),
         _ => Err(Error::Message("failed to connect".into())),
     }
