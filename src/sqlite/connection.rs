@@ -63,7 +63,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
             Ok(())
         } else {
             Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() })
         }
     }
 
@@ -91,7 +91,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
             Ok(())
         } else {
             Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy().into_owned() })
+                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() })
         }
     }
 

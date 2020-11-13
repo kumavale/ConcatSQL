@@ -161,24 +161,37 @@ impl<'a> Parser<'a> {
         self.pos += next_pos;
         Ok(cur_char)
     }
+
+    pub fn visible_len(&self) -> usize {
+        use unicode_width::UnicodeWidthStr;
+        UnicodeWidthStr::width(&self.input[..self.pos])
+    }
 }
 
 // I want to write with const fn
 #[doc(hidden)]
 pub fn check_valid_literal(s: &'static str) -> Result<()> {
-    let err_msg = "invalid literal";
     let mut parser = Parser::new(&s, &ErrorLevel::Develop);
     while !parser.eof() {
         parser.consume_while(|c| c != '"' && c != '\'')?;
         match parser.next_char() {
-            Ok(c) => if (c == '"' || c == '\'') && parser.consume_string(c).is_err() {
-                return Error::new(&ErrorLevel::Develop, &format!("{}: {}", err_msg, &s), "");
+            Ok(c) => if c == '"' || c == '\'' {
+                let visible_len = parser.visible_len();
+                if parser.consume_string(c).is_err() {
+                    let err_msg = format!("    {}\n{:<width1$}\x1b[33m{:^<width2$}\x1b[0m",
+                        s, "", "^", width1 = visible_len + 4, width2 = parser.visible_len() - visible_len);
+                    return Err(Error::Message(err_msg));
+                }
             }
             _other => (), // Do nothing
         }
     }
 
     Ok(())
+}
+
+pub fn warning_invalid_literal() -> &'static str {
+    "\x1b[33mwarning\x1b[0m: invalid literal\n"
 }
 
 #[cfg(test)]
@@ -249,5 +262,14 @@ mod tests {
         assert!(!super::check_valid_literal("' AND ...").is_ok());
         assert!(!super::check_valid_literal("\\'").is_ok());
         assert!(!super::check_valid_literal("\\\"").is_ok());
+
+        assert_eq!(
+            super::check_valid_literal("O'Reilly").unwrap_err().to_string(),
+            "    O'Reilly\n     \x1b[33m^^^^^^^\x1b[0m"
+        );
+        assert_eq!(
+            super::check_valid_literal("passwd='").unwrap_err().to_string(),
+            "    passwd='\n           \x1b[33m^\x1b[0m"
+        );
     }
 }

@@ -478,18 +478,24 @@ mod sqlite {
 
             conn.iterate(sql.to_wrapstring(), |_| { true }).unwrap();
         }
+    }
+
+    mod warning {
+        use concatsql::prelude::*;
+        use super::stmt;
 
         #[test]
-        #[should_panic = "invalid literal"]
-        fn sqli_eq_quote() {
+        fn sqli_enable() {
             let conn = concatsql::sqlite::open(":memory:").unwrap();
             let stmt = prep!(stmt());
             conn.execute(&stmt).unwrap();
 
-            let name = "OR TRUE; DROP TABLE users; --";
+            let name = "OR 1=2; SELECT 1; --";
             let sql = prep!("select age from users where name = '") + name + &prep!("';");
 
-            conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+            for row in conn.rows(&sql).unwrap() {
+                assert_eq!(row.get(0).unwrap(), "1");
+            }
         }
     }
 }

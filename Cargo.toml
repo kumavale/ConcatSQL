@@ -15,6 +15,7 @@ postgres = ["postgres-sys"]
 
 [dependencies]
 indexmap = "1.6"
+unicode-width = "0.1"
 
 [dependencies.sqlite3-sys]
 version = "0.12"

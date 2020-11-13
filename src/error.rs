@@ -36,18 +36,22 @@ impl Default for ErrorLevel {
 
 impl Error {
     #[allow(unused_variables)]
-    pub(crate) fn new(error_level: &ErrorLevel, err_msg: &str, detail_msg: &str) -> Result<(), Error> {
+    pub(crate) fn new<E1, E2>(error_level: &ErrorLevel, err_msg: E1, detail_msg: E2) -> Result<(), Error>
+        where
+            E1: ToString,
+            E2: ToString,
+    {
         match error_level {
             ErrorLevel::AlwaysOk => Ok(()),
             ErrorLevel::Release  => Err(Error::AnyError),
             ErrorLevel::Develop  => Err(Error::Message(err_msg.to_string())),
             #[cfg(debug_assertions)]
-            ErrorLevel::Debug    => Err(Error::Message(format!("{}: {}", err_msg, detail_msg))),
+            ErrorLevel::Debug    => Err(Error::Message(err_msg.to_string() + ": " + &detail_msg.to_string())),
         }
     }
 }
 
-impl std::string::ToString for Error {
+impl ToString for Error {
     fn to_string(&self) -> String {
         match self {
             Error::Message(s) => s.to_string(),

@@ -27,7 +27,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
     fn execute_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
         match self.borrow_mut().batch_execute(query) {
             Ok(_) => Ok(()),
-            Err(e) => Error::new(error_level, "exec error", &e.to_string()),
+            Err(e) => Error::new(error_level, "exec error", &e),
         }
     }
 
@@ -37,7 +37,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         let mut conn = self.borrow_mut();
         let rows = match conn.query(query, &[]) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
+            Err(e) => return Error::new(error_level, "exec error", &e),
         };
 
         let mut pairs = Vec::new();
@@ -83,7 +83,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         let mut conn = self.borrow_mut();
         let result = match conn.query(query, &[]) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
         };
 
         let mut rows: Vec<Row> = Vec::new();

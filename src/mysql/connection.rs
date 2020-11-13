@@ -33,7 +33,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         let mut conn = self.borrow_mut();
         match conn.query_drop(query) {
             Ok(_) => Ok(()),
-            Err(e) => Error::new(error_level, "exec error", &e.to_string()),
+            Err(e) => Error::new(error_level, "exec error", &e),
         }
     }
 
@@ -43,20 +43,20 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         let mut conn = self.borrow_mut();
         let mut result = match conn.query_iter(query) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
+            Err(e) => return Error::new(error_level, "exec error", &e),
         };
 
         while let Some(result_set) = result.next_set() {
             let result_set = match result_set {
                 Ok(result_set) => result_set,
-                Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
+                Err(e) => return Error::new(error_level, "exec error", &e),
             };
             let mut pairs: Vec<(String, Option<String>)> = Vec::with_capacity(result_set.affected_rows() as usize);
 
             for row in result_set {
                 let row = match row {
                     Ok(row) => row,
-                    Err(e) => return Error::new(error_level, "exec error", &e.to_string()),
+                    Err(e) => return Error::new(error_level, "exec error", &e),
                 };
 
                 for (i, col) in row.columns().iter().enumerate() {
@@ -78,20 +78,20 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         let mut conn = self.borrow_mut();
         let mut result = match conn.query_iter(query) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
         };
         let mut rows: Vec<Row> = Vec::new();
 
         while let Some(result_set) = result.next_set() {
             let result_set = match result_set {
                 Ok(result_set) => result_set,
-                Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
             };
 
             for result_row in result_set {
                 let result_row = match result_row {
                     Ok(row) => row,
-                    Err(e) => return Error::new(error_level, "exec error", &e.to_string()).map(|_|Vec::new()),
+                    Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
                 };
                 let mut row = Row::new();
 
