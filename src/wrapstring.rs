@@ -1,89 +1,112 @@
 use std::ops::Add;
 
-/// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
-#[derive(Clone, Debug, PartialEq)]
-pub struct WrapString {
-    pub(crate) query: String,
+/// TODO
+#[derive(Clone, Debug)]
+pub enum Param<'a> {
+    I32(i32),
+    I64(i64),
+    F64(f64),
+    Blob(&'a [u8]),
+    Text(String),
+    Null,
 }
 
-impl WrapString {
+/// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
+#[derive(Clone, Debug)]
+pub struct WrapString<'a> {
+    pub(crate) prepare: String,
+    pub(crate) params:  Vec<Param<'a>>,
+}
+
+impl<'a> WrapString<'a> {
     #[doc(hidden)]
     pub fn init(s: &'static str) -> Self {
         Self {
-            query: s.to_string(),
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn int<T: ToString>(value: T) -> Result<Self, &'static str> {
-        let value = value.to_string();
-        if value.parse::<i64>().is_ok() {
-            Ok(WrapString::new(&value))
-        } else {
-            Err("not integer")
+            prepare: s.to_string(),
+            params:  Vec::new(),
         }
     }
 
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
-            query: s.to_string(),
+            prepare: s.to_string(),
+            params:  Vec::new(),
         }
     }
 }
 
-impl Add for WrapString {
-    type Output = WrapString;
+impl<'a> Add for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: WrapString) -> WrapString {
-        WrapString { query: self.query + &other.query }
+    fn add(mut self, other: WrapString<'a>) -> WrapString<'a> {
+        self.prepare.push_str(&other.prepare);
+        self.params.extend(other.params);
+        self
     }
 }
 
-impl<'a> Add<&'a WrapString> for WrapString {
-    type Output = WrapString;
+impl<'a, 'b> Add<&'b WrapString<'a>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: &'a WrapString) -> WrapString {
-        WrapString { query: self.query + &other.query }
+    fn add(mut self, other: &'b WrapString<'a>) -> WrapString<'a> {
+        self.prepare.push_str(&other.prepare);
+        self.params.extend_from_slice(&other.params);
+        self
     }
 }
 
-impl Add<String> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<String> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: String) -> WrapString {
-        WrapString { query: self.query + &crate::parser::escape_string(&other) }
+    fn add(mut self, other: String) -> WrapString<'a> {
+        self.prepare.push('?');
+        self.params.push(Param::Text(other));
+        self
     }
 }
 
-impl Add<&String> for WrapString {
-    type Output = WrapString;
+impl<'a, 'b> Add<&'b String> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: &String) -> WrapString {
-        WrapString { query: self.query + &crate::parser::escape_string(other) }
+    fn add(mut self, other: &'b String) -> WrapString<'a> {
+        //WrapString { query: self.query + &crate::parser::escape_string(other) }
+        self.prepare.push('?');
+        self.params.push(Param::Text(other.to_string()));
+        self
     }
 }
 
-impl Add<&str> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&'a str> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: &str) -> WrapString {
-        WrapString { query: self.query + &crate::parser::escape_string(other) }
+    fn add(mut self, other: &'a str) -> WrapString<'a> {
+        //WrapString { query: self.query + &crate::parser::escape_string(other) }
+        self.prepare.push('?');
+        self.params.push(Param::Text(other.to_string()));
+        self
     }
 }
 
-impl Add<&&str> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&&'a str> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: &&str) -> WrapString {
-        WrapString { query: self.query + &crate::parser::escape_string(other) }
+    fn add(mut self, other: &&'a str) -> WrapString<'a> {
+        //WrapString { query: self.query + &crate::parser::escape_string(other) }
+        self.prepare.push('?');
+        self.params.push(Param::Text(other.to_string()));
+        self
     }
 }
 
-impl<T: self::Num> Add<T> for WrapString {
-    type Output = WrapString;
+impl<'a, T: self::Num> Add<T> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(self, other: T) -> WrapString {
-        WrapString { query: self.query + &other.to_string() }
+    fn add(mut self, other: T) -> WrapString<'a> {
+        //WrapString { query: self.query + &other.to_string() }
+        // TODO
+        self.prepare.push('?');
+        self.params.push(Param::Text("TODO".to_string()));
+        self
     }
 }
 
@@ -93,19 +116,19 @@ macro_rules! impl_Num { ($($type:ty), *) => ($(impl Num for $type {})*) }
 impl_Num!(usize, u8, u16, u32, u64, u128, isize, i8, i16, i32, i64, i128, f32, f64);
 
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
-pub trait ToWrapString {
+pub trait ToWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
-    fn to_wrapstring(&self) -> WrapString;
+    fn to_wrapstring(&self) -> WrapString<'a>;
 }
 
-impl ToWrapString for WrapString {
-    fn to_wrapstring(&self) -> WrapString {
-        WrapString::new(&self.query)
+impl<'a> ToWrapString<'a> for WrapString<'a> {
+    fn to_wrapstring(&self) -> WrapString<'a> {
+        self.clone()
     }
 }
 
-impl<T: ?Sized + ToString + std::fmt::Display> ToWrapString for T {
-    fn to_wrapstring(&self) -> WrapString {
+impl<'a, T: ?Sized + ToString + std::fmt::Display> ToWrapString<'a> for T {
+    fn to_wrapstring(&self) -> WrapString<'a> {
         WrapString::new(&crate::parser::escape_string(&self.to_string()))
     }
 }
@@ -130,15 +153,16 @@ pub trait ActualSQL {
     fn actual_sql(&self) -> &str;
 }
 
-impl ActualSQL for WrapString {
-    fn actual_sql(&self) -> &str {
-        &self.query
+impl<'a> ActualSQL for WrapString<'a> {
+    fn actual_sql(&self) -> String {
+        // TODO
+        self.prepare.to_string()
     }
 }
 
 impl ActualSQL for &'static str {
-    fn actual_sql(&self) -> &str {
-        self
+    fn actual_sql(&self) -> String {
+        self.to_string()
     }
 }
 

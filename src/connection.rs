@@ -45,9 +45,9 @@ impl<'a> fmt::Debug for Connection<'a> {
     }
 }
 
-impl AsRef<WrapString> for WrapString {
+impl<'a> AsRef<WrapString<'a>> for WrapString<'a> {
     #[inline]
-    fn as_ref(&self) -> &WrapString {
+    fn as_ref(&self) -> &WrapString<'a> {
         self
     }
 }
@@ -76,16 +76,16 @@ impl SafeStr for &'static str {
         self
     }
 }
-impl SafeStr for WrapString {
+impl<'a> SafeStr for WrapString<'a> {
     #[doc(hidden)]
     fn as_str(&self) -> &str {
-        &self.query
+        &self.prepare
     }
 }
-impl SafeStr for &WrapString {
+impl<'a> SafeStr for &WrapString<'a> {
     #[doc(hidden)]
     fn as_str(&self) -> &str {
-        &self.query
+        &self.prepare
     }
 }
 
@@ -182,7 +182,7 @@ impl<'a> Connection<'a> {
     ///
     /// - Use trusted values
     /// - Use in an environment where SQL injection does not occur
-    pub unsafe fn without_escape<T: ?Sized + ToString>(&self, query: &T) -> WrapString {
+    pub unsafe fn without_escape<T: ?Sized + ToString>(&self, query: &T) -> WrapString<'a> {
         WrapString::new(query)
     }
 

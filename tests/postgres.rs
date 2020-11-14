@@ -296,7 +296,7 @@ mod postgres {
     fn integer() {
         let conn = prepare();
         let age = 50;
-        let sql = prep!("select name from users where age < ") + int!(age).unwrap();
+        let sql = prep!("select name from users where age < ") + age;
 
         for row in conn.rows(&sql).unwrap().iter() {
             assert_eq!(row.get("name").unwrap(), "Alice");
