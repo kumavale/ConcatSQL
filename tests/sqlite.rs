@@ -444,6 +444,19 @@ mod sqlite {
         assert_eq!(cnt, 5);
     }
 
+    #[test]
+    #[ignore]
+    fn mass_connection() {
+        let capacity = 65536;
+        let mut conns = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            conns.push(concatsql::sqlite::open(":memory:").unwrap());
+        }
+        for i in 1..capacity {
+            assert_ne!(conns[0], conns[i]);
+        }
+    }
+
     mod should_panic {
         use concatsql::prelude::*;
         use super::stmt;

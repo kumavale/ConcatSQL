@@ -371,4 +371,17 @@ mod postgres {
 
         assert_eq!(cnt, 5);
     }
+
+    #[test]
+    #[ignore]
+    fn mass_connection() {
+        let capacity = 64;
+        let mut conns = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            conns.push(concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap());
+        }
+        for i in 1..capacity {
+            assert_ne!(conns[0], conns[i]);
+        }
+    }
 }

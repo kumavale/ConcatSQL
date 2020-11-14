@@ -194,6 +194,7 @@ pub fn check_valid_literal(s: &'static str) -> Result<()> {
     Ok(())
 }
 
+#[doc(hidden)]
 pub fn invalid_literal() -> &'static str {
     #[cfg(debug_assertions)]
     return "\x1b[31merror\x1b[0m: invalid literal\n";

@@ -396,5 +396,18 @@ mod mysql {
 
         assert_eq!(cnt, 5);
     }
+
+    #[test]
+    #[ignore]
+    fn mass_connection() {
+        let capacity = 100;
+        let mut conns = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            conns.push(concatsql::mysql::open("mysql://localhost:3306/test").unwrap());
+        }
+        for i in 1..capacity {
+            assert_ne!(conns[0], conns[i]);
+        }
+    }
 }
 
