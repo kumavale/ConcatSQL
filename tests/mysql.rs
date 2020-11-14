@@ -296,7 +296,7 @@ mod mysql {
     fn integer() {
         let conn = prepare();
         let age = 50;
-        let sql = prep!("select name from users where age <") + int!(age).unwrap();
+        let sql = prep!("select name from users where age <") + age;
 
         for row in conn.rows(&sql).unwrap().iter() {
             assert_eq!(row.get("name").unwrap(), "Alice");
@@ -306,19 +306,19 @@ mod mysql {
     #[test]
     fn ow_into_execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.execute(prep!("SELECT ") + int!(1).unwrap()).unwrap();
+        conn.execute(prep!("SELECT ") + 1).unwrap();
     }
 
     #[test]
     fn ow_into_iterate() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.iterate(prep!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
+        conn.iterate(prep!("SELECT ") + 1, |_| true ).unwrap();
     }
 
     #[test]
     fn ow_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        for row in conn.rows(prep!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }

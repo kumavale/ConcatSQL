@@ -71,7 +71,7 @@ pub mod prelude {
 
     pub use crate::connection::{Connection, SafeStr};
     pub use crate::row::{Row, Get};
-    pub use crate::{sanitize_like, prep, int};
+    pub use crate::{sanitize_like, prep};
     pub use crate::wrapstring::{WrapString, ToWrapString, ActualSQL, Num};
 }
 
@@ -146,27 +146,5 @@ macro_rules! prep {
             concatsql::WrapString::init($query)
         }
     };
-}
-
-/// It is guaranteed to be a signed 64-bit integer without quotation.
-///
-/// # Examples
-///
-/// ```
-/// # use concatsql::prelude::*;
-/// assert!(int!(42).is_ok());
-/// assert!(int!("42").is_ok());
-/// assert!(int!("42 or 1=1; --").is_err());
-/// ```
-/// ```
-/// # use concatsql::prelude::*;
-/// assert_eq!((prep!("id=") +       42           ).actual_sql(), "id=42");
-/// assert_eq!((prep!("id=") +      "42"          ).actual_sql(), "id='42'");
-/// assert_eq!((prep!("id=") + int!( 42 ).unwrap()).actual_sql(), "id=42");
-/// assert_eq!((prep!("id=") + int!("42").unwrap()).actual_sql(), "id=42");
-/// ```
-#[macro_export]
-macro_rules! int {
-    ($query:expr) => { concatsql::WrapString::int($query) };
 }
 

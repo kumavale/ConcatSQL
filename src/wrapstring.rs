@@ -14,16 +14,6 @@ impl WrapString {
         }
     }
 
-    #[doc(hidden)]
-    pub fn int<T: ToString>(value: T) -> Result<Self, &'static str> {
-        let value = value.to_string();
-        if value.parse::<i64>().is_ok() {
-            Ok(WrapString::new(&value))
-        } else {
-            Err("not integer")
-        }
-    }
-
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
             query: s.to_string(),
