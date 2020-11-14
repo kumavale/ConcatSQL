@@ -229,6 +229,17 @@ mod sqlite {
     }
 
     #[test]
+    fn int() {
+        assert!(int!(42).is_ok());
+        assert!(int!("42").is_ok());
+        assert!(int!("42".to_string()).is_ok());
+        assert!(int!(&"42".to_string()).is_ok());
+        assert!(int!(std::f64::consts::PI).is_err());
+        assert!(int!('A').is_err());
+        assert!(int!("str").is_err());
+    }
+
+    #[test]
     fn sanitizing() {
         let conn = prepare();
         let name = r#"<script>alert("&1");</script>"#;
@@ -322,21 +333,28 @@ mod sqlite {
     }
 
     #[test]
+    fn integer() {
+        assert!(int!(42).is_ok());
+        assert!(int!("42").is_ok());
+        assert!(int!("xxx").is_err());
+    }
+
+    #[test]
     fn prep_into_execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.execute(prep!("SELECT ") + 1).unwrap();
+        conn.execute(prep!("SELECT ") + int!(1).unwrap()).unwrap();
     }
 
     #[test]
     fn prep_into_iterate() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        conn.iterate(prep!("SELECT ") + 1, |_| true ).unwrap();
+        conn.iterate(prep!("SELECT ") + int!(1).unwrap(), |_| true ).unwrap();
     }
 
     #[test]
     fn prep_into_rows() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + int!(1).unwrap()).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
     }
@@ -362,7 +380,7 @@ mod sqlite {
             let conn_clone = conn.clone();
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
-                let sql = prep!("INSERT INTO users VALUES ('Thread', ") + i + prep!(");");
+                let sql = prep!("INSERT INTO users VALUES ('Thread', ") + int!(i).unwrap() + prep!(");");
                 conn.execute(&sql).unwrap();
             });
             handles.push(handle);
@@ -372,7 +390,7 @@ mod sqlite {
 
         let conn = &*conn.lock().unwrap();
         assert_eq!(90, (0..10).map(|mut i| {
-            conn.iterate(prep!("SELECT age FROM users WHERE age = ") + i, |pairs| {
+            conn.iterate(prep!("SELECT age FROM users WHERE age = ") + int!(i).unwrap(), |pairs| {
                 pairs.iter().for_each(|(_, v)| { assert_eq!(i.to_string(), v.unwrap()); i*=2; }); true
             }).unwrap(); i
         }).sum::<usize>());

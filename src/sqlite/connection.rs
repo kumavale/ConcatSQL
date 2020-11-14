@@ -216,18 +216,5 @@ mod tests {
         let conn = crate::sqlite::open(":memory:").unwrap();
         assert_eq!(format!("{:?}", &conn), format!("{:?}", &conn));
     }
-
-    #[test]
-    #[ignore]
-    fn mass_connection() {
-        let capacity = 65536;
-        let mut conns = Vec::with_capacity(capacity);
-        for _ in 0..capacity {
-            conns.push(crate::sqlite::open(":memory:").unwrap());
-        }
-        for i in 1..capacity {
-            assert_ne!(conns[0], conns[i]);
-        }
-    }
 }
 
