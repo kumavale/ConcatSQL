@@ -87,6 +87,26 @@ impl Add<&&str> for WrapString {
     }
 }
 
+// TODO:
+//     - sqlite: sqlite3_bind_blob()
+//     - mysql:
+//     - ~~postgres~~
+impl Add<Vec<u8>> for WrapString {
+    type Output = WrapString;
+    #[inline]
+    fn add(self, other: Vec<u8>) -> WrapString {
+        WrapString { query: self.query + &crate::parser::to_binary_literal(&other) }
+    }
+}
+
+impl Add<&Vec<u8>> for WrapString {
+    type Output = WrapString;
+    #[inline]
+    fn add(self, other: &Vec<u8>) -> WrapString {
+        WrapString { query: self.query + &crate::parser::to_binary_literal(other) }
+    }
+}
+
 impl<T: self::Num> Add<T> for WrapString {
     type Output = WrapString;
     #[inline]
@@ -136,6 +156,12 @@ mod tests {
         assert_eq!(sql.actual_sql(), "01234567890123");
         let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
         assert_eq!(sql.actual_sql(), "340282350000000000000000000000000000000infNaN");
+        let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
+        if cfg!(feature = "sqlite") || cfg!(feature = "mysql") {
+            assert_eq!(sql.actual_sql(), "X'414243'X'000102'");
+        } else {
+            assert_eq!(sql.actual_sql(), "'\\x414243''\\x000102'");
+        }
     }
 
     #[test]

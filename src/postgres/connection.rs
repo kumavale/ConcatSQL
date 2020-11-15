@@ -63,6 +63,8 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
                     Some(value.to_string())
                 } else if let Ok(value) = row.try_get::<usize, std::net::IpAddr>(i) {
                     Some(value.to_string())
+                } else if let Ok(value) = row.try_get::<usize, Vec<u8>>(i) {
+                    Some(crate::parser::to_hex(&value))
                 } else {
                     None
                 };
@@ -112,6 +114,8 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
                     Some(value.to_string())
                 } else if let Ok(value) = result_row.try_get::<usize, std::net::IpAddr>(i) {
                     Some(value.to_string())
+                } else if let Ok(value) = result_row.try_get::<usize, Vec<u8>>(i) {
+                    Some(crate::parser::to_hex(&value))
                 } else {
                     None
                 };

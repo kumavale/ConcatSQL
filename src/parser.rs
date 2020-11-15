@@ -85,6 +85,25 @@ pub(crate) fn escape_string(s: &str) -> String {
     escaped
 }
 
+pub(crate) fn to_hex(bytes: &[u8]) -> String {
+    use lazy_static::lazy_static;
+    lazy_static! {
+        static ref LUT: Vec<String> = (0u8..=255).map(|n| format!("{:02X}", n)).collect();
+    }
+
+    bytes.iter().map(|&n| LUT.get(n as usize).unwrap().to_owned()).collect::<String>()
+}
+
+pub(crate) fn to_binary_literal(bytes: &[u8]) -> String {
+    let data = to_hex(bytes);
+
+    if cfg!(feature = "sqlite") || cfg!(feature = "mysql") {
+        format!("X'{}'", data)
+    } else {
+        format!("'\\x{}'", data)
+    }
+}
+
 pub struct Parser<'a> {
     input:       &'a str,
     pos:         usize,

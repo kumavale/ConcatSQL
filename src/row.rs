@@ -116,6 +116,28 @@ impl<'b, T> Get for &'b T where T: Get + ?Sized {
     }
 }
 
+pub mod types {
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Blob(pub Vec<u8>);
+    impl Blob {
+        pub fn unwrap(self) -> Vec<u8> { self.0 }
+    }
+}
+
+impl FromStr for types::Blob {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        dbg!(s.as_bytes());
+        Ok(types::Blob(
+            (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i+2], 16))
+            .collect::<Result<Vec<u8>, Self::Err>>()?
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

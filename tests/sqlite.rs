@@ -398,6 +398,18 @@ mod sqlite {
         }
     }
 
+    #[test]
+    fn blob() {
+        let conn = concatsql::sqlite::open(":memory:").unwrap();
+        conn.execute("CREATE TABLE b (data blob)").unwrap();
+        let data = vec![0x1, 0xA, 0xFF, 0x00, 0x7F];
+        let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
+        conn.execute(&sql).unwrap();
+        for row in conn.rows("SELECT data FROM b").unwrap() {
+            assert_eq!(row.get_into::<_, types::Blob>(0).unwrap().unwrap(), data);
+        }
+    }
+
     mod should_panic {
         use concatsql::prelude::*;
         use super::stmt;

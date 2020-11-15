@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 use crate::Result;
+use crate::parser::to_hex;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
@@ -96,7 +97,16 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                 let mut row = Row::new();
 
                 for (i, col) in result_row.columns().iter().enumerate() {
-                    row.insert(col.name_str().to_string(), result_row.get(i));
+                    let value = match result_row[i] {
+                        mysql::Value::Bytes(ref bytes) => {
+                            match String::from_utf8(bytes.to_vec()) {
+                                Ok(s) => Some(s),
+                                Err(_) => Some(to_hex(&bytes)),
+                            }
+                        }
+                        _ => result_row.get(i),
+                    };
+                    row.insert(col.name_str().to_string(), value);
                 }
                 rows.push(row);
             }

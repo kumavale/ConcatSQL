@@ -52,7 +52,7 @@ pub mod postgres;
 
 pub use crate::connection::{Connection, SafeStr};
 pub use crate::error::{Error, ErrorLevel};
-pub use crate::row::{Row, Get};
+pub use crate::row::{Row, Get, types};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
 pub use crate::wrapstring::{WrapString, ToWrapString, Num};
 
@@ -70,7 +70,7 @@ pub mod prelude {
     pub use crate::postgres;
 
     pub use crate::connection::{Connection, SafeStr};
-    pub use crate::row::{Row, Get};
+    pub use crate::row::{Row, Get, types};
     pub use crate::{sanitize_like, prep};
     pub use crate::wrapstring::{WrapString, ToWrapString};
 }

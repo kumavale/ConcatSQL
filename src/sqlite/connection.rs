@@ -67,6 +67,8 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
+    // TODO:
+    //     Drop sqlite3_exec, use sqlite3_prepare / sqlite3_step [/ sqlite3_column_bytes / sqlite3_column_blob].
     fn iterate_inner(&self, s: &str, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
@@ -122,7 +124,7 @@ extern "C" fn process_callback(
     columns: *mut *mut i8,
 ) -> i32
 {
-    type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&str>)]) -> bool;
+    type F<'a> = &'a mut dyn FnMut(&[(&str, Option<&'a str>)]) -> bool;
     let mut pairs = Vec::with_capacity(count as usize);
     for i in 0..(count as isize) {
         let column = {
@@ -135,7 +137,24 @@ extern "C" fn process_callback(
             if pointer.is_null() {
                 None
             } else {
-                Some(std::str::from_utf8(unsafe { CStr::from_ptr(pointer).to_bytes() }).unwrap())
+                //Some(std::str::from_utf8(unsafe { CStr::from_ptr(pointer).to_bytes() }).unwrap())
+                let bytes = unsafe { CStr::from_ptr(pointer).to_bytes() };
+                match std::str::from_utf8(&bytes) {
+                    Ok(s) => Some(s),
+                    Err(_) => {
+                        let len = unsafe { ffi::sqlite3_blob_bytes(pointer as *mut ffi::sqlite3_blob) };
+                        dbg!(len);
+                        //let data = unsafe { ffi::sqlite3_column_blob(columns as *mut ffi::sqlite3_stmt, i as i32) };
+                        //dbg!(data);
+                        let bytes = unsafe { std::slice::from_raw_parts::<u8>(pointer as *const u8, len as usize)};
+                        //pointer = crate::parser::to_hex(bytes).as_ptr() as *mut _;
+                        let bytes: &str = Box::leak(crate::parser::to_hex(&bytes).into_boxed_str()); // 'a
+                        dbg!(&bytes);
+                        //pointer = bytes.as_ptr() as *mut _;
+                        //Some(std::str::from_utf8(unsafe { CStr::from_ptr(pointer).to_bytes() }).unwrap())
+                        Some(bytes)
+                    }
+                }
             }
         };
         pairs.push((column, value));
