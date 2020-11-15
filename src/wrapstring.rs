@@ -19,6 +19,24 @@ impl WrapString {
             query: s.to_string(),
         }
     }
+
+    /// Return the actual SQL statements that will be executed in the database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use concatsql::prelude::*;
+    /// assert_eq!(prep!("SELECT").actual_sql(),       "SELECT");
+    /// assert_eq!(prep!("O''Reilly").actual_sql(),    "O''Reilly");
+    /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
+    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "foo'bar'");
+    /// assert_eq!((prep!("foo")+42).actual_sql(),     "foo42");
+    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "foo'42'");
+    /// assert_eq!((prep!()+"O'Reilly").actual_sql(),  "'O''Reilly'");
+    /// ```
+    pub fn actual_sql(&self) -> &str {
+        &self.query
+    }
 }
 
 impl Add for WrapString {
@@ -100,38 +118,6 @@ impl<T: ?Sized + ToString + std::fmt::Display> ToWrapString for T {
     }
 }
 
-/// A trait for displaying SQL statements that will be executed in the database.
-pub trait ActualSQL {
-    /// Return the actual SQL statement.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use concatsql::prelude::*;
-    /// assert_eq!(prep!("SELECT").actual_sql(),       "SELECT");
-    /// assert_eq!("SELECT".actual_sql(),              "SELECT");
-    /// assert_eq!("O'Reilly".actual_sql(),            "O'Reilly");
-    /// assert_eq!(prep!("O''Reilly").actual_sql(),    "O''Reilly");
-    /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
-    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "foo'bar'");
-    /// assert_eq!((prep!("foo")+42).actual_sql(),     "foo42");
-    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "foo'42'");
-    /// ```
-    fn actual_sql(&self) -> &str;
-}
-
-impl ActualSQL for WrapString {
-    fn actual_sql(&self) -> &str {
-        &self.query
-    }
-}
-
-impl ActualSQL for &'static str {
-    fn actual_sql(&self) -> &str {
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
@@ -161,10 +147,69 @@ mod tests {
         assert_eq!("O'Reilly".to_wrapstring().actual_sql(), "'O''Reilly'");
     }
 
-    #[test]
-    fn actual_sql() {
-        assert_eq!("foo".actual_sql(), "foo");
-        assert_eq!(prep!("bar").actual_sql(), "bar");
-        assert_eq!((prep!("bar") + "baz").actual_sql(), "bar'baz'");
+    mod actual_sql {
+        use crate as concatsql;
+        use concatsql::prelude::*;
+
+        #[test]
+        fn double_quotaion_inside_double_quote() {
+            assert_eq!(
+                (prep!() + r#"".ow(""inside str"") -> String""#).actual_sql(),
+                r#"'".ow(""inside str"") -> String"'"#
+            );
+            assert_eq!(
+                (prep!() + r#"".ow("inside str") -> String""#).actual_sql(),
+                r#"'".ow("inside str") -> String"'"#
+            );
+        }
+
+        #[test]
+        fn double_quotaion_inside_sigle_quote() {
+            assert_eq!(
+                (prep!() + r#""I'm Alice""#).actual_sql(),
+                r#"'"I''m Alice"'"#
+            );
+            assert_eq!(
+                (prep!() + r#""I''m Alice""#).actual_sql(),
+                r#"'"I''''m Alice"'"#
+            );
+        }
+
+        #[test]
+        fn single_quotaion_inside_double_quote() {
+            assert_eq!(
+                (prep!() + r#"'.ow("inside str") -> String'"#).actual_sql(),
+                r#"'''.ow("inside str") -> String'''"#
+            );
+        }
+
+        #[test]
+        fn single_quotaion_inside_sigle_quote() {
+            assert_eq!(
+                (prep!() + "'I''m Alice'").actual_sql(),
+                "'''I''''m Alice'''"
+            );
+        }
+
+        #[test]
+        fn non_quotaion_inside_sigle_quote() {
+            assert_eq!(
+                (prep!() + "foo'bar'foo").actual_sql(),
+                "'foo''bar''foo'"
+            );
+        }
+
+        #[test]
+        fn non_quotaion_inside_double_quote() {
+            assert_eq!(
+                (prep!() + r#"foo"bar"foo"#).actual_sql(),
+                r#"'foo"bar"foo'"#
+            );
+        }
+
+        #[test]
+        fn empty_string() {
+            assert_eq!(prep!("").actual_sql(), "");
+        }
     }
 }

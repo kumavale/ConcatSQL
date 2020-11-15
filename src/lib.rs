@@ -54,7 +54,7 @@ pub use crate::connection::{Connection, SafeStr};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
-pub use crate::wrapstring::{WrapString, ToWrapString, ActualSQL, Num};
+pub use crate::wrapstring::{WrapString, ToWrapString, Num};
 
 pub mod prelude {
     //! Re-exports important traits and types.
@@ -72,7 +72,7 @@ pub mod prelude {
     pub use crate::connection::{Connection, SafeStr};
     pub use crate::row::{Row, Get};
     pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::{WrapString, ToWrapString, ActualSQL, Num};
+    pub use crate::wrapstring::{WrapString, ToWrapString};
 }
 
 /// A typedef of the result returned by many methods.

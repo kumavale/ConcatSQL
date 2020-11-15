@@ -146,67 +146,14 @@ mod sqlite {
     }
 
     #[test]
-    fn double_quotaion_inside_double_quote() {
-        assert_eq!(
-            r#"".ow(""inside str"") -> String""#.actual_sql(),
-            r#"".ow(""inside str"") -> String""#
-        );
-        assert_eq!(
-            r#"".ow("inside str") -> String""#.actual_sql(),
-            r#"".ow("inside str") -> String""#
-        );
-    }
-
-    #[test]
-    fn double_quotaion_inside_sigle_quote() {
-        assert_eq!(
-            r#""I'm Alice""#.actual_sql(),
-            r#""I'm Alice""#
-        );
-        assert_eq!(
-            r#""I''m Alice""#.actual_sql(),
-            r#""I''m Alice""#
-        );
-    }
-
-    #[test]
-    fn single_quotaion_inside_double_quote() {
-        assert_eq!(
-            r#"'.ow("inside str") -> String'"#.actual_sql(),
-            r#"'.ow("inside str") -> String'"#
-        );
-    }
-
-    #[test]
-    fn single_quotaion_inside_sigle_quote() {
-        assert_eq!(
-            "'I''m Alice'".actual_sql(),
-            "'I''m Alice'"
-        );
-    }
-
-    #[test]
-    fn non_quotaion_inside_sigle_quote() {
-        assert_eq!(
-            "foo'bar'foo".actual_sql(),
-            "foo'bar'foo"
-        );
-    }
-
-    #[test]
-    fn non_quotaion_inside_double_quote() {
-        assert_eq!(
-            r#"foo"bar"foo"#.actual_sql(),
-            r#"foo"bar"foo"#
-        );
-    }
-
-    #[test]
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
         let sql = prep!("select age from users where name = ") + name + &prep!("");
-        assert_eq!(name.actual_sql(), name);
+        assert_eq!(
+            sql.actual_sql(),
+            "select age from users where name = '''Alice''; DROP TABLE users; --'"
+        );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
 
@@ -339,12 +286,6 @@ mod sqlite {
         for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
             assert_eq!(row.get("1").unwrap(), "1");
         }
-    }
-
-    #[test]
-    fn empty_string() {
-        assert_eq!("".actual_sql(),           "");
-        assert_eq!(prep!("").actual_sql(), "");
     }
 
     #[test]
