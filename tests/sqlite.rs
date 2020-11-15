@@ -375,6 +375,7 @@ mod sqlite {
         let conn = prepare();
         let mut cnt = 0;
         for (i, row) in conn.rows("SELECT 1; SELECT 2;").unwrap().iter().enumerate() {
+                                 /*^^^^^^^^*/// <- only first statement
             cnt += 1;
             assert_eq!(row.get_into::<_, i32>(0).unwrap(), [ 1, 2 ][i]);
         };
@@ -382,7 +383,7 @@ mod sqlite {
             cnt += 1;
             assert_eq!(row.get_into::<_, i32>(0).unwrap(), [ 42, 69, 50 ][i]);
         };
-        assert_eq!(cnt, 5);
+        assert_eq!(cnt, 4);
     }
 
     #[test]
@@ -406,7 +407,7 @@ mod sqlite {
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
         conn.execute(&sql).unwrap();
         for row in conn.rows("SELECT data FROM b").unwrap() {
-            assert_eq!(row.get_into::<_, types::Blob>(0).unwrap().unwrap(), data);
+            assert_eq!(row.get_into::<_, types::Bytes>(0).unwrap().unwrap(), data);
         }
     }
 

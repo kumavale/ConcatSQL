@@ -333,6 +333,7 @@ mod postgres {
     }
 
     #[test]
+    #[cfg(not(any(feature = "sqlite", feature = "mysql")))]
     fn blob() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.execute("CREATE TEMPORARY TABLE b (data bytea)").unwrap();
@@ -340,7 +341,7 @@ mod postgres {
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
         conn.execute(&sql).unwrap();
         for row in conn.rows("SELECT data FROM b").unwrap() {
-            assert_eq!(row.get_into::<_, types::Blob>(0).unwrap().unwrap(), data);
+            assert_eq!(row.get_into::<_, types::Bytes>(0).unwrap().unwrap(), data);
         }
     }
 }
