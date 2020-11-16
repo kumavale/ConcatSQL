@@ -12,14 +12,20 @@ pub(crate) mod connection;
 ///
 /// # Examples
 ///
-/// ```should_panic
+/// ```
+/// # fn main() {
+/// #     test().ok();
+/// # }
+/// # fn test() -> Result<(), concatsql::Error> {
 /// // Open a new connection to an in-memory.
-/// let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// let conn = concatsql::sqlite::open(":memory:")?;
 /// // Open a new connection from path of literal.
-/// let conn = concatsql::sqlite::open("/path/to/db").unwrap();
+/// let conn = concatsql::sqlite::open("/path/to/db")?;
 /// // Open a new connection from std::path::Path.
 /// let path = std::path::Path::new("/path/to/db");
-/// let conn = concatsql::sqlite::open(path).unwrap();
+/// let conn = concatsql::sqlite::open(path)?;
+/// # Ok(())
+/// # }
 /// ```
 #[inline]
 pub fn open<'a, T: AsRef<Path>>(path: T) -> Result<Connection<'a>> {

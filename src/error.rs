@@ -8,6 +8,8 @@ pub enum Error {
     AnyError,
     /// Return value when [get_into](./struct.Row.html#method.get_into) method fails.
     ParseError,
+    /// Return value when [get_into](./struct.Row.html#method.get_into) method fails.
+    ColumnNotFound,
 }
 
 /// Change the output error message.
@@ -56,9 +58,10 @@ impl Error {
 impl ToString for Error {
     fn to_string(&self) -> String {
         match self {
-            Error::Message(s) => s.to_string(),
-            Error::AnyError =>   String::from("AnyError"),
-            Error::ParseError => String::from("ParseError"),
+            Error::Message(s) =>     s.to_string(),
+            Error::AnyError =>       String::from("AnyError"),
+            Error::ParseError =>     String::from("ParseError"),
+            Error::ColumnNotFound => String::from("ColumnNotFound"),
         }
     }
 }

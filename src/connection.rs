@@ -160,32 +160,6 @@ impl<'a> Connection<'a> {
         self.conn.rows_inner(query.as_str(), &*self.error_level.borrow())
     }
 
-    /// Does not escape.  
-    /// Don't use if the value entered is unreliable (e.g. entered by user).  
-    ///
-    /// # Danger
-    ///
-    /// ```
-    /// # use concatsql::prelude::*;
-    /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// # let stmt = r#"CREATE TABLE users (name TEXT, age INTEGER);
-    /// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
-    /// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#;
-    /// # conn.execute(stmt).unwrap();
-    /// let age = String::from("42 or 1=1; --");  // input by attcker
-    /// let sql = prep!("SELECT name FROM users WHERE age < ") + unsafe { conn.without_escape(&age) };
-    /// assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age < 42 or 1=1; --");
-    /// assert!(conn.rows(&sql).is_ok());
-    /// ```
-    ///
-    /// # Safety
-    ///
-    /// - Use trusted values
-    /// - Use in an environment where SQL injection does not occur
-    pub unsafe fn without_escape<T: ?Sized + ToString>(&self, query: &T) -> WrapString {
-        WrapString::new(query)
-    }
-
     /// Sets the error level.  
     /// The default value is [ErrorLevel](./enum.ErrorLevel.html)::Develop for debug builds and [ErrorLevel](./enum.ErrorLevel.html)::Release for release builds.
     ///
@@ -222,5 +196,32 @@ impl<'a> Drop for Connection<'a> {
             ConnKind::PostgreSQL => {}
         }
     }
+}
+
+/// Does not escape.
+///
+/// Don't use if the value entered is unreliable (e.g. entered by user).  
+///
+/// # Danger
+///
+/// ```
+/// # use concatsql::prelude::*;
+/// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// # let stmt = r#"CREATE TABLE users (name TEXT, age INTEGER);
+/// #               INSERT INTO users (name, age) VALUES ('Alice', 42);
+/// #               INSERT INTO users (name, age) VALUES ('Bob',   69);"#;
+/// # conn.execute(stmt).unwrap();
+/// let age = String::from("42 or 1=1; --");  // input by attcker
+/// let sql = prep!("SELECT name FROM users WHERE age < ") + unsafe { without_escape(&age) };
+/// assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age < 42 or 1=1; --");
+/// assert!(conn.rows(&sql).is_ok());
+/// ```
+///
+/// # Safety
+///
+/// - Use trusted values
+/// - Use in an environment where SQL injection does not occur
+pub unsafe fn without_escape<T: ?Sized + ToString>(query: &T) -> WrapString {
+    WrapString::new(query)
 }
 

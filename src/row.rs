@@ -38,7 +38,7 @@ impl Row {
     }
 
     /// Transforms and gets the columns of the result row.  
-    /// &#x26a0;&#xfe0f; If column is not found then execute `U::from_str("")`.
+    /// &#x26a0;&#xfe0f; If column is NULL then execute `U::from_str("")`.
     ///
     /// # Examples
     ///
@@ -74,7 +74,6 @@ impl Row {
     }
 
     /// Get all the column names.  
-    /// Column order is not guaranteed.
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
         self.pairs.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
@@ -93,7 +92,7 @@ impl Get for str {
     }
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
+        U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
     }
 }
 
@@ -103,7 +102,7 @@ impl Get for usize {
     }
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
+        U::from_sql(pairs.get_index(*self).ok_or(Error::ColumnNotFound)?.1.as_deref().unwrap_or(""))
     }
 }
 
@@ -177,6 +176,7 @@ impl FromSql for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::*;
 
     #[test]
     fn row() {
@@ -211,11 +211,11 @@ mod tests {
         assert!(row.get_into::<&str, u32>("key1").is_err());
         assert!(row.get_into::<&str, u32>("key2").is_err());
         assert!(row.get_into::<&str, u32>("key4").is_err());
-        assert!(!row.get_into::<&str, String>("key4").is_err());  // I want to make result to Err
+        assert!(row.get_into::<&str, String>("key4").is_err());
         assert!(row.get_into::<usize, u32>(0).is_err());
         assert!(row.get_into::<usize, u32>(1).is_err());
         assert!(row.get_into::<usize, u32>(99).is_err());
-        assert!(!row.get_into::<usize, String>(99).is_err());  // I want to make result to Err
+        assert!(row.get_into::<usize, String>(99).is_err());
 
         assert_eq!(row.get_into::<_, String>("key1"), Ok(String::from("value")));
         assert_eq!(row.get_into::<_, i32>("key3"), Ok(42));
@@ -232,11 +232,11 @@ mod tests {
         assert!(row.get_into::<_, u32>("key1").is_err());
         assert!(row.get_into::<_, u32>("key2").is_err());
         assert!(row.get_into::<_, u32>("key4").is_err());
-        assert!(!row.get_into::<_, String>("key4").is_err());  // I want to make result to Err
+        assert!(row.get_into::<_, String>("key4").is_err());
         assert!(row.get_into::<_, u32>(0).is_err());
         assert!(row.get_into::<_, u32>(1).is_err());
         assert!(row.get_into::<_, u32>(99).is_err());
-        assert!(!row.get_into::<_, String>(99).is_err());  // I want to make result to Err
+        assert!(row.get_into::<_, String>(99).is_err());
 
         assert_eq!(row.column_count(), 3);
 
@@ -266,6 +266,9 @@ mod tests {
         assert_eq!(row.get_into::<_, u128>("ABC"),  Ok(414243));
         assert_eq!(row.get_into::<_, isize>("ABC"), Ok(414243));
         assert_eq!(row.get_into::<_, usize>("ABC"), Ok(414243));
+
+        assert_eq!(row.get_into::<_, u8>("ABC"), Err(Error::ParseError));
+        assert_eq!(row.get_into::<_, u8>("def"), Err(Error::ColumnNotFound));
     }
 }
 

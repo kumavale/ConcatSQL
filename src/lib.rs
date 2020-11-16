@@ -50,7 +50,7 @@ pub mod mysql;
 #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres;
 
-pub use crate::connection::{Connection, SafeStr};
+pub use crate::connection::{Connection, SafeStr, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
@@ -69,7 +69,7 @@ pub mod prelude {
     #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     pub use crate::postgres;
 
-    pub use crate::connection::{Connection, SafeStr};
+    pub use crate::connection::{Connection, SafeStr, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
     pub use crate::wrapstring::{WrapString, ToWrapString};
