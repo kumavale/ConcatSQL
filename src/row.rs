@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use indexmap::map::IndexMap;
+use crate::error::Error;
 
 type IndexMapPairs = IndexMap<String, Option<String>>;
 
@@ -56,7 +57,7 @@ impl Row {
     /// }
     /// ```
     #[inline]
-    pub fn get_into<T: Get, U: FromStr>(&self, key: T) -> Result<U, <U as std::str::FromStr>::Err> {
+    pub fn get_into<T: Get, U: FromSql>(&self, key: T) -> Result<U, Error> {
         key.get_into::<U>(&self.pairs)
     }
 
@@ -83,7 +84,7 @@ impl Row {
 /// A trait implemented by types that can index into columns of a row.
 pub trait Get {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
-    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err>;
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error>;
 }
 
 impl Get for str {
@@ -91,8 +92,8 @@ impl Get for str {
         pairs.get(self)?.as_deref()
     }
 
-    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
-        U::from_str(pairs.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+        U::from_sql(pairs.get(self).unwrap_or(&None).as_deref().unwrap_or(""))
     }
 }
 
@@ -101,8 +102,8 @@ impl Get for usize {
         pairs.get_index(*self)?.1.as_deref()
     }
 
-    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
-        U::from_str(pairs.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+        U::from_sql(pairs.get_index(*self).unwrap_or((&String::new(), &None)).1.as_deref().unwrap_or(""))
     }
 }
 
@@ -111,29 +112,65 @@ impl<'b, T> Get for &'b T where T: Get + ?Sized {
         T::get(self, &pairs)
     }
 
-    fn get_into<'a, U: FromStr>(&self, pairs: &'a IndexMapPairs) -> Result<U, <U as std::str::FromStr>::Err> {
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         T::get_into(self, &pairs)
     }
 }
 
-pub mod types {
-    #[derive(Clone, Debug, PartialEq)]
-    pub struct Bytes(pub Vec<u8>);
-    impl Bytes {
-        pub fn unwrap(self) -> Vec<u8> { self.0 }
-    }
+/// Parse a value from a sql string.
+pub trait FromSql: Sized {
+    fn from_sql(s: &str) -> Result<Self, Error>;
 }
 
-impl FromStr for types::Bytes {
-    type Err = std::num::ParseIntError;
+macro_rules! from_sql_impl {
+    ( $($t:ty),* ) => {$(
+        impl FromSql for $t {
+            #[doc(hidden)]
+            fn from_sql(s: &str) -> Result<Self, Error> {
+                Self::from_str(s).map_err(|_|Error::ParseError)
+            }
+        }
+    )*};
+    ( $($t:ty,)* ) => { from_sql_impl! { $( $t ),* } };
+}
+from_sql_impl! {
+    std::net::IpAddr,
+    std::net::SocketAddr,
+    bool,
+    char,
+    f32, f64,
+    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, u128, usize,
+    std::ffi::OsString,
+    std::net::Ipv4Addr,
+    std::net::Ipv6Addr,
+    std::net::SocketAddrV4,
+    std::net::SocketAddrV6,
+    std::num::NonZeroI8,
+    std::num::NonZeroI16,
+    std::num::NonZeroI32,
+    std::num::NonZeroI64,
+    std::num::NonZeroI128,
+    std::num::NonZeroIsize,
+    std::num::NonZeroU8,
+    std::num::NonZeroU16,
+    std::num::NonZeroU32,
+    std::num::NonZeroU64,
+    std::num::NonZeroU128,
+    std::num::NonZeroUsize,
+    std::path::PathBuf,
+    String,
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(types::Bytes(
+impl FromSql for Vec<u8> {
+    #[doc(hidden)]
+    fn from_sql(s: &str) -> Result<Self, Error> {
+        Ok(
             (0..s.len())
             .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i+2], 16))
-            .collect::<Result<Vec<u8>, Self::Err>>()?
-        ))
+            .map(|i| u8::from_str_radix(&s[i..i+2], 16).map_err(|_|()))
+            .collect::<Result<Vec<u8>, ()>>().map_err(|_|Error::ParseError)?
+        )
     }
 }
 
@@ -214,6 +251,21 @@ mod tests {
         assert_eq!(row.get(&&&&&&&&"key1"), Some("value"));
         assert_eq!(row.get(&*String::from("key1")), Some("value"));
         assert_eq!(row.get(&0), Some("value"));
+
+        row.insert("ABC".to_string(), Some("414243".to_string()));
+        assert_eq!(row.get_into::<_, Vec<u8>>("ABC"), Ok(vec![b'A',b'B',b'C']));
+        assert!(row.get_into::<_, i8>("ABC").is_err());
+        assert!(row.get_into::<_, u8>("ABC").is_err());
+        assert!(row.get_into::<_, i16>("ABC").is_err());
+        assert!(row.get_into::<_, u16>("ABC").is_err());
+        assert_eq!(row.get_into::<_, i32>("ABC"),   Ok(414243));
+        assert_eq!(row.get_into::<_, u32>("ABC"),   Ok(414243));
+        assert_eq!(row.get_into::<_, i64>("ABC"),   Ok(414243));
+        assert_eq!(row.get_into::<_, u64>("ABC"),   Ok(414243));
+        assert_eq!(row.get_into::<_, i128>("ABC"),  Ok(414243));
+        assert_eq!(row.get_into::<_, u128>("ABC"),  Ok(414243));
+        assert_eq!(row.get_into::<_, isize>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, usize>("ABC"), Ok(414243));
     }
 }
 

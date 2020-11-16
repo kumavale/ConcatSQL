@@ -6,6 +6,8 @@ pub enum Error {
     Message(String),
     /// An any errors.
     AnyError,
+    /// Return value when [get_into](./struct.Row.html#method.get_into) method fails.
+    ParseError,
 }
 
 /// Change the output error message.
@@ -56,6 +58,7 @@ impl ToString for Error {
         match self {
             Error::Message(s) => s.to_string(),
             Error::AnyError =>   String::from("AnyError"),
+            Error::ParseError => String::from("ParseError"),
         }
     }
 }

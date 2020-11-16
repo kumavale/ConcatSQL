@@ -88,38 +88,46 @@ impl ConcatsqlConn for ffi::sqlite3 {
             if result == ffi::SQLITE_OK {
                 let column_count = ffi::sqlite3_column_count(stmt);
 
-                while ffi::sqlite3_step(stmt) == ffi::SQLITE_ROW {
-                    let mut pairs = Vec::with_capacity(column_count as usize);
+                loop {
+                    match ffi::sqlite3_step(stmt) {
+                        ffi::SQLITE_DONE => break,
+                        ffi::SQLITE_ROW => {
+                            let mut pairs = Vec::with_capacity(column_count as usize);
 
-                    for i in 0..(column_count as i32) {
-                        let column_name = {
-                            let column_name = ffi::sqlite3_column_name(stmt, i);
-                            std::str::from_utf8(CStr::from_ptr(column_name).to_bytes()).unwrap()
-                        };
-                        let value = {
-                            match ffi::sqlite3_column_type(stmt, i) {
-                                ffi::SQLITE_BLOB => {
-                                    let ptr = ffi::sqlite3_column_blob(stmt, i);
-                                    let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
-                                    let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
-                                    Some(Box::leak(crate::parser::to_hex(&bytes).into_boxed_str()) as &str)
-                                },
-                                ffi::SQLITE_TEXT | ffi::SQLITE_INTEGER | ffi::SQLITE_FLOAT => {
-                                    let ptr = ffi::sqlite3_column_text(stmt, i) as *const i8;
-                                    let value = String::from_utf8_lossy(CStr::from_ptr(ptr).to_bytes()).into_owned();
-                                    Some(Box::leak(value.into_boxed_str()) as &str)
-                                }
-                                _ => {
-                                    None
-                                }
+                            for i in 0..(column_count as i32) {
+                                let column_name = {
+                                    let column_name = ffi::sqlite3_column_name(stmt, i);
+                                    std::str::from_utf8(CStr::from_ptr(column_name).to_bytes()).unwrap()
+                                };
+                                let value = {
+                                    match ffi::sqlite3_column_type(stmt, i) {
+                                        ffi::SQLITE_BLOB => {
+                                            let ptr = ffi::sqlite3_column_blob(stmt, i);
+                                            let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
+                                            let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
+                                            Some(Box::leak(crate::parser::to_hex(&bytes).into_boxed_str()) as &str)
+                                        },
+                                        ffi::SQLITE_INTEGER |
+                                        ffi::SQLITE_FLOAT   |
+                                        ffi::SQLITE_TEXT    => {
+                                            let ptr = ffi::sqlite3_column_text(stmt, i) as *const i8;
+                                            Some(std::str::from_utf8(CStr::from_ptr(ptr).to_bytes()).unwrap())
+                                        }
+                                        _ => None
+                                    }
+                                };
+                                pairs.push((column_name, value));
                             }
-                        };
-                        pairs.push((column_name, value));
-                    }
 
-                    if !callback(&pairs) {
-                        ffi::sqlite3_finalize(stmt);
-                        return Ok(());
+                            if !callback(&pairs) {
+                                break;
+                            }
+                        }
+                        _ => {
+                            ffi::sqlite3_finalize(stmt);
+                            return Error::new(&error_level, "exec error",
+                                &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+                        }
                     }
                 }
 

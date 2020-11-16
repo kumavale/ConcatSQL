@@ -359,7 +359,7 @@ mod mysql {
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
         conn.execute(&sql).unwrap();
         for row in conn.rows("SELECT data FROM b").unwrap() {
-            assert_eq!(row.get_into::<_, types::Bytes>(0).unwrap().unwrap(), data);
+            assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
     }
 }
