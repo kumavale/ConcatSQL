@@ -1,4 +1,4 @@
-//! Interface to [SQLite](https://www.sqlite.org) of OverwriteSQL.
+//! Interface to [SQLite](https://www.sqlite.org) of ConcatSQL.
 
 use std::path::Path;
 use crate::Result;

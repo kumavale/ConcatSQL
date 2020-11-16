@@ -1,4 +1,4 @@
-//! Interface to [PostgreSQL](https://www.postgresql.org/) of OverwriteSQL.
+//! Interface to [PostgreSQL](https://www.postgresql.org/) of ConcatSQL.
 
 pub(crate) mod connection;
 
