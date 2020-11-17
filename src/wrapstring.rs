@@ -46,12 +46,11 @@ impl WrapString {
     /// assert_eq!(prep!("O''Reilly").actual_sql(),    "\"O''Reilly\", []");
     /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"\"O'Reilly\"\", []");
     /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "\"foo?\", [\"bar\"]");
-    /// assert_eq!((prep!("foo")+42).actual_sql(),     "\"foo?\", [\"42\"]");
+    /// assert_eq!((prep!("foo")+42i32).actual_sql(),  "\"foo?\", [42]");
     /// assert_eq!((prep!("foo")+"42").actual_sql(),   "\"foo?\", [\"42\"]");
     /// assert_eq!((prep!()+"O'Reilly").actual_sql(),  "\"?\", [\"O'Reilly\"]");
     /// ```
     pub fn actual_sql(&self) -> String {
-        // temporary
         let params = {
             let mut params = "[".to_string();
             for (i, param) in self.params.iter().enumerate() {
@@ -272,6 +271,36 @@ impl Add<f64> for WrapString {
     }
 }
 
+macro_rules! impl_add_Option_for_WrapString {
+    ( $($t:ty),* ) => {$(
+        impl Add<Option<$t>> for WrapString {
+            type Output = WrapString;
+            #[inline]
+            fn add(mut self, other: Option<$t>) -> WrapString {
+                match other {
+                    Some(other) => self.add(other),
+                    None => {
+                        self.query .push(None);
+                        self.params.push(Value::Null);
+                        self
+                    }
+                }
+            }
+        }
+    )*};
+    ( $($t:ty,)* ) => { impl_add_Option_for_WrapString!{ $( $t ),* } }
+}
+
+impl_add_Option_for_WrapString! {
+    String,
+    &str,
+    std::borrow::Cow<'_, str>,
+    Vec<u8>,
+    u8, u16, u32, u64, u128, usize,
+    i8, i16, i32, i64, i128, isize,
+    f32, f64,
+}
+
 ///// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 /// TODO
 pub trait IntoWrapString {
@@ -326,6 +355,10 @@ mod tests {
         }
         let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
         assert_eq!(sql.actual_sql(), "\"????\", [\"A\", \"B\", \"C\", \"D\"]");
+        let x: Option<i32> = Some(42);
+        let y: Option<i32> = None;
+        let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + x + y;
+        assert_eq!(sql.actual_sql(), "\"A??????\", [\"B\", \"C\", 0, 3.14, 42, Null]");
     }
 
     mod actual_sql {

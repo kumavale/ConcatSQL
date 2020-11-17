@@ -104,7 +104,6 @@ mod sqlite {
         let age = "50";
         let sql = prep!("SELECT name FROM users WHERE ") +
             &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
-        dbg!(sql.actual_sql());
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {

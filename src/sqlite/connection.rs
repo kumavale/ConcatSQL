@@ -44,13 +44,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 
 impl ConcatsqlConn for ffi::sqlite3 {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let mut query = String::new();
-        for part in &ws.query {
-            match part {
-                Some(s) => query.push_str(&s),
-                None => query.push('?'),
-            }
-        }
+        let query = ws.compile();
 
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
