@@ -55,7 +55,7 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(prep!(sql).actual_sql(), "SELECT name FROM users");
+        assert_eq!(prep!(sql).actual_sql(), "\"SELECT name FROM users\", []");
     }
 
     #[test]
@@ -104,6 +104,7 @@ mod sqlite {
         let age = "50";
         let sql = prep!("SELECT name FROM users WHERE ") +
             &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
+        dbg!(sql.actual_sql());
 
         let mut i = 0;
         conn.iterate(&sql, |pairs| {
@@ -152,7 +153,7 @@ mod sqlite {
         let sql = prep!("select age from users where name = ") + name + &prep!("");
         assert_eq!(
             sql.actual_sql(),
-            "select age from users where name = '''Alice''; DROP TABLE users; --'"
+            "\"select age from users where name = ?\", [\"'Alice'; DROP TABLE users; --\"]"
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -206,66 +207,47 @@ mod sqlite {
     fn error_level_AlwaysOk() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      Ok(()));
-        assert_eq!(conn.execute(&endless),                          Ok(()));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), Ok(()));
-        assert_eq!(conn.rows(&invalid_sql),                         Ok(vec![]));
-        assert_eq!(conn.rows(&endless),                             Ok(vec![]));
+        assert_eq!(conn.execute(invalid_sql),                      Ok(()));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), Ok(()));
+        assert_eq!(conn.rows(invalid_sql),                         Ok(vec![]));
     }
 
     #[test]
     fn error_level_release() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Release);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!());
-        assert_eq!(conn.execute(&endless),                          err!());
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!());
-        assert_eq!(conn.rows(&invalid_sql),                         err!());
-        assert_eq!(conn.rows(&endless),                             err!());
+        assert_eq!(conn.execute(invalid_sql),                      err!());
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!());
+        assert_eq!(conn.rows(invalid_sql),                         err!());
     }
 
     #[test]
     fn error_level_develop() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Develop);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!("exec error"));
-        assert_eq!(conn.execute(&endless),                          err!("exec error"));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.rows(&invalid_sql),                         err!("exec error"));
-        assert_eq!(conn.rows(&endless),                             err!("exec error"));
+        assert_eq!(conn.execute(invalid_sql),                      err!("exec error"));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!("exec error"));
+        assert_eq!(conn.rows(invalid_sql),                         err!("exec error"));
     }
 
     #[test]
     fn error_level_debug() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),
-            err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.execute(&endless),
-            err!("exec error: near \"\'\'\'endless\'\": syntax error"));
-        assert_eq!(conn.iterate(&invalid_sql, |_| unreachable!()),
-            err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.iterate(&endless,     |_| unreachable!()),
-            err!("exec error: near \"\'\'\'endless\'\": syntax error"));
-        assert_eq!(conn.rows(&invalid_sql),
-            err!("exec error: near \"\'INVALID SQL\'\": syntax error"));
-        assert_eq!(conn.rows(&endless),
-            err!("exec error: near \"\'\'\'endless\'\": syntax error"));
+        assert_eq!(conn.execute(invalid_sql),
+            err!("exec error: near \"INVALID_SQL\": syntax error"));
+        assert_eq!(conn.iterate(invalid_sql, |_| unreachable!()),
+            err!("exec error: near \"INVALID_SQL\": syntax error"));
+        assert_eq!(conn.rows(invalid_sql),
+            err!("exec error: near \"INVALID_SQL\": syntax error"));
     }
 
     #[test]
@@ -283,9 +265,12 @@ mod sqlite {
     #[test]
     fn prep_into_rows() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
+        let mut executed = false;
         for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
-            assert_eq!(row.get("1").unwrap(), "1");
+            executed = true;
+            assert_eq!(row.get(0).unwrap(), "1");
         }
+        assert!(executed);
     }
 
     #[test]
@@ -324,7 +309,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A%";
-        let sql = prep!("SELECT * FROM users WHERE name LIKE") + name + prep!(";");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + name + prep!(";");
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -336,21 +321,17 @@ mod sqlite {
 
         let name = "A";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%A%\"]");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
-        if cfg!(feature="mysql") || cfg!(feature="postgres") {
-            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
-        } else {
-            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
-        }
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%\\%A\\%%\"]");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%$%A$%%\"]");
         conn.execute(&sql).unwrap();
     }
 
@@ -359,7 +340,7 @@ mod sqlite {
         let conn = prepare();
 
         let name = "A?['i]*";
-        let sql = prep!("SELECT * FROM users WHERE name GLOB") + name + prep!(";");
+        let sql = prep!("SELECT * FROM users WHERE name GLOB ") + name;
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -418,37 +399,32 @@ mod sqlite {
         for _ in conn.rows(&sql).unwrap() { unreachable!(); }
     }
 
-    mod should_panic {
-        use concatsql::prelude::*;
-        use super::stmt;
+    #[test]
+    fn sql_injection() {
+        let conn = prepare();
 
-        #[test]
-        #[should_panic = "exec error"]
-        fn literal() {
-            let conn = concatsql::sqlite::open(":memory:").unwrap();
-            let stmt = prep!(stmt());
-
-            conn.execute(&stmt).unwrap();
-
-            let sql = "select * from users;";
-
-            conn.iterate(sql.to_wrapstring(), |_| { true }).unwrap();
+        let name = "' OR 1=2; SELECT 1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
         }
 
-        #[test]
-        #[cfg(debug_assertions)]
-        #[should_panic = "invalid literal"]
-        fn sqli_enable() {
-            let conn = concatsql::sqlite::open(":memory:").unwrap();
-            let stmt = prep!(stmt());
-            conn.execute(&stmt).unwrap();
+        let name = "' OR 1=1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
 
-            let name = "OR 1=2; SELECT 1; --";
-            let sql = prep!("select age from users where name = '") + name + &prep!("';");
+        let name = "Alice";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
 
-            for row in conn.rows(&sql).unwrap() {
-                assert_eq!(row.get(0).unwrap(), "1");
-            }
+        let name = "'' OR 1=1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = ") + name;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
         }
     }
 }

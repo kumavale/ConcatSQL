@@ -5,13 +5,13 @@ use std::cell::RefCell;
 use crate::Result;
 use crate::ErrorLevel;
 use crate::row::Row;
-use crate::wrapstring::WrapString;
+use crate::wrapstring::{WrapString, IntoWrapString};
 
 pub(crate) trait ConcatsqlConn {
-    fn execute_inner(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<()>;
-    fn iterate_inner(&self, query: &str, error_level: &crate::ErrorLevel,
+    fn execute_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
+    fn iterate_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
-    fn rows_inner(&self, query: &str, error_level: &crate::ErrorLevel) -> Result<Vec<Row>>;
+    fn rows_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<Vec<Row>>;
     fn kind(&self) -> ConnKind;
 }
 
@@ -45,50 +45,6 @@ impl<'a> fmt::Debug for Connection<'a> {
     }
 }
 
-impl AsRef<WrapString> for WrapString {
-    #[inline]
-    fn as_ref(&self) -> &WrapString {
-        self
-    }
-}
-
-/// Hard-coded string or escaped string.
-///
-/// - &'static [str](https://doc.rust-lang.org/std/primitive.str.html)
-/// - [WrapString](./struct.WrapString.html)
-/// - &[WrapString](./struct.WrapString.html)
-pub trait SafeStr {
-    /// Extracts a string slice containing the entire [WrapString](./struct.WrapString.html).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use concatsql::prelude::*;
-    /// let s = prep!("foo");
-    ///
-    /// assert_eq!("foo", s.as_str());
-    /// ```
-    fn as_str(&self) -> &str;
-}
-impl SafeStr for &'static str {
-    #[doc(hidden)]
-    fn as_str(&self) -> &str {
-        self
-    }
-}
-impl SafeStr for WrapString {
-    #[doc(hidden)]
-    fn as_str(&self) -> &str {
-        &self.query
-    }
-}
-impl SafeStr for &WrapString {
-    #[doc(hidden)]
-    fn as_str(&self) -> &str {
-        &self.query
-    }
-}
-
 impl<'a> Connection<'a> {
     /// Execute a statement without processing the resulting rows if any.
     ///
@@ -105,8 +61,8 @@ impl<'a> Connection<'a> {
     /// conn.execute(prep!("SELECT * FROM users;")).unwrap();
     /// ```
     #[inline]
-    pub fn execute<T: SafeStr>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(query.as_str(), &*self.error_level.borrow())
+    pub fn execute<T: IntoWrapString>(&self, query: T) -> Result<()> {
+        self.conn.execute_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -132,11 +88,11 @@ impl<'a> Connection<'a> {
     /// }).unwrap();
     /// ```
     #[inline]
-    pub fn iterate<T: SafeStr, F>(&self, query: T, mut callback: F) -> Result<()>
+    pub fn iterate<T: IntoWrapString, F>(&self, query: T, mut callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(query.as_str(), &*self.error_level.borrow(), &mut callback)
+        self.conn.iterate_inner(&query.into_wrapstring(), &*self.error_level.borrow(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -156,8 +112,8 @@ impl<'a> Connection<'a> {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<T: SafeStr>(&self, query: T) -> Result<Vec<Row>> {
-        self.conn.rows_inner(query.as_str(), &*self.error_level.borrow())
+    pub fn rows<T: IntoWrapString>(&self, query: T) -> Result<Vec<Row>> {
+        self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
     /// Sets the error level.  

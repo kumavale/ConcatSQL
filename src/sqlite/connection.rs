@@ -1,6 +1,6 @@
 extern crate sqlite3_sys as ffi;
 
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 use std::ptr;
 use std::path::Path;
 use std::pin::Pin;
@@ -10,6 +10,7 @@ use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a>> {
@@ -42,38 +43,86 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 }
 
 impl ConcatsqlConn for ffi::sqlite3 {
-    fn execute_inner(&self, s: &str, error_level: &ErrorLevel) -> Result<()> {
-        let query = match CString::new(s) {
-            Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", s),
-        };
-        let mut err_msg = ptr::null_mut();
-
-        unsafe {
-            ffi::sqlite3_exec(
-                self as *const _ as *mut _,
-                query.as_ptr(),
-                None,             // callback fn
-                ptr::null_mut(),  // callback arg
-                &mut err_msg,
-            );
+    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+        let mut query = String::new();
+        for part in &ws.query {
+            match part {
+                Some(s) => query.push_str(&s),
+                None => query.push('?'),
+            }
         }
 
-        if err_msg.is_null() {
+        let query = match CString::new(query.as_bytes()) {
+            Ok(string) => string,
+            _ => return Error::new(&error_level, "invalid query", query),
+        };
+
+        let mut stmt = ptr::null_mut();
+
+        if ws.params.is_empty() {
+            let mut err_msg = ptr::null_mut();
+            unsafe {
+                ffi::sqlite3_exec(
+                    self as *const _ as *mut _,
+                    query.as_ptr(),
+                    None,             // callback fn
+                    ptr::null_mut(),  // callback arg
+                    &mut err_msg,
+                );
+            }
+
+            if err_msg.is_null() {
+                return Ok(());
+            } else {
+                return Error::new(&error_level, "exec error",
+                    unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() });
+            }
+        }
+
+        unsafe {
+            let result = ffi::sqlite3_prepare_v2(
+                self as *const _ as *mut _,
+                query.as_ptr(),
+                -1,
+                &mut stmt,
+                ptr::null_mut(),
+            );
+
+            if result != ffi::SQLITE_OK {
+                ffi::sqlite3_finalize(stmt);
+                return Error::new(&error_level, "exec error",
+                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+            }
+
+            bind_all(stmt, ws, error_level)?;
+
+            loop {
+                match ffi::sqlite3_step(stmt) {
+                    ffi::SQLITE_DONE => break,
+                    ffi::SQLITE_ROW => (),  // Do nothing
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "exec error",
+                            &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+                    }
+                }
+            }
+
+            ffi::sqlite3_finalize(stmt);
             Ok(())
-        } else {
-            Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() })
         }
     }
 
-    fn iterate_inner(&self, s: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = match CString::new(s) {
+        let query = ws.compile();
+
+        let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", s),
+            _ => return Error::new(&error_level, "invalid query", query),
         };
+
         let mut stmt = ptr::null_mut();
 
         unsafe {
@@ -90,6 +139,8 @@ impl ConcatsqlConn for ffi::sqlite3 {
                 return Error::new(&error_level, "exec error",
                     &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
             }
+
+            bind_all(stmt, ws, error_level)?;
 
             let column_count = ffi::sqlite3_column_count(stmt) as i32;
 
@@ -116,10 +167,10 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
-    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+    fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
         let mut rows: Vec<Row> = Vec::new();
 
-        self.iterate_inner(query, error_level, &mut |pairs: &[(&str, Option<&str>)]| {
+        self.iterate_inner(ws, error_level, &mut |pairs: &[(&str, Option<&str>)]| {
             let mut row = Row::new();
             for (column, value) in pairs.iter() {
                 row.insert(column.to_string(), value.map(|v| v.to_string()));
@@ -166,6 +217,74 @@ impl Storing for Vec<(&str, Option<&str>)> {
             self.push((column_name, value));
         }
     }
+}
+
+unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+    for (index, param) in (1i32..).zip(ws.params.iter()) {
+        match param {
+            Value::Null => {
+                ffi::sqlite3_bind_null(stmt, index);
+            }
+            Value::I32(value) => {
+                ffi::sqlite3_bind_int(stmt, index, *value);
+            }
+            Value::I64(value) => {
+                ffi::sqlite3_bind_int64(stmt, index, *value);
+            }
+            Value::I128(value) => {
+                let value = value.to_string();
+                let len = value.as_bytes().len();
+                let value = match CString::new(value.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", value);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+            Value::F32(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value as f64);
+            }
+            Value::F64(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value);
+            }
+            Value::Text(value) => {
+                let len = value.as_bytes().len();
+                let value = match CString::new(value.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", value);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+            Value::Bytes(value) => {
+                ffi::sqlite3_bind_blob(
+                    stmt,
+                    index,
+                    value.as_ptr() as *const _,
+                    value.len() as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -222,11 +341,10 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn actual_sql() {
-        assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
-        assert_eq!(prep!("O''Reilly").actual_sql(), "O''Reilly");
-        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
-
-        //crate::prep!("O'Reilly").actual_sql();      // panic
+        assert_eq!(prep!("SELECT").actual_sql(), "\"SELECT\", []");
+        assert_eq!(prep!("O''Reilly").actual_sql(), "\"O''Reilly\", []");
+        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"\"O'Reilly\"\", []");
+        assert_eq!(prep!("O'Reilly").actual_sql(), "\"O'Reilly\", []");
     }
 
     #[test]

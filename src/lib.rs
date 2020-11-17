@@ -50,11 +50,11 @@ pub mod mysql;
 #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres;
 
-pub use crate::connection::{Connection, SafeStr, without_escape};
+pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
-pub use crate::wrapstring::{WrapString, ToWrapString, Num};
+pub use crate::wrapstring::{WrapString, IntoWrapString};
 
 pub mod prelude {
     //! Re-exports important traits and types.
@@ -69,10 +69,10 @@ pub mod prelude {
     #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     pub use crate::postgres;
 
-    pub use crate::connection::{Connection, SafeStr, without_escape};
+    pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::{WrapString, ToWrapString};
+    pub use crate::wrapstring::{WrapString, IntoWrapString};
 }
 
 /// A typedef of the result returned by many methods.
@@ -133,16 +133,16 @@ macro_rules! prep {
     ($query:expr) => {
         {
             // I want to make an error at compile time...
-            static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
-            INITIAL_CHECK.call_once(|| {
-                if let Err(detail) = concatsql::check_valid_literal($query) {
-                    eprintln!("{}{}:{}", concatsql::invalid_literal(), file!(), line!());
-                    eprintln!("{}", detail.to_string());
+            //static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
+            //INITIAL_CHECK.call_once(|| {
+            //    if let Err(detail) = concatsql::check_valid_literal($query) {
+            //        eprintln!("{}{}:{}", concatsql::invalid_literal(), file!(), line!());
+            //        eprintln!("{}", detail.to_string());
 
-                    #[cfg(debug_assertions)]
-                    panic!("invalid literal");
-                }
-            });
+            //        #[cfg(debug_assertions)]
+            //        panic!("invalid literal");
+            //    }
+            //});
             concatsql::WrapString::init($query)
         }
     };
