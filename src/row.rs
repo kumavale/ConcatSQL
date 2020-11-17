@@ -73,6 +73,12 @@ impl Row {
         self.pairs.len() == 0
     }
 
+    /// Get the column name.  
+    #[inline]
+    pub fn column_name<T: Get>(&self, key: T) ->  Option<&str> {
+        key.get_key(&self.pairs)
+    }
+
     /// Get all the column names.  
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
@@ -84,6 +90,7 @@ impl Row {
 pub trait Get {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error>;
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
 }
 
 impl Get for str {
@@ -93,6 +100,24 @@ impl Get for str {
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_key_value(self)?.0)
+    }
+}
+
+impl Get for String {
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        pairs.get(self)?.as_deref()
+    }
+
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+        U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_key_value(self)?.0)
     }
 }
 
@@ -104,6 +129,10 @@ impl Get for usize {
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get_index(*self).ok_or(Error::ColumnNotFound)?.1.as_deref().unwrap_or(""))
     }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_index(*self)?.0)
+    }
 }
 
 impl<'b, T> Get for &'b T where T: Get + ?Sized {
@@ -113,6 +142,10 @@ impl<'b, T> Get for &'b T where T: Get + ?Sized {
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         T::get_into(self, &pairs)
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        T::get_key(self, &pairs)
     }
 }
 
@@ -251,6 +284,9 @@ mod tests {
         assert_eq!(row.get(&&&&&&&&"key1"), Some("value"));
         assert_eq!(row.get(&*String::from("key1")), Some("value"));
         assert_eq!(row.get(&0), Some("value"));
+        assert_eq!(row.get(String::from("key1")), Some("value"));
+        assert_eq!(row.get(&String::from("key1")), Some("value"));
+        assert_eq!(row.get(&&String::from("key1")), Some("value"));
 
         row.insert("ABC".to_string(), Some("414243".to_string()));
         assert_eq!(row.get_into::<_, Vec<u8>>("ABC"), Ok(vec![b'A',b'B',b'C']));
@@ -269,6 +305,11 @@ mod tests {
 
         assert_eq!(row.get_into::<_, u8>("ABC"), Err(Error::ParseError));
         assert_eq!(row.get_into::<_, u8>("def"), Err(Error::ColumnNotFound));
+
+        assert_eq!(row.column_name(0),       Some("key1"));
+        assert_eq!(row.column_name(99),      None);
+        assert_eq!(row.column_name("key1"),  Some("key1"));
+        assert_eq!(row.column_name("key99"), None);
     }
 }
 
