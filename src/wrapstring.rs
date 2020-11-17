@@ -87,6 +87,22 @@ impl Add<&&str> for WrapString {
     }
 }
 
+impl Add<std::borrow::Cow<'_, str>> for WrapString {
+    type Output = WrapString;
+    #[inline]
+    fn add(self, other: std::borrow::Cow<'_, str>) -> WrapString {
+        WrapString { query: self.query + &crate::parser::escape_string(&other) }
+    }
+}
+
+impl Add<&std::borrow::Cow<'_, str>> for WrapString {
+    type Output = WrapString;
+    #[inline]
+    fn add(self, other: &std::borrow::Cow<'_, str>) -> WrapString {
+        WrapString { query: self.query + &crate::parser::escape_string(other) }
+    }
+}
+
 // TODO:
 //     - sqlite: sqlite3_bind_blob()
 //     - mysql:
@@ -146,6 +162,7 @@ mod tests {
     #[test]
     #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op, clippy::approx_constant)]
     fn concat_anything_type() {
+        use std::borrow::Cow;
         let sql = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
         assert_eq!(sql.actual_sql(), "AB'C''D''E'F423.14");
         let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
@@ -162,6 +179,8 @@ mod tests {
         } else {
             assert_eq!(sql.actual_sql(), "'\\x414243''\\x000102'");
         }
+        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
+        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
     }
 
     #[test]

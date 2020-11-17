@@ -411,6 +411,13 @@ mod sqlite {
         }
     }
 
+    #[test]
+    fn question() {
+        let conn = prepare();
+        let sql = prep!("SELECT name FROM users WHERE name=") + "?";
+        for _ in conn.rows(&sql).unwrap() { unreachable!(); }
+    }
+
     mod should_panic {
         use concatsql::prelude::*;
         use super::stmt;

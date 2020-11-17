@@ -344,4 +344,11 @@ mod postgres {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
     }
+
+    #[test]
+    fn question() {
+        let conn = prepare();
+        let sql = prep!("SELECT name FROM users WHERE name=") + "?";
+        for _ in conn.rows(&sql).unwrap() { unreachable!(); }
+    }
 }
