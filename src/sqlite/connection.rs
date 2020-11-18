@@ -44,7 +44,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 
 impl ConcatsqlConn for ffi::sqlite3 {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = ws.compile();
+        let query = compile(ws);
 
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
@@ -110,7 +110,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = ws.compile();
+        let query = compile(ws);
 
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
@@ -179,6 +179,17 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn kind(&self) -> ConnKind {
         ConnKind::SQLite
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::new();
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(&s),
+            None =>    query.push('?'),
+        }
+    }
+    query
 }
 
 trait Storing {
@@ -335,10 +346,10 @@ mod tests {
     #[test]
     #[cfg(debug_assertions)]
     fn actual_sql() {
-        assert_eq!(prep!("SELECT").actual_sql(), "\"SELECT\", []");
-        assert_eq!(prep!("O''Reilly").actual_sql(), "\"O''Reilly\", []");
-        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"\"O'Reilly\"\", []");
-        assert_eq!(prep!("O'Reilly").actual_sql(), "\"O'Reilly\", []");
+        assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
+        assert_eq!(prep!("O''Reilly").actual_sql(), "O''Reilly");
+        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
+        assert_eq!(prep!("O'Reilly").actual_sql(), "O'Reilly");
     }
 
     #[test]

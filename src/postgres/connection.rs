@@ -9,6 +9,7 @@ use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(params: &str) -> Result<Connection> {
@@ -23,19 +24,44 @@ pub fn open(params: &str) -> Result<Connection> {
     })
 }
 
+macro_rules! to_sql {
+    ($value:expr) => (
+        match $value {
+            Value::Null         => &"NULL" as &(dyn postgres::types::ToSql + Sync),
+            Value::I32(value)   => value,
+            Value::I64(value)   => value,
+            Value::I128(_value) => unimplemented!(),
+            Value::F32(value)   => value,
+            Value::F64(value)   => value,
+            Value::Text(value)  => value,
+            Value::Bytes(value) => value,
+        }
+    );
+}
+
 impl ConcatsqlConn for RefCell<postgres::Client> {
-    fn execute_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
-        match self.borrow_mut().batch_execute(query) {
-            Ok(_) => Ok(()),
-            Err(e) => Error::new(error_level, "exec error", &e),
+    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+        let query = compile(ws);
+        if ws.params.is_empty() {
+            match self.borrow_mut().batch_execute(&query) {
+                Ok(_) => Ok(()),
+                Err(e) => Error::new(error_level, "exec error", &e),
+            }
+        } else {
+            let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
+            match self.borrow_mut().execute(&query as &str, &params[..]) {
+                Ok(_) => Ok(()),
+                Err(e) => Error::new(error_level, "exec error", &e),
+            }
         }
     }
 
-    fn iterate_inner(&self, query: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let mut conn = self.borrow_mut();
-        let rows = match conn.query(query, &[]) {
+        let query = compile(ws);
+        let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
+        let rows = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
             Err(e) => return Error::new(error_level, "exec error", &e),
         };
@@ -81,9 +107,10 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         Ok(())
     }
 
-    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
-        let mut conn = self.borrow_mut();
-        let result = match conn.query(query, &[]) {
+    fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+        let query = compile(ws);
+        let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
+        let result = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
             Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
         };
@@ -131,6 +158,21 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
     fn kind(&self) -> ConnKind {
         ConnKind::PostgreSQL
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::new();
+    let mut index = 1;
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(&s),
+            None => {
+                query.push_str(&format!("${}", index));
+                index += 1;
+            }
+        }
+    }
+    query
 }
 
 

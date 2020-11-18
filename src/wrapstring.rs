@@ -1,4 +1,5 @@
 use std::ops::Add;
+use crate::parser::{escape_string, to_binary_literal};
 
 /// TODO
 #[derive(Clone, Debug, PartialEq)]
@@ -42,44 +43,33 @@ impl WrapString {
     ///
     /// ```
     /// # use concatsql::prelude::*;
-    /// assert_eq!(prep!("SELECT").actual_sql(),       "\"SELECT\", []");
-    /// assert_eq!(prep!("O''Reilly").actual_sql(),    "\"O''Reilly\", []");
-    /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"\"O'Reilly\"\", []");
-    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "\"foo?\", [\"bar\"]");
-    /// assert_eq!((prep!("foo")+42i32).actual_sql(),  "\"foo?\", [42]");
-    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "\"foo?\", [\"42\"]");
-    /// assert_eq!((prep!()+"O'Reilly").actual_sql(),  "\"?\", [\"O'Reilly\"]");
+    /// assert_eq!(prep!("SELECT").actual_sql(),       "SELECT");
+    /// assert_eq!(prep!("O''Reilly").actual_sql(),    "O''Reilly");
+    /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
+    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "foo'bar'");
+    /// assert_eq!((prep!("foo")+42i32).actual_sql(),  "foo42");
+    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "foo'42'");
+    /// assert_eq!((prep!()+"O'Reilly").actual_sql(),  "'O''Reilly'");
     /// ```
     pub fn actual_sql(&self) -> String {
-        let params = {
-            let mut params = "[".to_string();
-            for (i, param) in self.params.iter().enumerate() {
-                if i != 0 {
-                    params.push_str(", ");
-                }
-                match param {
-                    Value::Null         => params.push_str("Null"),
-                    Value::I32(value)   => params.push_str(&value.to_string()),
-                    Value::I64(value)   => params.push_str(&value.to_string()),
-                    Value::I128(value)  => params.push_str(&value.to_string()),
-                    Value::F32(value)   => params.push_str(&value.to_string()),
-                    Value::F64(value)   => params.push_str(&value.to_string()),
-                    Value::Text(value)  => params.push_str(&format!("\"{}\"", value)),
-                    Value::Bytes(value) => params.push_str(&format!("{:?}", value)),
-                }
-            }
-            params.push(']');
-            params
-        };
-        format!("\"{}\", {}", self.compile(), params)
-    }
-
-    pub(crate) fn compile(&self) -> String {
         let mut query = String::new();
+        let mut index = 0;
         for part in &self.query {
             match part {
                 Some(s) => query.push_str(&s),
-                None =>    query.push('?'),
+                None => {
+                    match &self.params[index] {
+                        Value::Null         => query.push_str("NULL"),
+                        Value::I32(value)   => query.push_str(&value.to_string()),
+                        Value::I64(value)   => query.push_str(&value.to_string()),
+                        Value::I128(value)  => query.push_str(&value.to_string()),
+                        Value::F32(value)   => query.push_str(&value.to_string()),
+                        Value::F64(value)   => query.push_str(&value.to_string()),
+                        Value::Text(value)  => query.push_str(&escape_string(&value)),
+                        Value::Bytes(value) => query.push_str(&to_binary_literal(&value)),
+                    }
+                    index += 1;
+                }
             }
         }
         query
@@ -342,25 +332,25 @@ mod tests {
     fn concat_anything_type() {
         use std::borrow::Cow;
         let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
-        assert_eq!(sql.actual_sql(), "\"AB???F??\", [\"C\", \"D\", \"E\", 42, 3.14]");
+        assert_eq!(sql.actual_sql(), "AB'C''D''E'F423.14");
         let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
-        assert_eq!(sql.actual_sql(), "\"????\", [\"A\", \"B\", \"C\", \"D\"]");
+        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
         let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
-        assert_eq!(sql.actual_sql(), "\"????\", [\"A\", \"B\", \"C\", \"D\"]");
+        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
         let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5u128 + 6isize + 7i8 + 8i16 + 9i32 + 0i64 + 1i128 + 2f32 + 3f64;
-        assert_eq!(sql.actual_sql(), "\"??????????????\", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3]");
+        assert_eq!(sql.actual_sql(), "01234567890123");
         let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
-        assert_eq!(sql.actual_sql(), "\"???\", [340282350000000000000000000000000000000, inf, NaN]");
+        assert_eq!(sql.actual_sql(), "340282350000000000000000000000000000000infNaN");
         let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
         if cfg!(feature = "sqlite") || cfg!(feature = "mysql") {
-            assert_eq!(sql.actual_sql(), "\"??\", [[65, 66, 67], [0, 1, 2]]");
+            assert_eq!(sql.actual_sql(), "X'414243'X'000102'");
         } else {
-            assert_eq!(sql.actual_sql(), "\"$1$2\", [[65, 66, 67], [0, 1, 2]]");
+            assert_eq!(sql.actual_sql(), "'\\x414243''\\x000102'");
         }
         let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
-        assert_eq!(sql.actual_sql(), "\"????\", [\"A\", \"B\", \"C\", \"D\"]");
+        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
         let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
-        assert_eq!(sql.actual_sql(), "\"A???????\", [\"B\", \"C\", 0, 3.14, 42, Null, Null]");
+        assert_eq!(sql.actual_sql(), "A'B''C'03.1442NULLNULL");
     }
 
     mod actual_sql {
@@ -371,11 +361,11 @@ mod tests {
         fn double_quotaion_inside_double_quote() {
             assert_eq!(
                 (prep!() + r#"".ow(""inside str"") -> String""#).actual_sql(),
-                r#""?", ["".ow(""inside str"") -> String""]"#
+                r#"'".ow(""inside str"") -> String"'"#
             );
             assert_eq!(
                 (prep!() + r#"".ow("inside str") -> String""#).actual_sql(),
-                r#""?", ["".ow("inside str") -> String""]"#
+                r#"'".ow("inside str") -> String"'"#
             );
         }
 
@@ -383,11 +373,11 @@ mod tests {
         fn double_quotaion_inside_sigle_quote() {
             assert_eq!(
                 (prep!() + r#""I'm Alice""#).actual_sql(),
-                r#""?", [""I'm Alice""]"#
+                r#"'"I''m Alice"'"#
             );
             assert_eq!(
                 (prep!() + r#""I''m Alice""#).actual_sql(),
-                r#""?", [""I''m Alice""]"#
+                r#"'"I''''m Alice"'"#
             );
         }
 
@@ -395,7 +385,7 @@ mod tests {
         fn single_quotaion_inside_double_quote() {
             assert_eq!(
                 (prep!() + r#"'.ow("inside str") -> String'"#).actual_sql(),
-                r#""?", ["'.ow("inside str") -> String'"]"#
+                r#"'''.ow("inside str") -> String'''"#
             );
         }
 
@@ -403,7 +393,7 @@ mod tests {
         fn single_quotaion_inside_sigle_quote() {
             assert_eq!(
                 (prep!() + "'I''m Alice'").actual_sql(),
-                r#""?", ["'I''m Alice'"]"#
+                r#"'''I''''m Alice'''"#
             );
         }
 
@@ -411,7 +401,7 @@ mod tests {
         fn non_quotaion_inside_sigle_quote() {
             assert_eq!(
                 (prep!() + "foo'bar'foo").actual_sql(),
-                r#""?", ["foo'bar'foo"]"#
+                r#"'foo''bar''foo'"#
             );
         }
 
@@ -419,15 +409,15 @@ mod tests {
         fn non_quotaion_inside_double_quote() {
             assert_eq!(
                 (prep!() + r#"foo"bar"foo"#).actual_sql(),
-                r#""?", ["foo"bar"foo"]"#
+                r#"'foo"bar"foo'"#
             );
         }
 
         #[test]
         fn empty_string() {
-            assert_eq!(prep!().actual_sql(), "\"\", []");
-            assert_eq!(prep!("").actual_sql(), "\"\", []");
-            assert_eq!((prep!("") + "").actual_sql(), "\"?\", [\"\"]");
+            assert_eq!(prep!().actual_sql(), "");
+            assert_eq!(prep!("").actual_sql(), "");
+            assert_eq!((prep!("") + "").actual_sql(), "''");
         }
     }
 }

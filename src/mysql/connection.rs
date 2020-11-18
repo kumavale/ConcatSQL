@@ -48,7 +48,7 @@ macro_rules! to_mysql_value {
 impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
-        let query = ws.compile();
+        let query = compile(ws);
         if ws.params.is_empty() {
             match conn.query_drop(&query) {
                 Ok(_) => Ok(()),
@@ -107,7 +107,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         let mut conn = self.borrow_mut();
-        let query = ws.compile();
+        let query = compile(ws);
 
         if ws.params.is_empty() {
             let mut result = match conn.query_iter(&query) {
@@ -129,7 +129,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 
     fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
         let mut conn = self.borrow_mut();
-        let query = ws.compile();
+        let query = compile(ws);
 
         macro_rules! run {
             ($result:expr, $rows:expr) => {
@@ -190,6 +190,17 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn kind(&self) -> ConnKind {
         ConnKind::MySQL
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::new();
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(&s),
+            None =>    query.push('?'),
+        }
+    }
+    query
 }
 
 

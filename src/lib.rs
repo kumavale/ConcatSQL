@@ -17,7 +17,7 @@
 //!     let age = String::from("42");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "\"SELECT name FROM users WHERE age = ?\", [\"42\"]");
+//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42'");
 //!     for row in conn.rows(&sql).unwrap() {
 //!         assert_eq!(row.get(0).unwrap(),      "Alice");
 //!         assert_eq!(row.get("name").unwrap(), "Alice");
@@ -26,7 +26,7 @@
 //!     let age = String::from("42 OR 1=1; --");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "\"SELECT name FROM users WHERE age = ?\", [\"42 OR 1=1; --\"]");
+//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
 //! }
 //! ```

@@ -117,7 +117,7 @@ mod mysql {
         let sql = prep!("select age from users where name = ") + name;
         assert_eq!(
             sql.actual_sql(),
-            "\"select age from users where name = ?\", [\"'Alice'; DROP TABLE users; --\"]"
+            "select age from users where name = '''Alice''; DROP TABLE users; --'"
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -226,19 +226,19 @@ mod mysql {
     }
 
     #[test]
-    fn ow_into_execute() {
+    fn prep_into_execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.execute(prep!("SELECT ") + 1).unwrap();
     }
 
     #[test]
-    fn ow_into_iterate() {
+    fn prep_into_iterate() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.iterate(prep!("SELECT ") + 1, |_| true ).unwrap();
     }
 
     #[test]
-    fn ow_into_rows() {
+    fn prep_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
             assert_eq!(row.get(0).unwrap(),   "1");
@@ -250,8 +250,8 @@ mod mysql {
     fn executable_comment_syntax() {
         let conn = prepare();
         let sqls = vec![
-            //(prep!("SELECT 1 ") + "/*! +1 */", "\"SELECT 1 ?\", [\"/*! +1 */\"]", "1"), <- syntax error
-            (prep!("SELECT 1 /*! +1 */"),      "\"SELECT 1 /*! +1 */\", []",      "2"),
+            //(prep!("SELECT 1 ") + "/*! +1 */", "SELECT 1 '/*! +1 */'", "1"), <- syntax error
+            (prep!("SELECT 1 /*! +1 */"),      "SELECT 1 /*! +1 */",   "2"),
         ];
 
         for (sql, actual_sql, result) in sqls {
@@ -282,17 +282,17 @@ mod mysql {
 
         let name = "A";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%A%\"]");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
-        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%\\%A\\%%\"]");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%$%A$%%\"]");
+        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
 

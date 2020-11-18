@@ -169,7 +169,7 @@ impl<'a> Drop for Connection<'a> {
 /// # conn.execute(stmt).unwrap();
 /// let age = String::from("42 or 1=1; --");  // input by attcker
 /// let sql = prep!("SELECT name FROM users WHERE age < ") + unsafe { without_escape(&age) };
-/// assert_eq!(sql.actual_sql(), "\"SELECT name FROM users WHERE age < 42 or 1=1; --\", []");
+/// assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age < 42 or 1=1; --");
 /// assert!(conn.rows(&sql).is_ok());
 /// ```
 ///
