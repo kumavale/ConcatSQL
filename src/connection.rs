@@ -61,7 +61,7 @@ impl<'a> Connection<'a> {
     /// conn.execute(prep!("SELECT * FROM users;")).unwrap();
     /// ```
     #[inline]
-    pub fn execute<T: IntoWrapString>(&self, query: T) -> Result<()> {
+    pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
         self.conn.execute_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
@@ -88,7 +88,7 @@ impl<'a> Connection<'a> {
     /// }).unwrap();
     /// ```
     #[inline]
-    pub fn iterate<T: IntoWrapString, F>(&self, query: T, mut callback: F) -> Result<()>
+    pub fn iterate<T: IntoWrapString<'a>, F>(&self, query: T, mut callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
@@ -112,7 +112,7 @@ impl<'a> Connection<'a> {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<T: IntoWrapString>(&self, query: T) -> Result<Vec<Row>> {
+    pub fn rows<T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row>> {
         self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
