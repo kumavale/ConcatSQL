@@ -1,7 +1,7 @@
 use std::ops::Add;
 use crate::parser::{escape_string, to_binary_literal};
 
-/// TODO
+/// Values that can be bound as static placeholders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Null,
@@ -37,21 +37,24 @@ impl WrapString {
         }
     }
 
-    /// Return the actual SQL statements that will be executed in the database.
+    /// Simulates the SQL statement that will be executed in the database.
+    ///
+    /// If multiple features are specified, they may not be displayed correctly.  
+    /// &#x26a0;&#xfe0f; This crate actually using static placeholders.  
     ///
     /// # Examples
     ///
     /// ```
     /// # use concatsql::prelude::*;
-    /// assert_eq!(prep!("SELECT").actual_sql(),       "SELECT");
-    /// assert_eq!(prep!("O''Reilly").actual_sql(),    "O''Reilly");
-    /// assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
-    /// assert_eq!((prep!("foo")+"bar").actual_sql(),  "foo'bar'");
-    /// assert_eq!((prep!("foo")+42i32).actual_sql(),  "foo42");
-    /// assert_eq!((prep!("foo")+"42").actual_sql(),   "foo'42'");
-    /// assert_eq!((prep!()+"O'Reilly").actual_sql(),  "'O''Reilly'");
+    /// assert_eq!(prep!("SELECT").simulate(),       "SELECT");
+    /// assert_eq!(prep!("O''Reilly").simulate(),    "O''Reilly");
+    /// assert_eq!(prep!("\"O'Reilly\"").simulate(), "\"O'Reilly\"");
+    /// assert_eq!((prep!("foo")+"bar").simulate(),  "foo'bar'");
+    /// assert_eq!((prep!("foo")+42i32).simulate(),  "foo42");
+    /// assert_eq!((prep!("foo")+"42").simulate(),   "foo'42'");
+    /// assert_eq!((prep!()+"O'Reilly").simulate(),  "'O''Reilly'");
     /// ```
-    pub fn actual_sql(&self) -> String {
+    pub fn simulate(&self) -> String {
         let mut query = String::new();
         let mut index = 0;
         for part in &self.query {
@@ -156,16 +159,11 @@ impl Add<&std::borrow::Cow<'_, str>> for WrapString {
     }
 }
 
-// TODO:
-//     - sqlite: sqlite3_bind_blob()
-//     - mysql:
-//     - ~~postgres~~
 impl Add<Vec<u8>> for WrapString {
     type Output = WrapString;
     #[inline]
     fn add(mut self, other: Vec<u8>) -> WrapString {
         self.query .push(None);
-        //self.params.push(Value::Text(crate::parser::to_binary_literal(&other)));
         self.params.push(Value::Bytes(other));
         self
     }
@@ -176,7 +174,6 @@ impl Add<&Vec<u8>> for WrapString {
     #[inline]
     fn add(mut self, other: &Vec<u8>) -> WrapString {
         self.query .push(None);
-        //self.params.push(Value::Text(crate::parser::to_binary_literal(other)));
         self.params.push(Value::Bytes(other.clone()));
         self
     }
@@ -295,11 +292,9 @@ impl Add<()> for WrapString {
     }
 }
 
-///// A trait for converting a value to a [WrapString](./struct.WrapString.html).
-/// TODO
+/// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 pub trait IntoWrapString {
-    ///// Converts the given value to a [WrapString](./struct.WrapString.html).
-    /// TODO
+    /// Converts the given value to a [WrapString](./struct.WrapString.html).
     fn into_wrapstring(self) -> WrapString;
 }
 
@@ -332,39 +327,39 @@ mod tests {
     fn concat_anything_type() {
         use std::borrow::Cow;
         let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
-        assert_eq!(sql.actual_sql(), "AB'C''D''E'F423.14");
+        assert_eq!(sql.simulate(), "AB'C''D''E'F423.14");
         let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
-        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
+        assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
-        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
+        assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5u128 + 6isize + 7i8 + 8i16 + 9i32 + 0i64 + 1i128 + 2f32 + 3f64;
-        assert_eq!(sql.actual_sql(), "01234567890123");
+        assert_eq!(sql.simulate(), "01234567890123");
         let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
-        assert_eq!(sql.actual_sql(), "340282350000000000000000000000000000000infNaN");
+        assert_eq!(sql.simulate(), "340282350000000000000000000000000000000infNaN");
         let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
         if cfg!(feature = "sqlite") || cfg!(feature = "mysql") {
-            assert_eq!(sql.actual_sql(), "X'414243'X'000102'");
+            assert_eq!(sql.simulate(), "X'414243'X'000102'");
         } else {
-            assert_eq!(sql.actual_sql(), "'\\x414243''\\x000102'");
+            assert_eq!(sql.simulate(), "'\\x414243''\\x000102'");
         }
         let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
-        assert_eq!(sql.actual_sql(), "'A''B''C''D'");
+        assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
-        assert_eq!(sql.actual_sql(), "A'B''C'03.1442NULLNULL");
+        assert_eq!(sql.simulate(), "A'B''C'03.1442NULLNULL");
     }
 
-    mod actual_sql {
+    mod simulate {
         use crate as concatsql;
         use concatsql::prelude::*;
 
         #[test]
         fn double_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"".ow(""inside str"") -> String""#).actual_sql(),
+                (prep!() + r#"".ow(""inside str"") -> String""#).simulate(),
                 r#"'".ow(""inside str"") -> String"'"#
             );
             assert_eq!(
-                (prep!() + r#"".ow("inside str") -> String""#).actual_sql(),
+                (prep!() + r#"".ow("inside str") -> String""#).simulate(),
                 r#"'".ow("inside str") -> String"'"#
             );
         }
@@ -372,11 +367,11 @@ mod tests {
         #[test]
         fn double_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + r#""I'm Alice""#).actual_sql(),
+                (prep!() + r#""I'm Alice""#).simulate(),
                 r#"'"I''m Alice"'"#
             );
             assert_eq!(
-                (prep!() + r#""I''m Alice""#).actual_sql(),
+                (prep!() + r#""I''m Alice""#).simulate(),
                 r#"'"I''''m Alice"'"#
             );
         }
@@ -384,7 +379,7 @@ mod tests {
         #[test]
         fn single_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"'.ow("inside str") -> String'"#).actual_sql(),
+                (prep!() + r#"'.ow("inside str") -> String'"#).simulate(),
                 r#"'''.ow("inside str") -> String'''"#
             );
         }
@@ -392,7 +387,7 @@ mod tests {
         #[test]
         fn single_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + "'I''m Alice'").actual_sql(),
+                (prep!() + "'I''m Alice'").simulate(),
                 r#"'''I''''m Alice'''"#
             );
         }
@@ -400,7 +395,7 @@ mod tests {
         #[test]
         fn non_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + "foo'bar'foo").actual_sql(),
+                (prep!() + "foo'bar'foo").simulate(),
                 r#"'foo''bar''foo'"#
             );
         }
@@ -408,16 +403,16 @@ mod tests {
         #[test]
         fn non_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"foo"bar"foo"#).actual_sql(),
+                (prep!() + r#"foo"bar"foo"#).simulate(),
                 r#"'foo"bar"foo'"#
             );
         }
 
         #[test]
         fn empty_string() {
-            assert_eq!(prep!().actual_sql(), "");
-            assert_eq!(prep!("").actual_sql(), "");
-            assert_eq!((prep!("") + "").actual_sql(), "''");
+            assert_eq!(prep!().simulate(), "");
+            assert_eq!(prep!("").simulate(), "");
+            assert_eq!((prep!("") + "").simulate(), "''");
         }
     }
 }

@@ -17,7 +17,7 @@
 //!     let age = String::from("42");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42'");
+//!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
 //!     for row in conn.rows(&sql).unwrap() {
 //!         assert_eq!(row.get(0).unwrap(),      "Alice");
 //!         assert_eq!(row.get("name").unwrap(), "Alice");
@@ -26,7 +26,7 @@
 //!     let age = String::from("42 OR 1=1; --");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
+//!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
 //! }
 //! ```
@@ -105,29 +105,18 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// prep!("SELECT * FROM users WHERE passwd=") + prep!(&passwd); // shouldn't compile!
 /// ```
 ///
-/// If TODO
-///
-/// ```
-/// # use concatsql::prelude::*;
-/// # let id = 42;
-/// prep!("SELECT * FROM users WHERE id='") + id;
-/// # /*
-///                                     ^
-/// # */
-/// ```
-///
 /// # Safety
 ///
 /// ```
 /// # use concatsql::prelude::*;
-/// # let id = 42;
-/// prep!("SELECT * FROM users WHERE id=") + id;
+/// prep!("SELECT * FROM users WHERE id=") + 42;
 /// prep!("INSERT INTO msg VALUES ('I''m cat.')");
 /// prep!("INSERT INTO msg VALUES (\"I'm cat.\")");
+/// prep!("INSERT INTO msg VALUES (") + "I'm cat." + prep!(")");
 /// ```
 #[macro_export]
 macro_rules! prep {
-    () =>            { concatsql::WrapString::init("") };
+    ()            => { concatsql::WrapString::init("")     };
     ($query:expr) => { concatsql::WrapString::init($query) };
 }
 

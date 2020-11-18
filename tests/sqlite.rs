@@ -56,7 +56,7 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(prep!(sql).actual_sql(), "SELECT name FROM users");
+        assert_eq!(prep!(sql).simulate(), "SELECT name FROM users");
     }
 
     #[test]
@@ -152,7 +152,7 @@ mod sqlite {
         let name = "'Alice'; DROP TABLE users; --";
         let sql = prep!("select age from users where name = ") + name + &prep!("");
         assert_eq!(
-            sql.actual_sql(),
+            sql.simulate(),
             "select age from users where name = '''Alice''; DROP TABLE users; --'"
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -321,21 +321,21 @@ mod sqlite {
 
         let name = "A";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
+        assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
         if cfg!(feature = "mysql") || cfg!(feature = "postgres") {
-            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
+            assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
         } else {
-            assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
+            assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%\\%A\\%%'");
         }
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
+        assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
 
