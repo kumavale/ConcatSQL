@@ -11,6 +11,7 @@ mod postgres {
 
     fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn

@@ -12,6 +12,7 @@ mod sqlite {
 
     fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
+        conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn

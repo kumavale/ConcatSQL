@@ -9,8 +9,8 @@ pub enum Value {
     I128(i128),
     F32(f32),
     F64(f64),
-    Text(String),    // TODO &'a str
-    Bytes(Vec<u8>),  // TODO &'a Vec<u8>
+    Text(String),
+    Bytes(Vec<u8>),
 }
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
@@ -92,10 +92,7 @@ impl Add for WrapString {
     fn add(mut self, other: WrapString) -> WrapString {
         self.query .extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
-        WrapString {
-            query:  self.query,
-            params: self.params,
-        }
+        self
     }
 }
 
@@ -105,10 +102,7 @@ impl<'a> Add<&'a WrapString> for WrapString {
     fn add(mut self, other: &'a WrapString) -> WrapString {
         self.query .extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
-        WrapString {
-            query:  self.query,
-            params: self.params,
-        }
+        self
     }
 }
 
@@ -301,6 +295,16 @@ impl_add_Option_for_WrapString! {
     f32, f64,
 }
 
+impl Add<()> for WrapString {
+    type Output = WrapString;
+    #[inline]
+    fn add(mut self, _other: ()) -> WrapString {
+        self.query .push(None);
+        self.params.push(Value::Null);
+        self
+    }
+}
+
 ///// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 /// TODO
 pub trait IntoWrapString {
@@ -355,10 +359,8 @@ mod tests {
         }
         let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
         assert_eq!(sql.actual_sql(), "\"????\", [\"A\", \"B\", \"C\", \"D\"]");
-        let x: Option<i32> = Some(42);
-        let y: Option<i32> = None;
-        let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + x + y;
-        assert_eq!(sql.actual_sql(), "\"A??????\", [\"B\", \"C\", 0, 3.14, 42, Null]");
+        let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
+        assert_eq!(sql.actual_sql(), "\"A???????\", [\"B\", \"C\", 0, 3.14, 42, Null, Null]");
     }
 
     mod actual_sql {

@@ -10,6 +10,7 @@ use crate::parser::to_hex;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
@@ -29,87 +30,158 @@ pub fn open(url: &str) -> Result<Connection> {
     })
 }
 
+macro_rules! to_mysql_value {
+    ($value:expr) => (
+        match $value {
+            Value::Null         => mysql::Value::from(None as Option<i32>),
+            Value::I32(value)   => mysql::Value::from(value),
+            Value::I64(value)   => mysql::Value::from(value),
+            Value::I128(value)  => mysql::Value::from(value),
+            Value::F32(value)   => mysql::Value::from(value),
+            Value::F64(value)   => mysql::Value::from(value),
+            Value::Text(value)  => mysql::Value::from(value),
+            Value::Bytes(value) => mysql::Value::from(value),
+        }
+    );
+}
+
 impl ConcatsqlConn for RefCell<mysql::Conn> {
-    fn execute_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<()> {
+    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
-        match conn.query_drop(query) {
-            Ok(_) => Ok(()),
-            Err(e) => Error::new(error_level, "exec error", &e),
+        let query = ws.compile();
+        if ws.params.is_empty() {
+            match conn.query_drop(&query) {
+                Ok(_) => Ok(()),
+                Err(e) => Error::new(error_level, "exec error", &e),
+            }
+        } else {
+            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            match conn.exec_drop(&query, params) {
+                Ok(_) => Ok(()),
+                Err(e) => Error::new(error_level, "exec error", &e),
+            }
         }
     }
 
-    fn iterate_inner(&self, query: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let mut conn = self.borrow_mut();
-        let mut result = match conn.query_iter(query) {
-            Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e),
-        };
+        macro_rules! run {
+            ($result:expr) => {
+                while let Some(result_set) = $result.next_set() {
+                    let result_set = match result_set {
+                        Ok(result_set) => result_set,
+                        Err(e) => return Error::new(error_level, "exec error", &e),
+                    };
+                    let mut pairs: Vec<(String, Option<String>)> = Vec::with_capacity(result_set.affected_rows() as usize);
 
-        while let Some(result_set) = result.next_set() {
-            let result_set = match result_set {
-                Ok(result_set) => result_set,
+                    for row in result_set {
+                        let row = match row {
+                            Ok(row) => row,
+                            Err(e) => return Error::new(error_level, "exec error", &e),
+                        };
+
+                        for (i, col) in row.columns().iter().enumerate() {
+                            let value = match row[i] {
+                                mysql::Value::NULL      => None,
+                                mysql::Value::Int(v)    => Some(v.to_string()),
+                                mysql::Value::UInt(v)   => Some(v.to_string()),
+                                mysql::Value::Float(v)  => Some(v.to_string()),
+                                mysql::Value::Double(v) => Some(v.to_string()),
+                                mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
+                                    Ok(string) => Some(string),
+                                    Err(_) => Some(to_hex(&bytes)),
+                                }
+                                _ => unimplemented!(),
+                            };
+                            pairs.push((col.name_str().to_string(), value));
+                        }
+                    }
+
+                    let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (&*p.0, p.1.as_deref())).collect();
+                    if !pairs.is_empty() && !callback(&pairs) {
+                        return Error::new(error_level, "exec error", "query aborted");
+                    }
+                }
+            };
+        }
+
+        let mut conn = self.borrow_mut();
+        let query = ws.compile();
+
+        if ws.params.is_empty() {
+            let mut result = match conn.query_iter(&query) {
+                Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e),
             };
-            let mut pairs: Vec<(String, Option<String>)> = Vec::with_capacity(result_set.affected_rows() as usize);
-
-            for row in result_set {
-                let row = match row {
-                    Ok(row) => row,
-                    Err(e) => return Error::new(error_level, "exec error", &e),
-                };
-
-                for (i, col) in row.columns().iter().enumerate() {
-                    pairs.push((col.name_str().to_string(), row.get(i)));
-                }
-
-            }
-
-            let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (&*p.0, p.1.as_deref())).collect();
-            if !pairs.is_empty() && !callback(&pairs) {
-                return Error::new(error_level, "exec error", "query aborted");
-            }
+            run!(result);
+        } else {
+            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            let mut result = match conn.exec_iter(&query, params) {
+                Ok(result) => result,
+                Err(e) => return Error::new(error_level, "exec error", &e),
+            };
+            run!(result);
         }
 
         Ok(())
     }
 
-    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+    fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
         let mut conn = self.borrow_mut();
-        let mut result = match conn.query_iter(query) {
-            Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
-        };
+        let query = ws.compile();
+
+        macro_rules! run {
+            ($result:expr, $rows:expr) => {
+                while let Some(result_set) = $result.next_set() {
+                    let result_set = match result_set {
+                        Ok(result_set) => result_set,
+                        Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
+                    };
+
+                    for result_row in result_set {
+                        let result_row = match result_row {
+                            Ok(row) => row,
+                            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
+                        };
+                        let mut row = Row::new();
+
+                        for (i, col) in result_row.columns().iter().enumerate() {
+                            let value = match result_row[i] {
+                                mysql::Value::NULL      => None,
+                                mysql::Value::Int(v)    => Some(v.to_string()),
+                                mysql::Value::UInt(v)   => Some(v.to_string()),
+                                mysql::Value::Float(v)  => Some(v.to_string()),
+                                mysql::Value::Double(v) => Some(v.to_string()),
+                                mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
+                                    Ok(string) => Some(string),
+                                    Err(_) => Some(to_hex(&bytes)),
+                                }
+                                _ => unimplemented!(),
+                            };
+                            row.insert(col.name_str().to_string(), value);
+                        }
+                        $rows.push(row);
+                    }
+                }
+            };
+        }
+
         let mut rows: Vec<Row> = Vec::new();
 
-        while let Some(result_set) = result.next_set() {
-            let result_set = match result_set {
-                Ok(result_set) => result_set,
+        if ws.params.is_empty() {
+            let mut result = match conn.query_iter(&query) {
+                Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
             };
-
-            for result_row in result_set {
-                let result_row = match result_row {
-                    Ok(row) => row,
-                    Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
-                };
-                let mut row = Row::new();
-
-                for (i, col) in result_row.columns().iter().enumerate() {
-                    let value = match result_row[i] {
-                        mysql::Value::Bytes(ref bytes) => {
-                            match String::from_utf8(bytes.to_vec()) {
-                                Ok(s) => Some(s),
-                                Err(_) => Some(to_hex(&bytes)),
-                            }
-                        }
-                        _ => result_row.get(i),
-                    };
-                    row.insert(col.name_str().to_string(), value);
-                }
-                rows.push(row);
-            }
+            run!(result, rows);
+        } else {
+            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            let mut result = match conn.exec_iter(&query, params) {
+                Ok(result) => result,
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
+            };
+            run!(result, rows);
         }
 
         Ok(rows)

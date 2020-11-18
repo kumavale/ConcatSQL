@@ -11,6 +11,7 @@ mod mysql {
 
     fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
+        conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn
@@ -33,13 +34,6 @@ mod mysql {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
-    }
-
-    #[test]
-    #[should_panic = "exec error"]
-    fn execute_should_error() {
-        let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        conn.execute(stmt().to_wrapstring()).unwrap();
     }
 
     #[test]
@@ -120,10 +114,10 @@ mod mysql {
     fn start_with_quotation_and_end_with_anything_else() {
         let conn = prepare();
         let name = "'Alice'; DROP TABLE users; --";
-        let sql = prep!("select age from users where name = ") + name + &prep!("");
+        let sql = prep!("select age from users where name = ") + name;
         assert_eq!(
             sql.actual_sql(),
-            "select age from users where name = '''Alice''; DROP TABLE users; --'"
+            "\"select age from users where name = ?\", [\"'Alice'; DROP TABLE users; --\"]"
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
     }
@@ -177,66 +171,47 @@ mod mysql {
     fn error_level_AlwaysOk() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      Ok(()));
-        assert_eq!(conn.execute(&endless),                          Ok(()));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), Ok(()));
-        assert_eq!(conn.rows(&invalid_sql),                         Ok(vec![]));
-        assert_eq!(conn.rows(&endless),                             Ok(vec![]));
+        assert_eq!(conn.execute(invalid_sql),                      Ok(()));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), Ok(()));
+        assert_eq!(conn.rows(invalid_sql),                         Ok(vec![]));
     }
 
     #[test]
     fn error_level_release() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Release);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!());
-        assert_eq!(conn.execute(&endless),                          err!());
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!());
-        assert_eq!(conn.rows(&invalid_sql),                         err!());
-        assert_eq!(conn.rows(&endless),                             err!());
+        assert_eq!(conn.execute(invalid_sql),                      err!());
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!());
+        assert_eq!(conn.rows(invalid_sql),                         err!());
     }
 
     #[test]
     fn error_level_develop() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Develop);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!("exec error"));
-        assert_eq!(conn.execute(&endless),                          err!("exec error"));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.rows(&invalid_sql),                         err!("exec error"));
-        assert_eq!(conn.rows(&endless),                             err!("exec error"));
+        assert_eq!(conn.execute(invalid_sql),                      err!("exec error"));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!("exec error"));
+        assert_eq!(conn.rows(invalid_sql),                         err!("exec error"));
     }
 
     #[test]
     fn error_level_debug() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Debug);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
-        assert_eq!(conn.execute(&endless),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
-        assert_eq!(conn.iterate(&invalid_sql, |_| unreachable!()),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
-        assert_eq!(conn.iterate(&endless,    |_| unreachable!()),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
-        assert_eq!(conn.rows(&invalid_sql),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'INVALID SQL\'\' at line 1 }"));
-        assert_eq!(conn.rows(&endless),
-            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'\'\'\'endless\'\' at line 1 }"));
+        assert_eq!(conn.execute(invalid_sql),
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'INVALID_SQL\' at line 1 }"));
+        assert_eq!(conn.iterate(invalid_sql, |_| unreachable!()),
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'INVALID_SQL\' at line 1 }"));
+        assert_eq!(conn.rows(invalid_sql),
+            err!("exec error: MySqlError { ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near \'INVALID_SQL\' at line 1 }"));
     }
 
     #[test]
@@ -266,7 +241,8 @@ mod mysql {
     fn ow_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
-            assert_eq!(row.get("1").unwrap(), "1");
+            assert_eq!(row.get(0).unwrap(),   "1");
+            assert_eq!(row.get("?").unwrap(), "1");
         }
     }
 
@@ -274,8 +250,8 @@ mod mysql {
     fn executable_comment_syntax() {
         let conn = prepare();
         let sqls = vec![
-            (prep!("SELECT 1 ") + "/*! +1 */", "SELECT 1 '/*! +1 */'", "1"),
-            (prep!("SELECT 1 /*! +1 */"),      "SELECT 1 /*! +1 */",   "2"),
+            //(prep!("SELECT 1 ") + "/*! +1 */", "\"SELECT 1 ?\", [\"/*! +1 */\"]", "1"), <- syntax error
+            (prep!("SELECT 1 /*! +1 */"),      "\"SELECT 1 /*! +1 */\", []",      "2"),
         ];
 
         for (sql, actual_sql, result) in sqls {
@@ -306,17 +282,17 @@ mod mysql {
 
         let name = "A";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%A%\"]");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%\\%A\\%%\"]");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
+        assert_eq!(sql.actual_sql(), "\"SELECT * FROM users WHERE name LIKE ?\", [\"%$%A$%%\"]");
         conn.execute(&sql).unwrap();
     }
 
