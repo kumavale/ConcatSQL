@@ -219,36 +219,36 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
             Value::Null => {
                 ffi::sqlite3_bind_null(stmt, index);
             }
-            //Value::I32(value) => {
-            //    ffi::sqlite3_bind_int(stmt, index, *value);
-            //}
-            //Value::I64(value) => {
-            //    ffi::sqlite3_bind_int64(stmt, index, *value);
-            //}
-            //Value::I128(value) => {
-            //    let value = value.to_string();
-            //    let len = value.as_bytes().len();
-            //    let value = match CString::new(value.as_bytes()) {
-            //        Ok(string) => string,
-            //        _ => {
-            //            ffi::sqlite3_finalize(stmt);
-            //            return Error::new(&error_level, "invalid param", value);
-            //        }
-            //    };
-            //    ffi::sqlite3_bind_text(
-            //        stmt,
-            //        index,
-            //        value.as_ptr(),
-            //        len as i32,
-            //        Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-            //    );
-            //}
-            //Value::F32(value) => {
-            //    ffi::sqlite3_bind_double(stmt, index, *value as f64);
-            //}
-            //Value::F64(value) => {
-            //    ffi::sqlite3_bind_double(stmt, index, *value);
-            //}
+            Value::I32(value) => {
+                ffi::sqlite3_bind_int(stmt, index, *value);
+            }
+            Value::I64(value) => {
+                ffi::sqlite3_bind_int64(stmt, index, *value);
+            }
+            Value::I128(value) => {
+                let value = value.to_string();
+                let len = value.as_bytes().len();
+                let value = match CString::new(value.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", value);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+            Value::F32(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value as f64);
+            }
+            Value::F64(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value);
+            }
             Value::Text(value) => {
                 let len = value.as_bytes().len();
                 let value = match CString::new(value.as_bytes()) {
