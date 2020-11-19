@@ -1,4 +1,5 @@
 use std::ops::Add;
+use std::borrow::Cow;
 use crate::parser::{escape_string, to_binary_literal};
 
 /// Values that can be bound as static placeholders.
@@ -16,23 +17,23 @@ pub enum Value {
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
-pub struct WrapString {
-    pub(crate) query:  Vec<Option<String>>,
+pub struct WrapString<'a> {
+    pub(crate) query:  Vec<Option<Cow<'a, str>>>,
     pub(crate) params: Vec<Value>,
 }
 
-impl WrapString {
+impl<'a> WrapString<'a> {
     #[doc(hidden)]
     pub fn init(s: &'static str) -> Self {
         Self {
-            query:  vec![ Some(s.to_string()) ],
+            query:  vec![ Some(Cow::Borrowed(s)) ],
             params: Vec::new(),
         }
     }
 
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
-            query:  vec![ Some(s.to_string()) ],
+            query:  vec![ Some(Cow::Owned(s.to_string())) ],
             params: Vec::new(),
         }
     }
@@ -79,100 +80,100 @@ impl WrapString {
     }
 }
 
-impl Add for WrapString {
-    type Output = WrapString;
+impl<'a> Add for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: WrapString) -> WrapString {
+    fn add(mut self, other: WrapString<'a>) -> WrapString<'a> {
         self.query .extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
         self
     }
 }
 
-impl<'a> Add<&'a WrapString> for WrapString {
-    type Output = WrapString;
+impl<'a, 'b> Add<&'b WrapString<'a>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &'a WrapString) -> WrapString {
+    fn add(mut self, other: &'b WrapString<'a>) -> WrapString<'a> {
         self.query .extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
         self
     }
 }
 
-impl Add<String> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<String> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: String) -> WrapString {
+    fn add(mut self, other: String) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other));
         self
     }
 }
 
-impl Add<&String> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&String> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &String) -> WrapString {
+    fn add(mut self, other: &String) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other.to_string()));
         self
     }
 }
 
-impl Add<&str> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&str> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &str) -> WrapString {
+    fn add(mut self, other: &str) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other.to_string()));
         self
     }
 }
 
-impl Add<&&str> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&&str> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &&str) -> WrapString {
+    fn add(mut self, other: &&str) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other.to_string()));
         self
     }
 }
 
-impl Add<std::borrow::Cow<'_, str>> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<std::borrow::Cow<'_, str>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: std::borrow::Cow<'_, str>) -> WrapString {
+    fn add(mut self, other: std::borrow::Cow<'_, str>) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other.into_owned()));
         self
     }
 }
 
-impl Add<&std::borrow::Cow<'_, str>> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&std::borrow::Cow<'_, str>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &std::borrow::Cow<'_, str>) -> WrapString {
+    fn add(mut self, other: &std::borrow::Cow<'_, str>) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(other.to_string()));
         self
     }
 }
 
-impl Add<Vec<u8>> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<Vec<u8>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: Vec<u8>) -> WrapString {
+    fn add(mut self, other: Vec<u8>) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Bytes(other));
         self
     }
 }
 
-impl Add<&Vec<u8>> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<&Vec<u8>> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &Vec<u8>) -> WrapString {
+    fn add(mut self, other: &Vec<u8>) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Bytes(other.clone()));
         self
@@ -181,10 +182,10 @@ impl Add<&Vec<u8>> for WrapString {
 
 macro_rules! impl_add_I32_for_WrapString {
     ( $($t:ty),* ) => ($(
-        impl Add<$t> for WrapString {
-            type Output = WrapString;
+        impl<'a> Add<$t> for WrapString<'a> {
+            type Output = WrapString<'a>;
             #[inline]
-            fn add(mut self, other: $t) -> WrapString {
+            fn add(mut self, other: $t) -> WrapString<'a> {
                 self.query .push(None);
                 self.params.push(Value::I32(other as i32));
                 self
@@ -195,10 +196,10 @@ macro_rules! impl_add_I32_for_WrapString {
 
 macro_rules! impl_add_I64_for_WrapString {
     ( $($t:ty),* ) => ($(
-        impl Add<$t> for WrapString {
-            type Output = WrapString;
+        impl<'a> Add<$t> for WrapString<'a> {
+            type Output = WrapString<'a>;
             #[inline]
-            fn add(mut self, other: $t) -> WrapString {
+            fn add(mut self, other: $t) -> WrapString<'a> {
                 self.query .push(None);
                 self.params.push(Value::I64(other as i64));
                 self
@@ -209,10 +210,10 @@ macro_rules! impl_add_I64_for_WrapString {
 
 macro_rules! impl_add_I128_for_WrapString {
     ( $($t:ty),* ) => ($(
-        impl Add<$t> for WrapString {
-            type Output = WrapString;
+        impl<'a> Add<$t> for WrapString<'a> {
+            type Output = WrapString<'a>;
             #[inline]
-            fn add(mut self, other: $t) -> WrapString {
+            fn add(mut self, other: $t) -> WrapString<'a> {
                 self.query .push(None);
                 self.params.push(Value::I128(other as i128));
                 self
@@ -232,20 +233,20 @@ impl_add_I32_for_WrapString!(usize, isize);
 #[cfg(target_pointer_width = "64")]
 impl_add_I64_for_WrapString!(usize, isize);
 
-impl Add<f32> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<f32> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: f32) -> WrapString {
+    fn add(mut self, other: f32) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::F32(other));
         self
     }
 }
 
-impl Add<f64> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<f64> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: f64) -> WrapString {
+    fn add(mut self, other: f64) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::F64(other));
         self
@@ -254,10 +255,10 @@ impl Add<f64> for WrapString {
 
 macro_rules! impl_add_Option_for_WrapString {
     ( $($t:ty),* ) => {$(
-        impl Add<Option<$t>> for WrapString {
-            type Output = WrapString;
+        impl<'a> Add<Option<$t>> for WrapString<'a> {
+            type Output = WrapString<'a>;
             #[inline]
-            fn add(mut self, other: Option<$t>) -> WrapString {
+            fn add(mut self, other: Option<$t>) -> WrapString<'a> {
                 match other {
                     Some(other) => self.add(other),
                     None => {
@@ -282,10 +283,10 @@ impl_add_Option_for_WrapString! {
     f32, f64,
 }
 
-impl Add<()> for WrapString {
-    type Output = WrapString;
+impl<'a> Add<()> for WrapString<'a> {
+    type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, _other: ()) -> WrapString {
+    fn add(mut self, _other: ()) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Null);
         self
@@ -293,25 +294,25 @@ impl Add<()> for WrapString {
 }
 
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
-pub trait IntoWrapString {
+pub trait IntoWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
-    fn into_wrapstring(self) -> WrapString;
+    fn into_wrapstring(self) -> WrapString<'a>;
 }
 
-impl IntoWrapString for WrapString {
-    fn into_wrapstring(self) -> WrapString {
+impl<'a> IntoWrapString<'a> for WrapString<'a> {
+    fn into_wrapstring(self) -> WrapString<'a> {
         self
     }
 }
 
-impl IntoWrapString for &WrapString {
-    fn into_wrapstring(self) -> WrapString {
+impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
+    fn into_wrapstring(self) -> WrapString<'a> {
         self.clone()
     }
 }
 
-impl IntoWrapString for &'static str {
-    fn into_wrapstring(self) -> WrapString {
+impl<'a> IntoWrapString<'a> for &'static str {
+    fn into_wrapstring(self) -> WrapString<'a> {
         WrapString::new(self)
     }
 }

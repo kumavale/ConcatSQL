@@ -45,7 +45,7 @@ impl<'a> fmt::Debug for Connection<'a> {
     }
 }
 
-impl<'a> Connection<'a> {
+impl<'a, 'b> Connection<'a> {
     /// Execute a statement without processing the resulting rows if any.
     ///
     /// # Examples
@@ -61,7 +61,7 @@ impl<'a> Connection<'a> {
     /// conn.execute(prep!("SELECT * FROM users;")).unwrap();
     /// ```
     #[inline]
-    pub fn execute<T: IntoWrapString>(&self, query: T) -> Result<()> {
+    pub fn execute<T: IntoWrapString<'b>>(&self, query: T) -> Result<()> {
         self.conn.execute_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
@@ -88,7 +88,7 @@ impl<'a> Connection<'a> {
     /// }).unwrap();
     /// ```
     #[inline]
-    pub fn iterate<T: IntoWrapString, F>(&self, query: T, mut callback: F) -> Result<()>
+    pub fn iterate<T: IntoWrapString<'b>, F>(&self, query: T, mut callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
@@ -112,7 +112,7 @@ impl<'a> Connection<'a> {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<T: IntoWrapString>(&self, query: T) -> Result<Vec<Row>> {
+    pub fn rows<T: IntoWrapString<'b>>(&self, query: T) -> Result<Vec<Row>> {
         self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 
