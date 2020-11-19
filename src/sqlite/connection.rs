@@ -5,6 +5,7 @@ use std::ptr;
 use std::path::Path;
 use std::pin::Pin;
 use std::cell::RefCell;
+use std::borrow::Cow;
 
 use crate::Result;
 use crate::row::Row;
@@ -144,6 +145,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     ffi::SQLITE_ROW => {
                         let mut pairs = Vec::with_capacity(column_count as usize);
                         pairs.storing(stmt, column_count);
+                        let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                         if !callback(&pairs) {
                             break;
                         }
@@ -195,7 +197,7 @@ fn compile(ws: &WrapString) -> String {
 trait Storing {
     unsafe fn storing(&mut self, stmt: *mut ffi::sqlite3_stmt, column_count: i32);
 }
-impl Storing for Vec<(&str, Option<&str>)> {
+impl Storing for Vec<(&str, Option<Cow<'_, str>>)> {
     unsafe fn storing(&mut self, stmt: *mut ffi::sqlite3_stmt, column_count: i32) {
         for i in 0..(column_count) {
             let column_name = {
@@ -208,13 +210,13 @@ impl Storing for Vec<(&str, Option<&str>)> {
                         let ptr = ffi::sqlite3_column_blob(stmt, i);
                         let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
                         let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
-                        Some(Box::leak(crate::parser::to_hex(&bytes).into_boxed_str()) as &str)
+                        Some(Cow::Owned(crate::parser::to_hex(&bytes)))
                     },
                     ffi::SQLITE_INTEGER |
                     ffi::SQLITE_FLOAT   |
                     ffi::SQLITE_TEXT    => {
                         let ptr = ffi::sqlite3_column_text(stmt, i) as *const i8;
-                        Some(std::str::from_utf8(CStr::from_ptr(ptr).to_bytes()).unwrap())
+                        Some(Cow::Borrowed(std::str::from_utf8(CStr::from_ptr(ptr).to_bytes()).unwrap()))
                     }
                     _  /* ffi::SQLITE_NULL */ => None
                 }
