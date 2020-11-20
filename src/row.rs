@@ -6,8 +6,8 @@ type IndexMapPairs<'table> = IndexMap<&'table str, Option<String>>;
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Table<'table> {
-    rows:         Vec<Row<'table>>,
-    column_names: Vec<*const str>,
+    rows:                    Vec<Row<'table>>,
+    pub(crate) column_names: Vec<*const str>,
 }
 
 impl<'a> Table<'a> {

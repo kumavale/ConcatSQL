@@ -191,6 +191,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
 
             let column_count = ffi::sqlite3_column_count(stmt) as i32;
 
+            // First row
             match ffi::sqlite3_step(stmt) {
                 ffi::SQLITE_DONE => {
                     ffi::sqlite3_finalize(stmt);
@@ -216,6 +217,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                 }
             }
 
+            // Or later
             loop {
                 match ffi::sqlite3_step(stmt) {
                     ffi::SQLITE_DONE => break,
@@ -224,10 +226,8 @@ impl ConcatsqlConn for ffi::sqlite3 {
                         pairs.storing(stmt, column_count);
                         let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                         let mut row = Row::with_capacity(column_count as usize);
-                        for (column, value) in pairs.iter() {
-                            let column = Box::leak(column.to_string().into_boxed_str());
-                            table.push_column(column);
-                            row.insert(&*column, value.map(|v| v.to_string()));
+                        for (i, (_, value)) in pairs.iter().enumerate() {
+                            row.insert(&*table.column_names[i], value.map(|v| v.to_string()));
                         }
                         table.push(row);
                     }
