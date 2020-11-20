@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::borrow::Cow;
 
 use crate::Result;
-use crate::row::Row;
+use crate::row::{Table, Row};
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::{WrapString, Value};
@@ -112,12 +112,10 @@ impl ConcatsqlConn for ffi::sqlite3 {
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         let query = compile(ws);
-
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query),
         };
-
         let mut stmt = ptr::null_mut();
 
         unsafe {
@@ -163,19 +161,88 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
-    fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
-        let mut rows: Vec<Row> = Vec::new();
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Table<'a>> {
+        let mut table = Table::default();
 
-        self.iterate_inner(ws, error_level, &mut |pairs: &[(&str, Option<&str>)]| {
-            let mut row = Row::new();
-            for (column, value) in pairs.iter() {
-                row.insert(column.to_string(), value.map(|v| v.to_string()));
+        let query = compile(ws);
+        let query = match CString::new(query.as_bytes()) {
+            Ok(string) => string,
+            _ => return Error::new(&error_level, "invalid query", query).map(|_| Table::default()),
+        };
+        let mut stmt = ptr::null_mut();
+
+        unsafe {
+            let result = ffi::sqlite3_prepare_v2(
+                self as *const _ as *mut _,
+                query.as_ptr(),
+                -1,
+                &mut stmt,
+                ptr::null_mut(),
+            );
+
+            if result != ffi::SQLITE_OK {
+                ffi::sqlite3_finalize(stmt);
+                return Error::new(&error_level, "exec error",
+                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                    .map(|_| Table::default());
             }
-            rows.push(row);
-            true
-        })?;
 
-        Ok(rows)
+            bind_all(stmt, ws, error_level)?;
+
+            let column_count = ffi::sqlite3_column_count(stmt) as i32;
+
+            match ffi::sqlite3_step(stmt) {
+                ffi::SQLITE_DONE => {
+                    ffi::sqlite3_finalize(stmt);
+                    return Ok(table);
+                }
+                ffi::SQLITE_ROW => {
+                    let mut pairs = Vec::with_capacity(column_count as usize);
+                    pairs.storing(stmt, column_count);
+                    let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
+                    let mut row = Row::with_capacity(column_count as usize);
+                    for (column, value) in pairs.iter() {
+                        let column = Box::leak(column.to_string().into_boxed_str());
+                        table.push_column(column);
+                        row.insert(&*column, value.map(|v| v.to_string()));
+                    }
+                    table.push(row);
+                }
+                _ => {
+                    ffi::sqlite3_finalize(stmt);
+                    return Error::new(&error_level, "exec error",
+                        &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                        .map(|_| Table::default());
+                }
+            }
+
+            loop {
+                match ffi::sqlite3_step(stmt) {
+                    ffi::SQLITE_DONE => break,
+                    ffi::SQLITE_ROW => {
+                        let mut pairs = Vec::with_capacity(column_count as usize);
+                        pairs.storing(stmt, column_count);
+                        let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
+                        let mut row = Row::with_capacity(column_count as usize);
+                        for (column, value) in pairs.iter() {
+                            let column = Box::leak(column.to_string().into_boxed_str());
+                            table.push_column(column);
+                            row.insert(&*column, value.map(|v| v.to_string()));
+                        }
+                        table.push(row);
+                    }
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "exec error",
+                            &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                            .map(|_| Table::default());
+                    }
+                }
+            }
+
+            ffi::sqlite3_finalize(stmt);
+            Ok(table)
+        }
     }
 
     fn kind(&self) -> ConnKind {

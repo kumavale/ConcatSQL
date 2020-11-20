@@ -94,7 +94,7 @@ mod tests {
     fn error_level() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Develop);
-        for _ in conn.rows("SELECT 1").unwrap() {
+        for _ in &conn.rows("SELECT 1").unwrap() {
             conn.error_level(ErrorLevel::Develop);
         }
         conn.error_level(ErrorLevel::Develop);
