@@ -81,19 +81,8 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                             Err(e) => return Error::new(error_level, "exec error", &e),
                         };
 
-                        for (i, col) in row.columns().iter().enumerate() {
-                            let value = match row[i] {
-                                mysql::Value::NULL      => None,
-                                mysql::Value::Int(v)    => Some(v.to_string()),
-                                mysql::Value::UInt(v)   => Some(v.to_string()),
-                                mysql::Value::Float(v)  => Some(v.to_string()),
-                                mysql::Value::Double(v) => Some(v.to_string()),
-                                mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
-                                    Ok(string) => Some(string),
-                                    Err(_) => Some(to_hex(&bytes)),
-                                }
-                                _ => unimplemented!(),
-                            };
+                        for (index, col) in row.columns().iter().enumerate() {
+                            let value = row.get_to_string(index);
                             pairs.push((col.name_str().to_string(), value));
                         }
                     }
@@ -148,49 +137,26 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                         };
 
                         let column_len = result_row.columns_ref().len();
+                        let mut row = Row::with_capacity(column_len);
 
                         if first_row {
                             first_row = false;
-                            let mut row = Row::with_capacity(column_len);
-                            for (i, col) in result_row.columns_ref().iter().enumerate() {
-                                let value = match result_row[i] {
-                                    mysql::Value::NULL      => None,
-                                    mysql::Value::Int(v)    => Some(v.to_string()),
-                                    mysql::Value::UInt(v)   => Some(v.to_string()),
-                                    mysql::Value::Float(v)  => Some(v.to_string()),
-                                    mysql::Value::Double(v) => Some(v.to_string()),
-                                    mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
-                                        Ok(string) => Some(string),
-                                        Err(_) => Some(to_hex(&bytes)),
-                                    }
-                                    _ => unimplemented!(),
-                                };
+                            for (index, col) in result_row.columns_ref().iter().enumerate() {
+                                let value = result_row.get_to_string(index);
                                 let column = Box::leak(col.name_str().to_string().into_boxed_str());
                                 $table.push_column(column);
                                 row.insert(&*column, value);
                             }
-                            $table.push(row);
                         } else {
-                            let mut row = Row::with_capacity(column_len);
-                            for (i, _) in result_row.columns_ref().iter().enumerate() {
-                                let value = match result_row[i] {
-                                    mysql::Value::NULL      => None,
-                                    mysql::Value::Int(v)    => Some(v.to_string()),
-                                    mysql::Value::UInt(v)   => Some(v.to_string()),
-                                    mysql::Value::Float(v)  => Some(v.to_string()),
-                                    mysql::Value::Double(v) => Some(v.to_string()),
-                                    mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
-                                        Ok(string) => Some(string),
-                                        Err(_) => Some(to_hex(&bytes)),
-                                    }
-                                    _ => unimplemented!(),
-                                };
+                            for index in 0..column_len {
+                                let value = result_row.get_to_string(index);
                                 unsafe {
-                                    row.insert(&*$table.column_names[i], value);
+                                    row.insert(&*$table.column_names[index], value);
                                 }
                             }
-                            $table.push(row);
                         }
+
+                        $table.push(row);
                     }
                 }
             };
@@ -232,6 +198,25 @@ fn compile(ws: &WrapString) -> String {
     query
 }
 
+trait GetToString {
+    fn get_to_string(&self, index: usize) -> Option<String>;
+}
+impl GetToString for mysql::Row {
+    fn get_to_string(&self, index: usize) -> Option<String> {
+        match self[index] {
+            mysql::Value::NULL      => None,
+            mysql::Value::Int(v)    => Some(v.to_string()),
+            mysql::Value::UInt(v)   => Some(v.to_string()),
+            mysql::Value::Float(v)  => Some(v.to_string()),
+            mysql::Value::Double(v) => Some(v.to_string()),
+            mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
+                Ok(string) => Some(string),
+                Err(_) => Some(to_hex(&bytes)),
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
