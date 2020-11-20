@@ -220,7 +220,7 @@ mod mysql {
         let age = 50;
         let sql = prep!("select name from users where age <") + age;
 
-        for row in conn.rows(&sql).unwrap().iter() {
+        for row in conn.rows(&sql).unwrap() {
             assert_eq!(row.get("name").unwrap(), "Alice");
         }
     }
@@ -240,7 +240,7 @@ mod mysql {
     #[test]
     fn prep_into_rows() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + 1).unwrap() {
             assert_eq!(row.get(0).unwrap(),   "1");
             assert_eq!(row.get("?").unwrap(), "1");
         }
@@ -335,7 +335,7 @@ mod mysql {
         let data = vec![0x1, 0xA, 0xFF, 0x00, 0x7F];
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
         conn.execute(&sql).unwrap();
-        for row in &conn.rows("SELECT data FROM b").unwrap() {
+        for row in conn.rows("SELECT data FROM b").unwrap() {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
     }
@@ -344,7 +344,7 @@ mod mysql {
     fn question() {
         let conn = prepare();
         let sql = prep!("SELECT name FROM users WHERE name=") + "?";
-        for _ in &conn.rows(&sql).unwrap() { unreachable!(); }
+        for _ in conn.rows(&sql).unwrap() { unreachable!(); }
     }
 }
 

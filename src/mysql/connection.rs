@@ -142,17 +142,14 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                         if first_row {
                             first_row = false;
                             for (index, col) in result_row.columns_ref().iter().enumerate() {
+                                $table.push_column(col.name_str().to_string());
                                 let value = result_row.get_to_string(index);
-                                let column = Box::leak(col.name_str().to_string().into_boxed_str());
-                                $table.push_column(column);
-                                row.insert(&*column, value);
+                                row.insert(&**$table.column_names[index], value);
                             }
                         } else {
                             for index in 0..column_len {
                                 let value = result_row.get_to_string(index);
-                                unsafe {
-                                    row.insert(&*$table.column_names[index], value);
-                                }
+                                row.insert(&**$table.column_names[index], value);
                             }
                         }
 

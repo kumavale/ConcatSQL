@@ -1,4 +1,6 @@
 use std::str::FromStr;
+use std::pin::Pin;
+
 use indexmap::map::IndexMap;
 use crate::error::Error;
 
@@ -7,7 +9,7 @@ type IndexMapPairs<'table> = IndexMap<&'table str, Option<String>>;
 #[derive(Debug, Default, PartialEq)]
 pub struct Table<'table> {
     rows:                    Vec<Row<'table>>,
-    pub(crate) column_names: Vec<*const str>,
+    pub(crate) column_names: Vec<Pin<Box<String>>>,
 }
 
 impl<'a> Table<'a> {
@@ -17,8 +19,8 @@ impl<'a> Table<'a> {
             index: 0,                                                                                                                }
     }
 
-    pub(crate) fn push_column(&mut self, column_name: *const str) {
-        self.column_names.push(column_name);
+    pub(crate) fn push_column(&mut self, column_name: String) {
+        self.column_names.push(Box::pin(column_name));
     }
 
     pub(crate) fn push(&mut self, row: Row<'a>) {
@@ -43,22 +45,21 @@ impl<'a> Iterator for TableIter<'a> {
     }
 }
 
+impl<'a> IntoIterator for Table<'a> {
+    type Item = Row<'a>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.rows.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Table<'a> {
     type Item = <std::slice::Iter<'a, Row<'a>> as Iterator>::Item;
     type IntoIter = std::slice::Iter<'a, Row<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.rows.as_slice().iter()
-    }
-}
-
-impl<'a> Drop for Table<'a> {
-    fn drop(&mut self) {
-        for column_name in &self.column_names {
-            unsafe {
-                std::mem::drop(Box::from_raw(*column_name as *mut &str));
-            }
-        }
     }
 }
 
@@ -80,8 +81,8 @@ impl<'a> Row<'a> {
     }
 
     #[inline]
-    pub(crate) fn insert(&mut self, key: &'a str, value: Option<String>) {
-        self.pairs.insert(key, value);
+    pub(crate) fn insert(&mut self, key: *const str, value: Option<String>) {
+        unsafe { self.pairs.insert(&*key, value); }
     }
 
     /// Get the value of a column of the result row.

@@ -97,10 +97,9 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let column_len = first_row.columns().len();
             let mut row = Row::with_capacity(column_len);
             for (index, col) in first_row.columns().iter().enumerate() {
+                table.push_column(col.name().to_string());
                 let value = first_row.get_to_string(index);
-                let column_name = Box::leak(col.name().to_string().into_boxed_str());
-                table.push_column(column_name);
-                row.insert(&*column_name, value);
+                row.insert(&**table.column_names[index], value);
             }
             table.push(row);
         }
@@ -111,9 +110,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let mut row = Row::with_capacity(column_len);
             for index in 0..column_len {
                 let value = result_row.get_to_string(index);
-                unsafe {
-                    row.insert(&*table.column_names[index], value);
-                }
+                row.insert(&**table.column_names[index], value);
             }
             table.push(row);
         }

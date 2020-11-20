@@ -202,10 +202,9 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     pairs.storing(stmt, column_count);
                     let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                     let mut row = Row::with_capacity(column_count as usize);
-                    for (column, value) in pairs.iter() {
-                        let column = Box::leak(column.to_string().into_boxed_str());
-                        table.push_column(column);
-                        row.insert(&*column, value.map(|v| v.to_string()));
+                    for (index, (column, value)) in pairs.iter().enumerate() {
+                        table.push_column(column.to_string());
+                        row.insert(&**table.column_names[index], value.map(|v| v.to_string()));
                     }
                     table.push(row);
                 }
@@ -226,8 +225,8 @@ impl ConcatsqlConn for ffi::sqlite3 {
                         pairs.storing(stmt, column_count);
                         let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                         let mut row = Row::with_capacity(column_count as usize);
-                        for (i, (_, value)) in pairs.iter().enumerate() {
-                            row.insert(&*table.column_names[i], value.map(|v| v.to_string()));
+                        for (index, (_, value)) in pairs.iter().enumerate() {
+                            row.insert(&**table.column_names[index], value.map(|v| v.to_string()));
                         }
                         table.push(row);
                     }

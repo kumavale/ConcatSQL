@@ -108,7 +108,7 @@ impl<'a, 'b> Connection<'a> {
     /// # conn.execute(stmt).unwrap();
     /// let sql = prep!("SELECT name FROM users;");
     /// let rows = conn.rows(&sql).unwrap();
-    /// for row in &rows {
+    /// for row in rows {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
