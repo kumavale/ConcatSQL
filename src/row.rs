@@ -1,24 +1,91 @@
 use std::str::FromStr;
+use std::pin::Pin;
+use std::marker::PhantomPinned;
+
 use indexmap::map::IndexMap;
 use crate::error::Error;
 
-type IndexMapPairs = IndexMap<String, Option<String>>;
+type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
-/// A single result row of a query.
 #[derive(Debug, PartialEq)]
-pub struct Row {
-    pairs: IndexMapPairs,
+pub struct Table<'a> {
+    rows:                    Vec<Row<'a>>,
+    pub(crate) column_names: Vec<String>,
+    _pinned:                 PhantomPinned,
 }
 
-impl Row {
-    #[inline]
+impl<'a> Default for Table<'a> {
+    fn default() -> Self {
+        Self {
+            rows:         Vec::new(),
+            column_names: Vec::new(),
+            _pinned:      PhantomPinned,
+        }
+    }
+}
+
+impl<'a> Table<'a> {
+    pub fn iter(&self) -> TableIter {
+        TableIter {
+            table: &self,
+            index: 0,                                                                                                                }
+    }
+
+    pub(crate) fn push_column(&mut self, column_name: String) {
+        self.column_names.push(column_name);
+    }
+
+    pub(crate) fn push(&mut self, row: Row<'a>) {
+        self.rows.push(row);
+    }
+}
+
+pub struct TableIter<'a> {
+    table: &'a Table<'a>,
+    index: usize,
+}
+
+impl<'a> Iterator for TableIter<'a> {
+    type Item = &'a Row<'a>;
+    fn next(&mut self) -> Option<&'a Row<'a>> {
+        if self.index < self.table.rows.len() {
+            self.index += 1;
+            Some(&self.table.rows[self.index - 1])
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Pin<Box<Table<'a>>> {
+    type Item = <std::slice::Iter<'a, Row<'a>> as Iterator>::Item;
+    type IntoIter = std::slice::Iter<'a, Row<'a>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.rows.as_slice().iter()
+    }
+}
+
+/// A single result row of a query.
+#[derive(Debug, Default, PartialEq)]
+pub struct Row<'a> {
+    pairs: IndexMapPairs<'a>,
+}
+
+impl<'a> Row<'a> {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
         Self { pairs: IndexMap::new() }
     }
 
     #[inline]
-    pub(crate) fn insert(&mut self, key: String, value: Option<String>) {
-        self.pairs.insert(key, value);
+    pub(crate) fn with_capacity(n: usize) -> Self {
+        Self { pairs: IndexMap::with_capacity(n) }
+    }
+
+    #[inline]
+    pub(crate) fn insert(&mut self, key: *const str, value: Option<String>) {
+        unsafe { self.pairs.insert(&*key, value); }
     }
 
     /// Get the value of a column of the result row.
@@ -28,7 +95,7 @@ impl Row {
     /// ```
     /// # use concatsql::prelude::*;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// for row in conn.rows("SELECT 1").unwrap() {
+    /// for row in &conn.rows("SELECT 1").unwrap() {
     ///     assert_eq!(row.get(0).unwrap(),   "1");
     ///     assert_eq!(row.get("1").unwrap(), "1");
     /// }
@@ -45,7 +112,7 @@ impl Row {
     /// ```
     /// # use concatsql::prelude::*;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// for row in conn.rows("SELECT 1").unwrap() {
+    /// for row in &conn.rows("SELECT 1").unwrap() {
     ///     assert_eq!(row.get_into::<_, i32>(0).unwrap(),   1);
     ///     assert_eq!(row.get_into::<_, i32>("1").unwrap(), 1);
     ///
@@ -82,7 +149,7 @@ impl Row {
     /// Get all the column names.  
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
-        self.pairs.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
+        self.pairs.keys().copied().collect::<Vec<_>>()
     }
 }
 
@@ -109,15 +176,15 @@ impl Get for str {
 
 impl Get for String {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
-        pairs.get(self)?.as_deref()
+        pairs.get(&**self)?.as_deref()
     }
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+        U::from_sql(pairs.get(&**self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
     }
 
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
-        Some(pairs.get_key_value(self)?.0)
+        Some(pairs.get_key_value(&**self)?.0)
     }
 }
 
@@ -214,9 +281,9 @@ mod tests {
     #[test]
     fn row() {
         let mut row = Row::new();
-        row.insert("key1".to_string(), Some("value".to_string()));
-        row.insert("key2".to_string(), None);
-        row.insert("key3".to_string(), Some("42".to_string()));
+        row.insert("key1", Some("value".to_string()));
+        row.insert("key2", None);
+        row.insert("key3", Some("42".to_string()));
 
         assert_eq!(row.get("key1"), Some("value"));
         assert_eq!(row.get("key1").unwrap(), "value");
@@ -288,7 +355,7 @@ mod tests {
         assert_eq!(row.get(&String::from("key1")), Some("value"));
         assert_eq!(row.get(&&String::from("key1")), Some("value"));
 
-        row.insert("ABC".to_string(), Some("414243".to_string()));
+        row.insert("ABC", Some("414243".to_string()));
         assert_eq!(row.get_into::<_, Vec<u8>>("ABC"), Ok(vec![b'A',b'B',b'C']));
         assert!(row.get_into::<_, i8>("ABC").is_err());
         assert!(row.get_into::<_, u8>("ABC").is_err());

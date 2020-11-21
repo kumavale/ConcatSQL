@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 use crate::Result;
-use crate::row::Row;
+use crate::row::{Table, Row};
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::{WrapString, Value};
@@ -30,7 +30,7 @@ macro_rules! to_sql {
             Value::Null         => &"NULL" as &(dyn postgres::types::ToSql + Sync),
             Value::I32(value)   => value,
             Value::I64(value)   => value,
-            Value::I128(_value) => unimplemented!(),
+            Value::I128(_value) => unimplemented!(),  // TODO UUID
             Value::F32(value)   => value,
             Value::F64(value)   => value,
             Value::Text(value)  => value,
@@ -68,33 +68,8 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
 
         let mut pairs = Vec::new();
         for row in rows {
-            for (i, col) in row.columns().iter().enumerate() {
-                let value = if let Ok(value) = row.try_get::<usize, String>(i) {
-                    Some(value)
-                } else if let Ok(value) = row.try_get::<usize, i32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, i64>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, u32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, f32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, f64>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, bool>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, i8>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, i16>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, std::net::IpAddr>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = row.try_get::<usize, Vec<u8>>(i) {
-                    Some(crate::parser::to_hex(&value))
-                } else {
-                    None
-                };
-
+            for (index, col) in row.columns().iter().enumerate() {
+                let value = row.get_to_string(index);
                 pairs.push((col.name().to_string(), value));
             }
         }
@@ -107,52 +82,38 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         Ok(())
     }
 
-    fn rows_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
         let query = compile(ws);
         let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
         let result = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Vec::new()),
+            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
         };
 
-        let mut rows: Vec<Row> = Vec::new();
+        let mut table = Table::default();
 
-        for result_row in result {
-            let mut row = Row::new();
-
-            for (i, col) in result_row.columns().iter().enumerate() {
-                let value = if let Ok(value) = result_row.try_get::<usize, String>(i) {
-                    Some(value)
-                } else if let Ok(value) = result_row.try_get::<usize, i32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, i64>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, u32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, f32>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, f64>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, bool>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, i8>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, i16>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, std::net::IpAddr>(i) {
-                    Some(value.to_string())
-                } else if let Ok(value) = result_row.try_get::<usize, Vec<u8>>(i) {
-                    Some(crate::parser::to_hex(&value))
-                } else {
-                    None
-                };
-
-                row.insert(col.name().to_string(), value);
+        // First row
+        if let Some(first_row) = result.first() {
+            let column_len = first_row.columns().len();
+            let mut row = Row::with_capacity(column_len);
+            for (index, col) in first_row.columns().iter().enumerate() {
+                table.push_column(col.name().to_string());
+                row.insert(&*table.column_names[index], first_row.get_to_string(index));
             }
-            rows.push(row);
+            table.push(row);
         }
 
-        Ok(rows)
+        // Or later
+        for result_row in result.iter().skip(1) {
+            let column_len = result_row.columns().len();
+            let mut row = Row::with_capacity(column_len);
+            for index in 0..column_len {
+                row.insert(&*table.column_names[index], result_row.get_to_string(index));
+            }
+            table.push(row);
+        }
+
+        Ok(Box::pin(table))
     }
 
     fn kind(&self) -> ConnKind {
@@ -173,6 +134,39 @@ fn compile(ws: &WrapString) -> String {
         }
     }
     query
+}
+
+trait GetToString {
+    fn get_to_string(&self, index: usize) -> Option<String>;
+}
+impl GetToString for postgres::row::Row {
+    fn get_to_string(&self, index: usize) -> Option<String> {
+        if let Ok(value) = self.try_get::<usize, String>(index) {
+            Some(value)
+        } else if let Ok(value) = self.try_get::<usize, i32>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, i64>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, u32>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, f32>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, f64>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, bool>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, i8>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, i16>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, std::net::IpAddr>(index) {
+            Some(value.to_string())
+        } else if let Ok(value) = self.try_get::<usize, Vec<u8>>(index) {
+            Some(crate::parser::to_hex(&value))
+        } else {
+            None
+        }
+    }
 }
 
 
