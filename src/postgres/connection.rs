@@ -82,12 +82,12 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         Ok(())
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Table<'a>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
         let query = compile(ws);
         let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
         let result = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Table::default()),
+            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
         };
 
         let mut table = Table::default();
@@ -98,8 +98,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let mut row = Row::with_capacity(column_len);
             for (index, col) in first_row.columns().iter().enumerate() {
                 table.push_column(col.name().to_string());
-                let value = first_row.get_to_string(index);
-                row.insert(&**table.column_names[index], value);
+                row.insert(&*table.column_names[index], first_row.get_to_string(index));
             }
             table.push(row);
         }
@@ -109,13 +108,12 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let column_len = result_row.columns().len();
             let mut row = Row::with_capacity(column_len);
             for index in 0..column_len {
-                let value = result_row.get_to_string(index);
-                row.insert(&**table.column_names[index], value);
+                row.insert(&*table.column_names[index], result_row.get_to_string(index));
             }
             table.push(row);
         }
 
-        Ok(table)
+        Ok(Box::pin(table))
     }
 
     fn kind(&self) -> ConnKind {

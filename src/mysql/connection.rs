@@ -116,7 +116,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         Ok(())
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Table<'a>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
         let mut conn = self.borrow_mut();
         let query = compile(ws);
 
@@ -125,7 +125,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                 if let Some(result_set) = $result.next_set() {
                     let result_set = match result_set {
                         Ok(result_set) => result_set,
-                        Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Table::default()),
+                        Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
                     };
 
                     let mut first_row = true;
@@ -133,7 +133,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                     for result_row in result_set {
                         let result_row = match result_row {
                             Ok(row) => row,
-                            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Table::default()),
+                            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
                         };
 
                         let column_len = result_row.columns_ref().len();
@@ -144,12 +144,12 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                             for (index, col) in result_row.columns_ref().iter().enumerate() {
                                 $table.push_column(col.name_str().to_string());
                                 let value = result_row.get_to_string(index);
-                                row.insert(&**$table.column_names[index], value);
+                                row.insert(&*$table.column_names[index], value);
                             }
                         } else {
                             for index in 0..column_len {
                                 let value = result_row.get_to_string(index);
-                                row.insert(&**$table.column_names[index], value);
+                                row.insert(&*$table.column_names[index], value);
                             }
                         }
 
@@ -164,19 +164,19 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         if ws.params.is_empty() {
             let mut result = match conn.query_iter(&query) {
                 Ok(result) => result,
-                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Table::default()),
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
             };
             run!(result, table);
         } else {
             let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
             let mut result = match conn.exec_iter(&query, params) {
                 Ok(result) => result,
-                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Table::default()),
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
             };
             run!(result, table);
         }
 
-        Ok(table)
+        Ok(Box::pin(table))
     }
 
     fn kind(&self) -> ConnKind {

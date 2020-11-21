@@ -18,7 +18,7 @@
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
-//!     for row in conn.rows(&sql).unwrap() {
+//!     for row in &conn.rows(&sql).unwrap() {
 //!         assert_eq!(row.get(0).unwrap(),      "Alice");
 //!         assert_eq!(row.get("name").unwrap(), "Alice");
 //!     }

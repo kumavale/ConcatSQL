@@ -11,7 +11,7 @@ pub(crate) trait ConcatsqlConn {
     fn execute_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
     fn iterate_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<Table<'a>>;
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<Pin<Box<Table<'a>>>>;
     fn kind(&self) -> ConnKind;
 }
 
@@ -108,11 +108,11 @@ impl<'a, 'b> Connection<'a> {
     /// # conn.execute(stmt).unwrap();
     /// let sql = prep!("SELECT name FROM users;");
     /// let rows = conn.rows(&sql).unwrap();
-    /// for row in rows {
+    /// for row in &rows {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<'table, T: IntoWrapString<'b>>(&self, query: T) -> Result<Table<'table>> {
+    pub fn rows<'table, T: IntoWrapString<'b>>(&self, query: T) -> Result<Pin<Box<Table<'table>>>> {
         self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
     }
 

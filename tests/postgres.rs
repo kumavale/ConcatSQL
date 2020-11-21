@@ -175,7 +175,7 @@ mod postgres {
 
         assert_eq!(conn.execute(invalid_sql),                      Ok(()));
         assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), Ok(()));
-        assert_eq!(conn.rows(invalid_sql),                         Ok(Table::default()));
+        assert_eq!(conn.rows(invalid_sql),                         Ok(Box::pin(Table::default())));
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod postgres {
         let age = 50;
         let sql = prep!("select name from users where age < ") + age;
 
-        for row in conn.rows(&sql).unwrap() {
+        for row in &conn.rows(&sql).unwrap() {
             assert_eq!(row.get("name").unwrap(), "Alice");
         }
     }
@@ -240,17 +240,17 @@ mod postgres {
     #[test]
     fn prep_into_rows() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        for row in conn.rows(prep!("SELECT ") + 1 + prep!("::INTEGER")).unwrap() {
+        for row in &conn.rows(prep!("SELECT ") + 1 + prep!("::INTEGER")).unwrap() {
             assert_eq!(row.column_name(0).unwrap(), "int4");
             assert_eq!(row.get("int4").unwrap(), "1");
             assert_eq!(row.get(0).unwrap(), "1");
         }
-        for row in conn.rows(prep!("SELECT ") + "1" + prep!("::TEXT")).unwrap() {
+        for row in &conn.rows(prep!("SELECT ") + "1" + prep!("::TEXT")).unwrap() {
             assert_eq!(row.column_name(0).unwrap(), "text");
             assert_eq!(row.get("text").unwrap(), "1");
             assert_eq!(row.get(0).unwrap(), "1");
         }
-        for row in conn.rows(prep!("SELECT 1")).unwrap() {
+        for row in &conn.rows(prep!("SELECT 1")).unwrap() {
             assert_eq!(row.column_name(0).unwrap(), "?column?");
             assert_eq!(row.get("?column?").unwrap(), "1");
             assert_eq!(row.get(0).unwrap(), "1");
@@ -326,7 +326,7 @@ mod postgres {
         let data = vec![0x1, 0xA, 0xFF, 0x00, 0x7F];
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
         conn.execute(&sql).unwrap();
-        for row in conn.rows("SELECT data FROM b").unwrap() {
+        for row in &conn.rows("SELECT data FROM b").unwrap() {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
     }
@@ -335,6 +335,6 @@ mod postgres {
     fn question() {
         let conn = prepare();
         let sql = prep!("SELECT name FROM users WHERE name=") + "?";
-        for _ in conn.rows(&sql).unwrap() { unreachable!(); }
+        for _ in &conn.rows(&sql).unwrap() { unreachable!(); }
     }
 }

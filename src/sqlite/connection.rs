@@ -161,13 +161,13 @@ impl ConcatsqlConn for ffi::sqlite3 {
         }
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Table<'a>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
         let mut table = Table::default();
 
         let query = compile(ws);
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", query).map(|_| Table::default()),
+            _ => return Error::new(&error_level, "invalid query", query).map(|_| Box::pin(Table::default())),
         };
         let mut stmt = ptr::null_mut();
 
@@ -184,7 +184,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                 ffi::sqlite3_finalize(stmt);
                 return Error::new(&error_level, "exec error",
                     &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
-                    .map(|_| Table::default());
+                    .map(|_| Box::pin(Table::default()));
             }
 
             bind_all(stmt, ws, error_level)?;
@@ -195,7 +195,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
             match ffi::sqlite3_step(stmt) {
                 ffi::SQLITE_DONE => {
                     ffi::sqlite3_finalize(stmt);
-                    return Ok(table);
+                    return Ok(Box::pin(table));
                 }
                 ffi::SQLITE_ROW => {
                     let mut pairs = Vec::with_capacity(column_count as usize);
@@ -204,7 +204,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     let mut row = Row::with_capacity(column_count as usize);
                     for (index, (column, value)) in pairs.iter().enumerate() {
                         table.push_column(column.to_string());
-                        row.insert(&**table.column_names[index], value.map(|v| v.to_string()));
+                        row.insert(&*table.column_names[index], value.map(|v| v.to_string()));
                     }
                     table.push(row);
                 }
@@ -212,7 +212,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     ffi::sqlite3_finalize(stmt);
                     return Error::new(&error_level, "exec error",
                         &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
-                        .map(|_| Table::default());
+                        .map(|_| Box::pin(Table::default()));
                 }
             }
 
@@ -226,7 +226,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                         let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                         let mut row = Row::with_capacity(column_count as usize);
                         for (index, (_, value)) in pairs.iter().enumerate() {
-                            row.insert(&**table.column_names[index], value.map(|v| v.to_string()));
+                            row.insert(&*table.column_names[index], value.map(|v| v.to_string()));
                         }
                         table.push(row);
                     }
@@ -234,13 +234,13 @@ impl ConcatsqlConn for ffi::sqlite3 {
                         ffi::sqlite3_finalize(stmt);
                         return Error::new(&error_level, "exec error",
                             &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
-                            .map(|_| Table::default());
+                            .map(|_| Box::pin(Table::default()));
                     }
                 }
             }
 
             ffi::sqlite3_finalize(stmt);
-            Ok(table)
+            Ok(Box::pin(table))
         }
     }
 
