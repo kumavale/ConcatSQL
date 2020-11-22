@@ -18,7 +18,7 @@
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
-//!     for row in &conn.rows(&sql).unwrap() {
+//!     for row in conn.rows(&sql).unwrap() {
 //!         assert_eq!(row.get(0).unwrap(),      "Alice");
 //!         assert_eq!(row.get("name").unwrap(), "Alice");
 //!     }
@@ -52,7 +52,7 @@ pub mod postgres;
 
 pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
-pub use crate::row::{Table, Row, Get, FromSql};
+pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
 pub use crate::wrapstring::{WrapString, IntoWrapString};
 
@@ -70,7 +70,7 @@ pub mod prelude {
     pub use crate::postgres;
 
     pub use crate::connection::{Connection, without_escape};
-    pub use crate::row::{Table, Row, Get, FromSql};
+    pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
     pub use crate::wrapstring::{WrapString, IntoWrapString};
 }
