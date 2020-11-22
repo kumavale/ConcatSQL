@@ -4,9 +4,10 @@ use postgres::{Client, NoTls};
 
 use std::cell::RefCell;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use crate::Result;
-use crate::row::{Table, Row};
+use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::{WrapString, Value};
@@ -82,25 +83,26 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         Ok(())
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'a>>> {
         let query = compile(ws);
         let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
         let result = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
-            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
+            Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
         };
 
-        let mut table = Table::default();
+        let mut rows: Vec<Row> = Vec::new();
 
         // First row
         if let Some(first_row) = result.first() {
             let column_len = first_row.columns().len();
             let mut row = Row::with_capacity(column_len);
             for (index, col) in first_row.columns().iter().enumerate() {
-                table.push_column(col.name().to_string());
-                row.insert(&*table.column_names[index], first_row.get_to_string(index));
+                let column: Arc<str> = Arc::from(col.name().to_string());
+                row.push_column(column.clone());
+                unsafe { row.insert(&*Arc::as_ptr(&column), first_row.get_to_string(index)); }
             }
-            table.push(row);
+            rows.push(row);
         }
 
         // Or later
@@ -108,12 +110,12 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let column_len = result_row.columns().len();
             let mut row = Row::with_capacity(column_len);
             for index in 0..column_len {
-                row.insert(&*table.column_names[index], result_row.get_to_string(index));
+                unsafe { row.insert(&*Arc::as_ptr(&rows[0].column(index)), result_row.get_to_string(index)); }
             }
-            table.push(row);
+            rows.push(row);
         }
 
-        Ok(Box::pin(table))
+        Ok(rows)
     }
 
     fn kind(&self) -> ConnKind {

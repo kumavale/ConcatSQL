@@ -4,10 +4,11 @@ use mysql::prelude::*;
 
 use std::cell::RefCell;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use crate::Result;
 use crate::parser::to_hex;
-use crate::row::{Table, Row};
+use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::{WrapString, Value};
@@ -116,16 +117,16 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         Ok(())
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Pin<Box<Table<'a>>>> {
+    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'a>>> {
         let mut conn = self.borrow_mut();
         let query = compile(ws);
 
         macro_rules! run {
-            ($result:expr, $table:expr) => {
+            ($result:expr, $rows:expr) => {
                 if let Some(result_set) = $result.next_set() {
                     let result_set = match result_set {
                         Ok(result_set) => result_set,
-                        Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
+                        Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
                     };
 
                     let mut first_row = true;
@@ -133,7 +134,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                     for result_row in result_set {
                         let result_row = match result_row {
                             Ok(row) => row,
-                            Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
+                            Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
                         };
 
                         let column_len = result_row.columns_ref().len();
@@ -141,42 +142,41 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 
                         if first_row {
                             first_row = false;
-                            for (index, col) in result_row.columns_ref().iter().enumerate() {
-                                $table.push_column(col.name_str().to_string());
-                                let value = result_row.get_to_string(index);
-                                row.insert(&*$table.column_names[index], value);
+                            for (index, column) in result_row.columns_ref().iter().enumerate() {
+                                let column: Arc<str> = Arc::from(column.name_str().to_string());
+                                row.push_column(column.clone());
+                                unsafe { row.insert(&*Arc::as_ptr(&column), result_row.get_to_string(index)); }
                             }
                         } else {
                             for index in 0..column_len {
-                                let value = result_row.get_to_string(index);
-                                row.insert(&*$table.column_names[index], value);
+                                unsafe { row.insert(&*Arc::as_ptr(&$rows[0].column(index)), result_row.get_to_string(index)); }
                             }
                         }
 
-                        $table.push(row);
+                        $rows.push(row);
                     }
                 }
             };
         }
 
-        let mut table = Table::default();
+        let mut rows: Vec<Row> = Vec::new();
 
         if ws.params.is_empty() {
             let mut result = match conn.query_iter(&query) {
                 Ok(result) => result,
-                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
             };
-            run!(result, table);
+            run!(result, rows);
         } else {
             let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
             let mut result = match conn.exec_iter(&query, params) {
                 Ok(result) => result,
-                Err(e) => return Error::new(error_level, "exec error", &e).map(|_|Box::pin(Table::default())),
+                Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
             };
-            run!(result, table);
+            run!(result, rows);
         }
 
-        Ok(Box::pin(table))
+        Ok(rows)
     }
 
     fn kind(&self) -> ConnKind {
