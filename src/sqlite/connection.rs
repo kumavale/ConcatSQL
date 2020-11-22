@@ -296,15 +296,15 @@ impl Storing for Vec<(&str, Option<Cow<'_, str>>)> {
 
 unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
     for (index, param) in (1i32..).zip(ws.params.iter()) {
-        match param {
+        let result = match param {
             Value::Null => {
-                ffi::sqlite3_bind_null(stmt, index);
+                ffi::sqlite3_bind_null(stmt, index)
             }
             Value::I32(value) => {
-                ffi::sqlite3_bind_int(stmt, index, *value);
+                ffi::sqlite3_bind_int(stmt, index, *value)
             }
             Value::I64(value) => {
-                ffi::sqlite3_bind_int64(stmt, index, *value);
+                ffi::sqlite3_bind_int64(stmt, index, *value)
             }
             Value::I128(value) => {
                 let value = value.to_string();
@@ -322,13 +322,13 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
                     value.as_ptr(),
                     len as i32,
                     Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-                );
+                )
             }
             Value::F32(value) => {
-                ffi::sqlite3_bind_double(stmt, index, *value as f64);
+                ffi::sqlite3_bind_double(stmt, index, *value as f64)
             }
             Value::F64(value) => {
-                ffi::sqlite3_bind_double(stmt, index, *value);
+                ffi::sqlite3_bind_double(stmt, index, *value)
             }
             Value::Text(value) => {
                 let len = value.as_bytes().len();
@@ -345,7 +345,7 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
                     value.as_ptr(),
                     len as i32,
                     Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-                );
+                )
             }
             Value::Bytes(value) => {
                 ffi::sqlite3_bind_blob(
@@ -354,8 +354,12 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
                     value.as_ptr() as *const _,
                     value.len() as i32,
                     Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-                );
+                )
             }
+        };
+        if result != ffi::SQLITE_OK {
+            ffi::sqlite3_finalize(stmt);
+            return Error::new(&error_level, "bind error", &CStr::from_ptr(ffi::sqlite3_errstr(result)).to_string_lossy());
         }
     }
 

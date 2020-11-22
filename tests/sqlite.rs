@@ -417,22 +417,25 @@ mod sqlite {
         let conn = prepare();
 
         let name = "' OR 1=2; SELECT 1; --";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "' OR 1=1; --";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "Alice";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "'' OR 1=1; --";
         let sql = prep!("SELECT age FROM users WHERE name = ") + name;
