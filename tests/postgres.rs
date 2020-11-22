@@ -11,6 +11,7 @@ mod postgres {
 
     fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
         conn.execute(&stmt).unwrap();
         conn
@@ -37,13 +38,6 @@ mod postgres {
     }
 
     #[test]
-    #[should_panic = "exec error"]
-    fn execute_should_error() {
-        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.execute(stmt().to_wrapstring()).unwrap();
-    }
-
-    #[test]
     fn iterate() {
         let conn = prepare();
         let expects = ["Alice", "Bob", "Carol"];
@@ -60,8 +54,8 @@ mod postgres {
     }
 
     #[test]
-    #[should_panic = "exec error"] // TODO support multiple statement
-    fn iterate_2sets() {
+    #[should_panic = "exec error"]
+    fn multiple_stm_should_errort() {
         let conn = prepare();
         let sql = prep!("SELECT name FROM users; SELECT name FROM users;");
 
@@ -72,7 +66,7 @@ mod postgres {
     fn iterate_or() {
         let conn = prepare();
         let expects = ["Alice", "Bob"];
-        let age = "50";
+        let age = 50;  // "50" error
         let sql = prep!("SELECT name FROM users WHERE ") +
             &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
 
@@ -122,7 +116,7 @@ mod postgres {
         let name = "'Alice'; DROP TABLE users; --";
         let sql = prep!("select age from users where name = ") + name + &prep!("");
         assert_eq!(
-            sql.actual_sql(),
+            sql.simulate(),
             "select age from users where name = '''Alice''; DROP TABLE users; --'"
         );
         conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
@@ -177,66 +171,47 @@ mod postgres {
     fn error_level_AlwaysOk() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::AlwaysOk);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      Ok(()));
-        assert_eq!(conn.execute(&endless),                          Ok(()));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), Ok(()));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), Ok(()));
-        assert_eq!(conn.rows(&invalid_sql),                         Ok(vec![]));
-        assert_eq!(conn.rows(&endless),                             Ok(vec![]));
+        assert_eq!(conn.execute(invalid_sql),                      Ok(()));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), Ok(()));
+        assert_eq!(conn.rows(invalid_sql),                         Ok(Vec::new()));
     }
 
     #[test]
     fn error_level_release() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Release);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!());
-        assert_eq!(conn.execute(&endless),                          err!());
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!());
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!());
-        assert_eq!(conn.rows(&invalid_sql),                         err!());
-        assert_eq!(conn.rows(&endless),                             err!());
+        assert_eq!(conn.execute(invalid_sql),                      err!());
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!());
+        assert_eq!(conn.rows(invalid_sql),                         err!());
     }
 
     #[test]
     fn error_level_develop() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Develop);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),                      err!("exec error"));
-        assert_eq!(conn.execute(&endless),                          err!("exec error"));
-        assert_eq!(conn.iterate(&invalid_sql,  |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.iterate(&endless,      |_| unreachable!()), err!("exec error"));
-        assert_eq!(conn.rows(&invalid_sql),                         err!("exec error"));
-        assert_eq!(conn.rows(&endless),                             err!("exec error"));
+        assert_eq!(conn.execute(invalid_sql),                      err!("exec error"));
+        assert_eq!(conn.iterate(invalid_sql,  |_| unreachable!()), err!("exec error"));
+        assert_eq!(conn.rows(invalid_sql),                         err!("exec error"));
     }
 
     #[test]
     fn error_level_debug() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Debug);
-        let invalid_sql = "INVALID SQL".to_wrapstring();
-        let endless = "'endless".to_wrapstring();
+        let invalid_sql = "INVALID_SQL";
 
-        assert_eq!(conn.execute(&invalid_sql),
-            err!("exec error: db error: ERROR: \"\'INVALID SQL\'\"またはその近辺で構文エラー"));
-        assert_eq!(conn.execute(&endless),
-            err!("exec error: db error: ERROR: \"\'\'\'endless\'\"またはその近辺で構文エラー"));
-        assert_eq!(conn.iterate(&invalid_sql, |_| unreachable!()),
-            err!("exec error: db error: ERROR: \"\'INVALID SQL\'\"またはその近辺で構文エラー"));
-        assert_eq!(conn.iterate(&endless,    |_| unreachable!()),
-            err!("exec error: db error: ERROR: \"\'\'\'endless\'\"またはその近辺で構文エラー"));
-        assert_eq!(conn.rows(&invalid_sql),
-            err!("exec error: db error: ERROR: \"\'INVALID SQL\'\"またはその近辺で構文エラー"));
-        assert_eq!(conn.rows(&endless),
-            err!("exec error: db error: ERROR: \"\'\'\'endless\'\"またはその近辺で構文エラー"));
+        assert_eq!(conn.execute(invalid_sql),
+            err!("exec error: db error: ERROR: \"INVALID_SQL\"またはその近辺で構文エラー"));
+        assert_eq!(conn.iterate(invalid_sql, |_| unreachable!()),
+            err!("exec error: db error: ERROR: \"INVALID_SQL\"またはその近辺で構文エラー"));
+        assert_eq!(conn.rows(invalid_sql),
+            err!("exec error: db error: ERROR: \"INVALID_SQL\"またはその近辺で構文エラー"));
     }
 
     #[test]
@@ -245,27 +220,38 @@ mod postgres {
         let age = 50;
         let sql = prep!("select name from users where age < ") + age;
 
-        for row in conn.rows(&sql).unwrap().iter() {
+        for row in conn.rows(&sql).unwrap() {
             assert_eq!(row.get("name").unwrap(), "Alice");
         }
     }
 
     #[test]
-    fn ow_into_execute() {
+    fn prep_into_execute() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.execute(prep!("SELECT ") + 1).unwrap();
+        conn.execute(prep!("SELECT ") + 1 + prep!("::INTEGER")).unwrap();
     }
 
     #[test]
-    fn ow_into_iterate() {
+    fn prep_into_iterate() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        conn.iterate(prep!("SELECT ") + 1, |_| true ).unwrap();
+        conn.iterate(prep!("SELECT ") + 1 + prep!("::INTEGER"), |_| true ).unwrap();
     }
 
     #[test]
-    fn ow_into_rows() {
+    fn prep_into_rows() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
-        for row in conn.rows(prep!("SELECT ") + 1).unwrap().iter() {
+        for row in conn.rows(prep!("SELECT ") + 1 + prep!("::INTEGER")).unwrap() {
+            assert_eq!(row.column_name(0).unwrap(), "int4");
+            assert_eq!(row.get("int4").unwrap(), "1");
+            assert_eq!(row.get(0).unwrap(), "1");
+        }
+        for row in conn.rows(prep!("SELECT ") + "1" + prep!("::TEXT")).unwrap() {
+            assert_eq!(row.column_name(0).unwrap(), "text");
+            assert_eq!(row.get("text").unwrap(), "1");
+            assert_eq!(row.get(0).unwrap(), "1");
+        }
+        for row in conn.rows(prep!("SELECT 1")).unwrap() {
+            assert_eq!(row.column_name(0).unwrap(), "?column?");
             assert_eq!(row.get("?column?").unwrap(), "1");
             assert_eq!(row.get(0).unwrap(), "1");
         }
@@ -276,7 +262,7 @@ mod postgres {
         let conn = prepare();
 
         let name = "A%";
-        let sql = prep!("SELECT * FROM users WHERE name LIKE") + name + prep!(";");
+        let sql = prep!("SELECT * FROM users WHERE name LIKE ") + name;
 
         let mut executed = false;
         conn.rows(&sql).unwrap().iter().all(|row| {
@@ -288,17 +274,17 @@ mod postgres {
 
         let name = "A";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%A%'");
+        assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%A%'");
         conn.execute(&sql).unwrap();
 
         let name = "%A%";
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name) + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
+        assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%\\\\%A\\\\%%'");
         conn.execute(&sql).unwrap();
 
         let name = String::from("%A%");
         let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-        assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
+        assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%$%A$%%'");
         conn.execute(&sql).unwrap();
     }
 
@@ -343,5 +329,12 @@ mod postgres {
         for row in conn.rows("SELECT data FROM b").unwrap() {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
+    }
+
+    #[test]
+    fn question() {
+        let conn = prepare();
+        let sql = prep!("SELECT name FROM users WHERE name=") + "?";
+        for _ in conn.rows(&sql).unwrap() { unreachable!(); }
     }
 }

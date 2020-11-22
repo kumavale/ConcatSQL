@@ -1,23 +1,47 @@
 use std::str::FromStr;
+use std::sync::Arc;
+
 use indexmap::map::IndexMap;
 use crate::error::Error;
 
-type IndexMapPairs = IndexMap<String, Option<String>>;
+type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
 /// A single result row of a query.
-#[derive(Debug, PartialEq)]
-pub struct Row {
-    pairs: IndexMapPairs,
+#[derive(Debug, Default, PartialEq)]
+pub struct Row<'a> {
+    columns: Vec<Arc<str>>,
+    pairs:   IndexMapPairs<'a>,
 }
 
-impl Row {
-    #[inline]
+impl<'a> Row<'a> {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
-        Self { pairs: IndexMap::new() }
+        Self {
+            columns: Vec::new(),
+            pairs:   IndexMap::new(),
+        }
     }
 
     #[inline]
-    pub(crate) fn insert(&mut self, key: String, value: Option<String>) {
+    pub(crate) fn with_capacity(n: usize) -> Self {
+        Self {
+            columns: Vec::with_capacity(n),
+            pairs:   IndexMap::with_capacity(n),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn column(&mut self, index: usize) -> &Arc<str> {
+        &self.columns[index]
+    }
+
+    #[inline]
+    pub(crate) fn push_column(&mut self, column: Arc<str>) {
+        self.columns.push(column);
+    }
+
+    #[inline]
+    pub(crate) fn insert(&mut self, key: &'a str, value: Option<String>) {
         self.pairs.insert(key, value);
     }
 
@@ -28,7 +52,7 @@ impl Row {
     /// ```
     /// # use concatsql::prelude::*;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// for row in conn.rows("SELECT 1").unwrap() {
+    /// for row in &conn.rows("SELECT 1").unwrap() {
     ///     assert_eq!(row.get(0).unwrap(),   "1");
     ///     assert_eq!(row.get("1").unwrap(), "1");
     /// }
@@ -45,7 +69,7 @@ impl Row {
     /// ```
     /// # use concatsql::prelude::*;
     /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-    /// for row in conn.rows("SELECT 1").unwrap() {
+    /// for row in &conn.rows("SELECT 1").unwrap() {
     ///     assert_eq!(row.get_into::<_, i32>(0).unwrap(),   1);
     ///     assert_eq!(row.get_into::<_, i32>("1").unwrap(), 1);
     ///
@@ -73,10 +97,16 @@ impl Row {
         self.pairs.len() == 0
     }
 
+    /// Get the column name.  
+    #[inline]
+    pub fn column_name<T: Get>(&self, key: T) ->  Option<&str> {
+        key.get_key(&self.pairs)
+    }
+
     /// Get all the column names.  
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
-        self.pairs.keys().map(|k| (*k).as_str()).collect::<Vec<_>>()
+        self.pairs.keys().copied().collect::<Vec<_>>()
     }
 }
 
@@ -84,6 +114,7 @@ impl Row {
 pub trait Get {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error>;
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
 }
 
 impl Get for str {
@@ -93,6 +124,24 @@ impl Get for str {
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_key_value(self)?.0)
+    }
+}
+
+impl Get for String {
+    fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        pairs.get(&**self)?.as_deref()
+    }
+
+    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+        U::from_sql(pairs.get(&**self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_key_value(&**self)?.0)
     }
 }
 
@@ -104,6 +153,10 @@ impl Get for usize {
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get_index(*self).ok_or(Error::ColumnNotFound)?.1.as_deref().unwrap_or(""))
     }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        Some(pairs.get_index(*self)?.0)
+    }
 }
 
 impl<'b, T> Get for &'b T where T: Get + ?Sized {
@@ -113,6 +166,10 @@ impl<'b, T> Get for &'b T where T: Get + ?Sized {
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
         T::get_into(self, &pairs)
+    }
+
+    fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
+        T::get_key(self, &pairs)
     }
 }
 
@@ -181,9 +238,9 @@ mod tests {
     #[test]
     fn row() {
         let mut row = Row::new();
-        row.insert("key1".to_string(), Some("value".to_string()));
-        row.insert("key2".to_string(), None);
-        row.insert("key3".to_string(), Some("42".to_string()));
+        row.insert("key1", Some("value".to_string()));
+        row.insert("key2", None);
+        row.insert("key3", Some("42".to_string()));
 
         assert_eq!(row.get("key1"), Some("value"));
         assert_eq!(row.get("key1").unwrap(), "value");
@@ -251,8 +308,11 @@ mod tests {
         assert_eq!(row.get(&&&&&&&&"key1"), Some("value"));
         assert_eq!(row.get(&*String::from("key1")), Some("value"));
         assert_eq!(row.get(&0), Some("value"));
+        assert_eq!(row.get(String::from("key1")), Some("value"));
+        assert_eq!(row.get(&String::from("key1")), Some("value"));
+        assert_eq!(row.get(&&String::from("key1")), Some("value"));
 
-        row.insert("ABC".to_string(), Some("414243".to_string()));
+        row.insert("ABC", Some("414243".to_string()));
         assert_eq!(row.get_into::<_, Vec<u8>>("ABC"), Ok(vec![b'A',b'B',b'C']));
         assert!(row.get_into::<_, i8>("ABC").is_err());
         assert!(row.get_into::<_, u8>("ABC").is_err());
@@ -269,6 +329,11 @@ mod tests {
 
         assert_eq!(row.get_into::<_, u8>("ABC"), Err(Error::ParseError));
         assert_eq!(row.get_into::<_, u8>("def"), Err(Error::ColumnNotFound));
+
+        assert_eq!(row.column_name(0),       Some("key1"));
+        assert_eq!(row.column_name(99),      None);
+        assert_eq!(row.column_name("key1"),  Some("key1"));
+        assert_eq!(row.column_name("key99"), None);
     }
 }
 

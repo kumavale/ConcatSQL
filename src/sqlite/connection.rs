@@ -1,15 +1,18 @@
 extern crate sqlite3_sys as ffi;
 
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 use std::ptr;
 use std::path::Path;
 use std::pin::Pin;
 use std::cell::RefCell;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a>> {
@@ -42,37 +45,77 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 }
 
 impl ConcatsqlConn for ffi::sqlite3 {
-    fn execute_inner(&self, s: &str, error_level: &ErrorLevel) -> Result<()> {
-        let query = match CString::new(s) {
-            Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", s),
-        };
-        let mut err_msg = ptr::null_mut();
+    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+        let query = compile(ws);
 
-        unsafe {
-            ffi::sqlite3_exec(
-                self as *const _ as *mut _,
-                query.as_ptr(),
-                None,             // callback fn
-                ptr::null_mut(),  // callback arg
-                &mut err_msg,
-            );
+        let query = match CString::new(query.as_bytes()) {
+            Ok(string) => string,
+            _ => return Error::new(&error_level, "invalid query", query),
+        };
+
+        let mut stmt = ptr::null_mut();
+
+        if ws.params.is_empty() {
+            let mut err_msg = ptr::null_mut();
+            unsafe {
+                ffi::sqlite3_exec(
+                    self as *const _ as *mut _,
+                    query.as_ptr(),
+                    None,             // callback fn
+                    ptr::null_mut(),  // callback arg
+                    &mut err_msg,
+                );
+            }
+
+            if err_msg.is_null() {
+                return Ok(());
+            } else {
+                return Error::new(&error_level, "exec error",
+                    unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() });
+            }
         }
 
-        if err_msg.is_null() {
+        unsafe {
+            let result = ffi::sqlite3_prepare_v2(
+                self as *const _ as *mut _,
+                query.as_ptr(),
+                -1,
+                &mut stmt,
+                ptr::null_mut(),
+            );
+
+            if result != ffi::SQLITE_OK {
+                ffi::sqlite3_finalize(stmt);
+                return Error::new(&error_level, "exec error",
+                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+            }
+
+            bind_all(stmt, ws, error_level)?;
+
+            loop {
+                match ffi::sqlite3_step(stmt) {
+                    ffi::SQLITE_DONE => break,
+                    ffi::SQLITE_ROW => (),  // Do nothing
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "exec error",
+                            &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+                    }
+                }
+            }
+
+            ffi::sqlite3_finalize(stmt);
             Ok(())
-        } else {
-            Error::new(&error_level, "exec error",
-                unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() })
         }
     }
 
-    fn iterate_inner(&self, s: &str, error_level: &ErrorLevel,
+    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = match CString::new(s) {
+        let query = compile(ws);
+        let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", s),
+            _ => return Error::new(&error_level, "invalid query", query),
         };
         let mut stmt = ptr::null_mut();
 
@@ -85,81 +128,238 @@ impl ConcatsqlConn for ffi::sqlite3 {
                 ptr::null_mut(),
             );
 
-            if result == ffi::SQLITE_OK {
-                let column_count = ffi::sqlite3_column_count(stmt);
+            if result != ffi::SQLITE_OK {
+                ffi::sqlite3_finalize(stmt);
+                return Error::new(&error_level, "exec error",
+                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+            }
 
-                loop {
-                    match ffi::sqlite3_step(stmt) {
-                        ffi::SQLITE_DONE => break,
-                        ffi::SQLITE_ROW => {
-                            let mut pairs = Vec::with_capacity(column_count as usize);
+            bind_all(stmt, ws, error_level)?;
 
-                            for i in 0..(column_count as i32) {
-                                let column_name = {
-                                    let column_name = ffi::sqlite3_column_name(stmt, i);
-                                    std::str::from_utf8(CStr::from_ptr(column_name).to_bytes()).unwrap()
-                                };
-                                let value = {
-                                    match ffi::sqlite3_column_type(stmt, i) {
-                                        ffi::SQLITE_BLOB => {
-                                            let ptr = ffi::sqlite3_column_blob(stmt, i);
-                                            let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
-                                            let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
-                                            Some(Box::leak(crate::parser::to_hex(&bytes).into_boxed_str()) as &str)
-                                        },
-                                        ffi::SQLITE_INTEGER |
-                                        ffi::SQLITE_FLOAT   |
-                                        ffi::SQLITE_TEXT    => {
-                                            let ptr = ffi::sqlite3_column_text(stmt, i) as *const i8;
-                                            Some(std::str::from_utf8(CStr::from_ptr(ptr).to_bytes()).unwrap())
-                                        }
-                                        _ => None
-                                    }
-                                };
-                                pairs.push((column_name, value));
-                            }
+            let column_count = ffi::sqlite3_column_count(stmt) as i32;
 
-                            if !callback(&pairs) {
-                                break;
-                            }
-                        }
-                        _ => {
-                            ffi::sqlite3_finalize(stmt);
-                            return Error::new(&error_level, "exec error",
-                                &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+            loop {
+                match ffi::sqlite3_step(stmt) {
+                    ffi::SQLITE_DONE => break,
+                    ffi::SQLITE_ROW => {
+                        let mut pairs = Vec::with_capacity(column_count as usize);
+                        pairs.storing(stmt, column_count);
+                        let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
+                        if !callback(&pairs) {
+                            break;
                         }
                     }
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "exec error",
+                            &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+                    }
                 }
-
-                ffi::sqlite3_finalize(stmt);
-                Ok(())
-
-            } else {
-                ffi::sqlite3_finalize(stmt);
-                Error::new(&error_level, "exec error",
-                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
             }
+
+            ffi::sqlite3_finalize(stmt);
+            Ok(())
         }
     }
 
-    fn rows_inner(&self, query: &str, error_level: &ErrorLevel) -> Result<Vec<Row>> {
+    fn rows_inner<'r>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'r>>> {
         let mut rows: Vec<Row> = Vec::new();
 
-        self.iterate_inner(query, error_level, &mut |pairs: &[(&str, Option<&str>)]| {
-            let mut row = Row::new();
-            for (column, value) in pairs.iter() {
-                row.insert(column.to_string(), value.map(|v| v.to_string()));
-            }
-            rows.push(row);
-            true
-        })?;
+        let query = compile(ws);
+        let query = match CString::new(query.as_bytes()) {
+            Ok(string) => string,
+            _ => return Error::new(&error_level, "invalid query", query).map(|_| Vec::new()),
+        };
+        let mut stmt = ptr::null_mut();
 
-        Ok(rows)
+        unsafe {
+            let result = ffi::sqlite3_prepare_v2(
+                self as *const _ as *mut _,
+                query.as_ptr(),
+                -1,
+                &mut stmt,
+                ptr::null_mut(),
+            );
+
+            if result != ffi::SQLITE_OK {
+                ffi::sqlite3_finalize(stmt);
+                return Error::new(&error_level, "exec error",
+                    &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                    .map(|_| Vec::new());
+            }
+
+            bind_all(stmt, ws, error_level)?;
+
+            let column_count = ffi::sqlite3_column_count(stmt) as i32;
+
+            // First row
+            match ffi::sqlite3_step(stmt) {
+                ffi::SQLITE_DONE => {
+                    ffi::sqlite3_finalize(stmt);
+                    return Ok(rows);
+                }
+                ffi::SQLITE_ROW => {
+                    let mut pairs = Vec::with_capacity(column_count as usize);
+                    pairs.storing(stmt, column_count);
+                    let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
+                    let mut row = Row::with_capacity(column_count as usize);
+                    for (column, value) in pairs.iter() {
+                        let column: Arc<str> = Arc::from(column.to_string());
+                        row.push_column(column.clone());
+                        row.insert(&*Arc::as_ptr(&column), value.map(|v| v.to_string()));
+                    }
+                    rows.push(row);
+                }
+                _ => {
+                    ffi::sqlite3_finalize(stmt);
+                    return Error::new(&error_level, "exec error",
+                        &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                        .map(|_| Vec::new());
+                }
+            }
+
+            // Or later
+            loop {
+                match ffi::sqlite3_step(stmt) {
+                    ffi::SQLITE_DONE => break,
+                    ffi::SQLITE_ROW => {
+                        let mut pairs = Vec::with_capacity(column_count as usize);
+                        pairs.storing(stmt, column_count);
+                        let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
+                        let mut row = Row::with_capacity(column_count as usize);
+                        for (index, (_, value)) in pairs.iter().enumerate() {
+                            row.insert(&*Arc::as_ptr(rows[0].column(index)), value.map(|v| v.to_string()));
+                        }
+                        rows.push(row);
+                    }
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "exec error",
+                            &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy())
+                            .map(|_| Vec::new());
+                    }
+                }
+            }
+
+            ffi::sqlite3_finalize(stmt);
+            Ok(rows)
+        }
     }
 
     fn kind(&self) -> ConnKind {
         ConnKind::SQLite
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::new();
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(&s),
+            None =>    query.push('?'),
+        }
+    }
+    query
+}
+
+trait Storing {
+    unsafe fn storing(&mut self, stmt: *mut ffi::sqlite3_stmt, column_count: i32);
+}
+impl Storing for Vec<(&str, Option<Cow<'_, str>>)> {
+    unsafe fn storing(&mut self, stmt: *mut ffi::sqlite3_stmt, column_count: i32) {
+        for i in 0..column_count {
+            let column_name = {
+                let column_name = ffi::sqlite3_column_name(stmt, i);
+                std::str::from_utf8(CStr::from_ptr(column_name).to_bytes()).unwrap()
+            };
+            let value = {
+                match ffi::sqlite3_column_type(stmt, i) {
+                    ffi::SQLITE_BLOB => {
+                        let ptr = ffi::sqlite3_column_blob(stmt, i);
+                        let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
+                        let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
+                        Some(Cow::Owned(crate::parser::to_hex(&bytes)))
+                    },
+                    ffi::SQLITE_INTEGER |
+                    ffi::SQLITE_FLOAT   |
+                    ffi::SQLITE_TEXT    => {
+                        let ptr = ffi::sqlite3_column_text(stmt, i) as *const i8;
+                        Some(Cow::Borrowed(std::str::from_utf8(CStr::from_ptr(ptr).to_bytes()).unwrap()))
+                    }
+                    _  /* ffi::SQLITE_NULL */ => None
+                }
+            };
+            self.push((column_name, value));
+        }
+    }
+}
+
+unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+    for (index, param) in (1i32..).zip(ws.params.iter()) {
+        match param {
+            Value::Null => {
+                ffi::sqlite3_bind_null(stmt, index);
+            }
+            Value::I32(value) => {
+                ffi::sqlite3_bind_int(stmt, index, *value);
+            }
+            Value::I64(value) => {
+                ffi::sqlite3_bind_int64(stmt, index, *value);
+            }
+            Value::I128(value) => {
+                let value = value.to_string();
+                let len = value.as_bytes().len();
+                let value = match CString::new(value.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", value);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+            Value::F32(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value as f64);
+            }
+            Value::F64(value) => {
+                ffi::sqlite3_bind_double(stmt, index, *value);
+            }
+            Value::Text(value) => {
+                let len = value.as_bytes().len();
+                let value = match CString::new(value.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", value);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+            Value::Bytes(value) => {
+                ffi::sqlite3_bind_blob(
+                    stmt,
+                    index,
+                    value.as_ptr() as *const _,
+                    value.len() as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -215,12 +415,11 @@ mod tests {
 
     #[test]
     #[cfg(debug_assertions)]
-    fn actual_sql() {
-        assert_eq!(prep!("SELECT").actual_sql(), "SELECT");
-        assert_eq!(prep!("O''Reilly").actual_sql(), "O''Reilly");
-        assert_eq!(prep!("\"O'Reilly\"").actual_sql(), "\"O'Reilly\"");
-
-        //crate::prep!("O'Reilly").actual_sql();      // panic
+    fn simulate() {
+        assert_eq!(prep!("SELECT").simulate(), "SELECT");
+        assert_eq!(prep!("O''Reilly").simulate(), "O''Reilly");
+        assert_eq!(prep!("\"O'Reilly\"").simulate(), "\"O'Reilly\"");
+        assert_eq!(prep!("O'Reilly").simulate(), "O'Reilly");
     }
 
     #[test]

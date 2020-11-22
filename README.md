@@ -32,7 +32,7 @@ let id     = String::from("42");    // User supplied input
 let passwd = String::from("pass");  // User supplied input
 
 let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
-assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
+assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 
 for row in conn.rows(&sql).unwrap() {
     assert_eq!(row.get(0).unwrap(),      "Alice");
@@ -47,7 +47,7 @@ let id     = String::from("42");             // User supplied input
 let passwd = String::from("'' or 1=1; --");  // User supplied input
 
 let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
-assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
+assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
 for row in conn.rows(&sql).unwrap() {
     unreachable!();

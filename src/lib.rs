@@ -17,7 +17,7 @@
 //!     let age = String::from("42");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42'");
+//!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
 //!     for row in conn.rows(&sql).unwrap() {
 //!         assert_eq!(row.get(0).unwrap(),      "Alice");
 //!         assert_eq!(row.get("name").unwrap(), "Alice");
@@ -26,7 +26,7 @@
 //!     let age = String::from("42 OR 1=1; --");  // user input
 //!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
-//!     assert_eq!(sql.actual_sql(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
+//!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
 //! }
 //! ```
@@ -50,11 +50,11 @@ pub mod mysql;
 #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres;
 
-pub use crate::connection::{Connection, SafeStr, without_escape};
+pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
-pub use crate::wrapstring::{WrapString, ToWrapString, Num};
+pub use crate::wrapstring::{WrapString, IntoWrapString};
 
 pub mod prelude {
     //! Re-exports important traits and types.
@@ -69,10 +69,10 @@ pub mod prelude {
     #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     pub use crate::postgres;
 
-    pub use crate::connection::{Connection, SafeStr, without_escape};
+    pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::{WrapString, ToWrapString};
+    pub use crate::wrapstring::{WrapString, IntoWrapString};
 }
 
 /// A typedef of the result returned by many methods.
@@ -105,46 +105,18 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// prep!("SELECT * FROM users WHERE passwd=") + prep!(&passwd); // shouldn't compile!
 /// ```
 ///
-/// # Panics
-///
-/// **SQL injection successful if you have incomplete single or double quotes.**  
-/// Panic when debug builds and display warning messages when release builds.  
-///
-/// ```should_panic
-/// # use concatsql::prelude::*;
-/// # let id = 42;
-/// prep!("SELECT * FROM users WHERE id='") + id + prep!("'");
-/// prep!("INSERT INTO msg VALUES ('I'm cat.')");
-/// assert_eq!((prep!("WHERE passwd='") + " or 1=1; --" + prep!("'")).actual_sql(), "WHERE passwd='' or 1=1; --''"); // When release builds
-/// ```
-///
 /// # Safety
 ///
 /// ```
 /// # use concatsql::prelude::*;
-/// # let id = 42;
-/// prep!("SELECT * FROM users WHERE id=") + id;
+/// prep!("SELECT * FROM users WHERE id=") + 42;
 /// prep!("INSERT INTO msg VALUES ('I''m cat.')");
 /// prep!("INSERT INTO msg VALUES (\"I'm cat.\")");
+/// prep!("INSERT INTO msg VALUES (") + "I'm cat." + prep!(")");
 /// ```
 #[macro_export]
 macro_rules! prep {
-    () => { concatsql::WrapString::init("") };
-    ($query:expr) => {
-        {
-            // I want to make an error at compile time...
-            static INITIAL_CHECK: std::sync::Once = std::sync::Once::new();
-            INITIAL_CHECK.call_once(|| {
-                if let Err(detail) = concatsql::check_valid_literal($query) {
-                    eprintln!("{}{}:{}", concatsql::invalid_literal(), file!(), line!());
-                    eprintln!("{}", detail.to_string());
-
-                    #[cfg(debug_assertions)]
-                    panic!("invalid literal");
-                }
-            });
-            concatsql::WrapString::init($query)
-        }
-    };
+    ()            => { concatsql::WrapString::init("")     };
+    ($query:expr) => { concatsql::WrapString::init($query) };
 }
 

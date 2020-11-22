@@ -49,11 +49,11 @@ pub fn html_special_chars(input: &str) -> String {
 /// # use concatsql::prelude::*;
 /// let name = "Ali";
 /// let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
-/// assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%Ali%'");
+/// assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%Ali%'");
 ///
 /// let name = String::from("%Ali%");
 /// let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + &sanitize_like!(name, '$') + "%");
-/// assert_eq!(sql.actual_sql(), "SELECT * FROM users WHERE name LIKE '%$%Ali$%%'");
+/// assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%$%Ali$%%'");
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {
