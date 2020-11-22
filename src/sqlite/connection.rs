@@ -204,7 +204,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                     let mut row = Row::with_capacity(column_count as usize);
                     for (column, value) in pairs.iter() {
-                        let column = Arc::new(column.to_string());
+                        let column: Arc<str> = Arc::from(column.to_string());
                         row.push_column(column.clone());
                         row.insert(&*Arc::as_ptr(&column), value.map(|v| v.to_string()));
                     }
@@ -267,7 +267,7 @@ trait Storing {
 }
 impl Storing for Vec<(&str, Option<Cow<'_, str>>)> {
     unsafe fn storing(&mut self, stmt: *mut ffi::sqlite3_stmt, column_count: i32) {
-        for i in 0..(column_count) {
+        for i in 0..column_count {
             let column_name = {
                 let column_name = ffi::sqlite3_column_name(stmt, i);
                 std::str::from_utf8(CStr::from_ptr(column_name).to_bytes()).unwrap()

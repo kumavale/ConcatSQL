@@ -8,9 +8,8 @@ type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
 /// A single result row of a query.
 #[derive(Debug, Default, PartialEq)]
-#[allow(clippy::rc_buffer)]
 pub struct Row<'a> {
-    columns: Vec<Arc<String>>,
+    columns: Vec<Arc<str>>,
     pairs:   IndexMapPairs<'a>,
 }
 
@@ -32,14 +31,12 @@ impl<'a> Row<'a> {
     }
 
     #[inline]
-    #[allow(clippy::rc_buffer)]
-    pub(crate) fn column(&mut self, index: usize) -> &Arc<String> {
+    pub(crate) fn column(&mut self, index: usize) -> &Arc<str> {
         &self.columns[index]
     }
 
     #[inline]
-    #[allow(clippy::rc_buffer)]
-    pub(crate) fn push_column(&mut self, column: Arc<String>) {
+    pub(crate) fn push_column(&mut self, column: Arc<str>) {
         self.columns.push(column);
     }
 

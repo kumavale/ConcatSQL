@@ -98,7 +98,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
             let column_len = first_row.columns().len();
             let mut row = Row::with_capacity(column_len);
             for (index, col) in first_row.columns().iter().enumerate() {
-                let column = Arc::new(col.name().to_string());
+                let column: Arc<str> = Arc::from(col.name().to_string());
                 row.push_column(column.clone());
                 unsafe { row.insert(&*Arc::as_ptr(&column), first_row.get_to_string(index)); }
             }

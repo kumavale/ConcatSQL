@@ -143,7 +143,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                         if first_row {
                             first_row = false;
                             for (index, column) in result_row.columns_ref().iter().enumerate() {
-                                let column = Arc::new(column.name_str().to_string());
+                                let column: Arc<str> = Arc::from(column.name_str().to_string());
                                 row.push_column(column.clone());
                                 unsafe { row.insert(&*Arc::as_ptr(&column), result_row.get_to_string(index)); }
                             }
