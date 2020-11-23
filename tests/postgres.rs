@@ -9,7 +9,7 @@ mod postgres {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    fn prepare<'a>() -> concatsql::Connection<'a> {
+    pub fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
@@ -319,7 +319,6 @@ mod postgres {
     }
 
     #[test]
-    #[cfg(not(any(feature = "sqlite", feature = "mysql")))]
     fn blob() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.execute("CREATE TEMPORARY TABLE b (data bytea)").unwrap();
@@ -337,4 +336,143 @@ mod postgres {
         let sql = prep!("SELECT name FROM users WHERE name=") + "?";
         for _ in conn.rows(&sql).unwrap() { unreachable!(); }
     }
+
+    #[test]
+    fn map_collect() {
+        let conn = prepare();
+        let rows = conn.rows("SELECT * FROM users").unwrap();
+        let names = rows.iter().map(|row| row.get("name")).collect::<Vec<Option<&str>>>();
+        let mut cnt = 0;
+        for (i, name) in names.iter().enumerate() {
+            cnt += 1;
+            assert_eq!(name.unwrap(), ["Alice","Bob","Carol"][i])
+        }
+        assert_eq!(cnt, 3);
+    }
+
+    #[test]
+    fn sql_injection() {
+        let conn = prepare();
+
+        let name = "'' OR 1=1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = ") + name;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let name = "''; DROP TABLE users; --";
+        let sql = prep!("SELECT age FROM users WHERE name = ") + name;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT ") + "0x50 + 0x45";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "0x50 + 0x45");
+        }
+
+        let sql = prep!("SELECT ") + "0x414243";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "0x414243");
+        }
+
+        let sql = prep!("SELECT ") + "CHAR(0x66)";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "CHAR(0x66)");
+        }
+
+        let sql = prep!("SELECT ") + "IF(1=1, 'true', 'false')";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "IF(1=1, 'true', 'false')");
+        }
+
+        let sql = prep!("SELECT ") + "na + '-' + me FROM users";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "na + '-' + me FROM users");
+        }
+
+        let sql = prep!("SELECT ") + "ASCII('a')";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "ASCII('a')");
+        }
+
+        let sql = prep!("SELECT ") + "CHAR(64)";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "CHAR(64)");
+        }
+    }
 }
+
+#[cfg(feature = "postgres")]
+mod anti_patterns {
+    use concatsql::prelude::*;
+
+    // Although it becomes possible, I do not believe it is less useful
+    // because its real advantage is that it still makes it harder to do the wrong thing.
+    #[test]
+    fn string_to_static_str() {
+        let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
+        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
+        conn.execute(sql).unwrap();
+    }
+
+    #[test]
+    fn text_op_integer() {
+        let conn = super::postgres::prepare();
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + i32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + i32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + i32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + i32::MIN;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + i32::MIN;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + i32::MIN;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + u32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + u32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + u32::MAX;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + u32::MIN;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + u32::MIN;
+        assert!(conn.rows(&sql).is_err());
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + u32::MIN;
+        assert!(conn.rows(&sql).is_err());
+    }
+
+    #[test]
+    #[should_panic = "expected 0 parameters but got 1"]
+    fn invalid_placeholders() {
+        let conn = super::postgres::prepare();
+
+        let name = "' OR 1=2; SELECT 1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        conn.execute(&sql).ok();
+
+        let name = "' OR 1=1; --";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        conn.execute(&sql).ok();
+
+        let name = "Alice";
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        conn.execute(&sql).ok();
+    }
+}
+
