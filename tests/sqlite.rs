@@ -541,6 +541,7 @@ mod anti_patterns {
         let conn = sqlite::open(":memory:").unwrap();
         let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
         conn.execute(sql).unwrap();
+        unsafe { Box::from_raw(sql.as_ptr() as *mut u8); }
     }
 
     #[test]

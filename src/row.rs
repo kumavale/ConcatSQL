@@ -236,6 +236,20 @@ mod tests {
     use crate::error::*;
 
     #[test]
+    fn column_names() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        for row in conn.rows("SELECT * FROM users").unwrap() {
+            assert_eq!(row.column_names(), ["name", "age"]);
+        }
+    }
+
+    #[test]
     fn row() {
         let mut row = Row::new();
         row.insert("key1", Some("value".to_string()));

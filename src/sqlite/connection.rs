@@ -40,7 +40,10 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
                 conn:        unsafe { Pin::new_unchecked(&*conn_ptr) },
                 error_level: RefCell::new(ErrorLevel::default()),
             }),
-        _ => Err(Error::Message("failed to connect".into())),
+        _ => {
+            unsafe { ffi::sqlite3_close(conn_ptr); }
+            Err(Error::Message("failed to connect".into()))
+        }
     }
 }
 
@@ -56,22 +59,26 @@ impl ConcatsqlConn for ffi::sqlite3 {
         let mut stmt = ptr::null_mut();
 
         if ws.params.is_empty() {
-            let mut err_msg = ptr::null_mut();
+            let mut errmsg = ptr::null_mut();
             unsafe {
                 ffi::sqlite3_exec(
                     self as *const _ as *mut _,
                     query.as_ptr(),
                     None,             // callback fn
                     ptr::null_mut(),  // callback arg
-                    &mut err_msg,
+                    &mut errmsg,
                 );
             }
 
-            if err_msg.is_null() {
+            if errmsg.is_null() {
                 return Ok(());
             } else {
-                return Error::new(&error_level, "exec error",
-                    unsafe{ &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy() });
+                unsafe {
+                    ffi::sqlite3_finalize(stmt);
+                    ffi::sqlite3_free(errmsg as *mut _);
+                    return Error::new(&error_level, "exec error",
+                        &CStr::from_ptr(ffi::sqlite3_errmsg(self as *const _ as *mut _)).to_string_lossy());
+                }
             }
         }
 
