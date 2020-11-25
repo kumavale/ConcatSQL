@@ -295,6 +295,88 @@ impl<'a> Add<()> for WrapString<'a> {
     }
 }
 
+/// In operator with string arrays.  
+/// If the array is empty, it will be ignored.
+///
+/// # Examples
+///
+/// ```
+/// # use concatsql::prelude::*;
+/// let names: Vec<&str> = vec![];
+/// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
+/// let names: Vec<&str> = vec!["foo","bar"];
+/// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "('foo','bar')");
+/// ```
+impl<'a> Add<Vec<String>> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: Vec<String>) -> WrapString<'a> {
+        if other.is_empty() {
+            self.query .push(None);
+            self.params.push(Value::Null);
+            return self;
+        }
+        if let Some(first) = other.first() {
+            self.query.push(None);
+            self.params.push(Value::Text(Cow::Owned(first.to_string())));
+        }
+        for param in other.into_iter().skip(1) {
+            self.query.push(Some(Cow::Borrowed(",")));
+            self.query.push(None);
+            self.params.push(Value::Text(Cow::Owned(param)));
+        }
+        self
+    }
+}
+
+macro_rules! impl_add_arrays_borrowed_for_WrapString {
+    ( $($t:ty),* ) => {$(
+        /// In operator with string arrays.  
+        /// If the array is empty, it will be ignored.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use concatsql::prelude::*;
+        /// let names: Vec<&str> = vec![];
+        /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
+        /// let names: Vec<&str> = vec!["foo","bar"];
+        /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "('foo','bar')");
+        /// ```
+        impl<'a> Add<$t> for WrapString<'a> {
+            type Output = WrapString<'a>;
+            #[inline]
+            fn add(mut self, other: $t) -> WrapString<'a> {
+                if other.is_empty() {
+                    self.query .push(None);
+                    self.params.push(Value::Null);
+                    return self;
+                }
+                if let Some(first) = other.first() {
+                    self.query.push(None);
+                    self.params.push(Value::Text(Cow::Borrowed(first)));
+                }
+                for param in other.iter().skip(1) {
+                    self.query.push(Some(Cow::Borrowed(",")));
+                    self.query.push(None);
+                    self.params.push(Value::Text(Cow::Borrowed(param)));
+                }
+                self
+            }
+        }
+    )*};
+    ( $($t:ty,)* ) => { impl_add_arrays_borrowed_for_WrapString!{ $( $t ),* } }
+}
+
+impl_add_arrays_borrowed_for_WrapString!{
+    Vec<&'a str>,
+    &'a Vec<String>,
+    &'a Vec<&'a str>,
+    &'a [&'a str],
+    &'a [String],
+}
+
+
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 pub trait IntoWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
@@ -360,6 +442,26 @@ mod tests {
         assert_eq!(sql.simulate(), "'A''B''C'");
         let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
         assert_eq!(sql.simulate(), "A'B''C'03.1442NULLNULL");
+        let vec: Vec<String> = Vec::new();
+        let sql = prep!("(") + vec + prep!(")");
+        assert_eq!(sql.simulate(), "(NULL)");
+        let sql = prep!("(") + vec!["A"] + prep!(")");
+        assert_eq!(sql.simulate(), "('A')");
+        let sql = prep!("(") + vec!["A","B"] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!("(") + vec![String::from("A"),String::from("B")] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let vec = vec!["A","B"];
+        let sql = prep!("(") + &vec + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let vec = vec![String::from("A"),String::from("B")];
+        let sql = prep!("(") + &vec + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!("(") + &["A","B"][..] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sli = &[String::from("A"),String::from("B")][..];
+        let sql = prep!("(") + sli + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
     }
 
     mod simulate {

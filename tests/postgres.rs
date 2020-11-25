@@ -351,6 +351,17 @@ mod postgres {
     }
 
     #[test]
+    fn in_array() {
+        let conn = prepare();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec![] as Vec<&str> + prep!(")");
+        conn.rows(&sql).unwrap();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec!["Adam"] + prep!(")");
+        conn.rows(&sql).unwrap();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec!["Adam","Eve"] + prep!(")");
+        conn.rows(&sql).unwrap();
+    }
+
+    #[test]
     fn sql_injection() {
         let conn = prepare();
 
