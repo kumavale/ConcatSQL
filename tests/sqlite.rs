@@ -10,7 +10,7 @@ mod sqlite {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    fn prepare<'a>() -> concatsql::Connection<'a> {
+    pub fn prepare<'a>() -> concatsql::Connection<'a> {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
@@ -413,31 +413,100 @@ mod sqlite {
     }
 
     #[test]
+    fn map_collect() {
+        let conn = prepare();
+        let rows = conn.rows("SELECT * FROM users").unwrap();
+        let names = rows.iter().map(|row| row.get("name")).collect::<Vec<Option<&str>>>();
+        let mut cnt = 0;
+        for (i, name) in names.iter().enumerate() {
+            cnt += 1;
+            assert_eq!(name.unwrap(), ["Alice","Bob","Carol"][i])
+        }
+        assert_eq!(cnt, 3);
+    }
+
+    #[test]
+    fn without_escape() {
+        unsafe {
+            assert_eq!((prep!() + concatsql::without_escape(&String::from("42")) ).simulate(), "42");
+            assert_eq!((prep!() + concatsql::without_escape(&String::from("foo"))).simulate(), "foo");
+            assert_eq!((prep!() + concatsql::without_escape(&String::from(""))   ).simulate(), "");
+            assert_eq!((prep!() +                            String::from("42")  ).simulate(), "'42'");
+            assert_eq!((prep!() +                            String::from("foo") ).simulate(), "'foo'");
+            assert_eq!((prep!() +                            String::from("")    ).simulate(), "''");
+        }
+    }
+
+    #[test]
     fn sql_injection() {
         let conn = prepare();
 
         let name = "' OR 1=2; SELECT 1; --";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "' OR 1=1; --";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "Alice";
-        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';");
-        for _ in conn.rows(&sql).unwrap() {
-            unreachable!();
-        }
+        let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
+        assert_eq!(
+            conn.rows(&sql),
+            Err(Error::Message("bind error: column index out of range".to_string()))
+        );
 
         let name = "'' OR 1=1; --";
         let sql = prep!("SELECT age FROM users WHERE name = ") + name;
         for _ in conn.rows(&sql).unwrap() {
             unreachable!();
+        }
+
+        let name = "''; DROP TABLE users; --";
+        let sql = prep!("SELECT age FROM users WHERE name = ") + name;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT ") + "0x50 + 0x45";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "0x50 + 0x45");
+        }
+
+        let sql = prep!("SELECT ") + "0x414243";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "0x414243");
+        }
+
+        let sql = prep!("SELECT ") + "CHAR(0x66)";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "CHAR(0x66)");
+        }
+
+        let sql = prep!("SELECT ") + "IF(1=1, 'true', 'false')";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "IF(1=1, 'true', 'false')");
+        }
+
+        let sql = prep!("SELECT ") + "na + '-' + me FROM users";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "na + '-' + me FROM users");
+        }
+
+        let sql = prep!("SELECT ") + "ASCII('a')";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "ASCII('a')");
+        }
+
+        let sql = prep!("SELECT ") + "CHAR(64)";
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(row.get(0).unwrap(), "CHAR(64)");
         }
     }
 }
@@ -472,6 +541,75 @@ mod anti_patterns {
         let conn = sqlite::open(":memory:").unwrap();
         let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
         conn.execute(sql).unwrap();
+        unsafe { Box::from_raw(sql.as_ptr() as *mut u8); }
+    }
+
+    #[test]
+    fn text_op_integer() {
+        let conn = super::sqlite::prepare();
+        let mut cnt = 0;
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + i32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + i32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + i32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            cnt += 1;
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + i32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + i32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + i32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            cnt += 1;
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + u32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + u32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + u32::MAX;
+        for _ in conn.rows(&sql).unwrap() {
+            cnt += 1;
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name = ") + u32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name < ") + u32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            unreachable!();
+        }
+
+        let sql = prep!("SELECT age FROM users WHERE name > ") + u32::MIN;
+        for _ in conn.rows(&sql).unwrap() {
+            cnt += 1;
+        }
+
+        assert_eq!(cnt, 12);
     }
 }
 

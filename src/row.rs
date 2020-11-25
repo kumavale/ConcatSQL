@@ -7,37 +7,28 @@ use crate::error::Error;
 type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
 /// A single result row of a query.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Row<'a> {
-    columns: Vec<Arc<str>>,
+    columns: Arc<[String]>,
     pairs:   IndexMapPairs<'a>,
 }
 
 impl<'a> Row<'a> {
-    #[cfg(test)]
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(columns: Arc<[String]>) -> Self {
         Self {
-            columns: Vec::new(),
-            pairs:   IndexMap::new(),
+            columns,
+            pairs: IndexMap::new(),
         }
     }
 
     #[inline]
-    pub(crate) fn with_capacity(n: usize) -> Self {
-        Self {
-            columns: Vec::with_capacity(n),
-            pairs:   IndexMap::with_capacity(n),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn column(&mut self, index: usize) -> &Arc<str> {
+    pub(crate) fn column(&self, index: usize) -> &str {
         &self.columns[index]
     }
 
     #[inline]
-    pub(crate) fn push_column(&mut self, column: Arc<str>) {
-        self.columns.push(column);
+    pub(crate) fn columns(&self) -> Arc<[String]> {
+        self.columns.clone()
     }
 
     #[inline]
@@ -107,6 +98,7 @@ impl<'a> Row<'a> {
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
         self.pairs.keys().copied().collect::<Vec<_>>()
+        //self.columns.iter().map(AsRef::as_ref).collect::<Vec<_>>()
     }
 }
 
@@ -236,8 +228,23 @@ mod tests {
     use crate::error::*;
 
     #[test]
+    #[cfg(feature = "sqlite")]
+    fn column_names() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        for row in conn.rows("SELECT * FROM users").unwrap() {
+            assert_eq!(row.column_names(), ["name", "age"]);
+        }
+    }
+
+    #[test]
     fn row() {
-        let mut row = Row::new();
+        let mut row = Row::new(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect());
         row.insert("key1", Some("value".to_string()));
         row.insert("key2", None);
         row.insert("key3", Some("42".to_string()));

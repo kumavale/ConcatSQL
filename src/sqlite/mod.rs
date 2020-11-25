@@ -94,9 +94,14 @@ mod tests {
 
     #[test]
     #[should_panic = "failed to connect"]
-    fn sqlite_open_failed() {
+    fn sqlite_open_failed_path() {
         use std::path::Path;
         let _conn = crate::sqlite::open(Path::new("/path/to/db")).unwrap();
+    }
+    #[test]
+    #[should_panic = "failed to connect"]
+    fn sqlite_open_failed_str() {
+        let _conn = crate::sqlite::open("/path/to/db").unwrap();
     }
 
     #[test]
