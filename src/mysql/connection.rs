@@ -4,7 +4,6 @@ use mysql::prelude::*;
 
 use std::cell::RefCell;
 use std::pin::Pin;
-use std::sync::Arc;
 
 use crate::Result;
 use crate::parser::to_hex;
@@ -138,22 +137,26 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
                         };
 
                         let column_len = result_row.columns_ref().len();
-                        let mut row = Row::with_capacity(column_len);
 
                         if first_row {
                             first_row = false;
-                            for (index, column) in result_row.columns_ref().iter().enumerate() {
-                                let column: Arc<str> = Arc::from(column.name_str().to_string());
-                                row.push_column(column.clone());
-                                unsafe { row.insert(&*Arc::as_ptr(&column), result_row.get_to_string(index)); }
-                            }
-                        } else {
+                            let columns = result_row.columns_ref().iter().map(|col|col.name_str().to_string()).collect();
+                            let mut row = Row::new(columns);
                             for index in 0..column_len {
-                                unsafe { row.insert(&*Arc::as_ptr(&$rows[0].column(index)), result_row.get_to_string(index)); }
+                                unsafe {
+                                    row.insert(&*(row.column(index) as *const str), result_row.get_to_string(index));
+                                }
                             }
+                            $rows.push(row);
+                        } else {
+                            let mut row = Row::new($rows[0].columns());
+                            for index in 0..column_len {
+                                unsafe {
+                                    row.insert(&*($rows[0].column(index) as *const str), result_row.get_to_string(index));
+                                }
+                            }
+                            $rows.push(row);
                         }
-
-                        $rows.push(row);
                     }
                 }
             };
