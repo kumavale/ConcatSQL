@@ -4,14 +4,14 @@ use crate::parser::{escape_string, to_binary_literal};
 
 /// Values that can be bound as static placeholders.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum Value<'a> {
     Null,
     I32(i32),
     I64(i64),
     I128(i128),
     F32(f32),
     F64(f64),
-    Text(String),
+    Text(Cow<'a, str>),
     Bytes(Vec<u8>),
 }
 
@@ -19,7 +19,7 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WrapString<'a> {
     pub(crate) query:  Vec<Option<Cow<'a, str>>>,
-    pub(crate) params: Vec<Value>,
+    pub(crate) params: Vec<Value<'a>>,
 }
 
 impl<'a> WrapString<'a> {
@@ -105,57 +105,57 @@ impl<'a> Add<String> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: String) -> WrapString<'a> {
         self.query .push(None);
+        self.params.push(Value::Text(Cow::Owned(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a String> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a String) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a str> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a str) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a &str> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a &str) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<std::borrow::Cow<'a, str>> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: std::borrow::Cow<'a, str>) -> WrapString<'a> {
+        self.query .push(None);
         self.params.push(Value::Text(other));
         self
     }
 }
 
-impl<'a> Add<&String> for WrapString<'a> {
+impl<'a> Add<&'a std::borrow::Cow<'a, str>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &String) -> WrapString<'a> {
+    fn add(mut self, other: &'a std::borrow::Cow<'a, str>) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<&str> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &str) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<&&str> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &&str) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<std::borrow::Cow<'_, str>> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: std::borrow::Cow<'_, str>) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.into_owned()));
-        self
-    }
-}
-
-impl<'a> Add<&std::borrow::Cow<'_, str>> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &std::borrow::Cow<'_, str>) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
+        self.params.push(Value::Text(Cow::Borrowed(&*other)));
         self
     }
 }
@@ -275,9 +275,11 @@ macro_rules! impl_add_Option_for_WrapString {
 
 impl_add_Option_for_WrapString! {
     String,
-    &str,
-    std::borrow::Cow<'_, str>,
+    &'a String,
+    &'a str,
+    std::borrow::Cow<'a, str>,
     Vec<u8>,
+    &'a Vec<u8>,
     u8, u16, u32, u64, u128, usize,
     i8, i16, i32, i64, i128, isize,
     f32, f64,
@@ -324,12 +326,23 @@ mod tests {
     use concatsql::prelude::*;
 
     #[test]
-    #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op, clippy::approx_constant)]
+    #[allow(
+        clippy::op_ref,
+        clippy::deref_addrof,
+        clippy::identity_op,
+        clippy::approx_constant,
+        clippy::many_single_char_names,
+    )]
     fn concat_anything_type() {
         use std::borrow::Cow;
-        let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
+        let a = String::from("A");
+        let b = &String::from("B");
+        let c = &**&&String::from("C");
+        let d = &***&&&String::from("D");
+        let e = String::from("E");
+        let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &e + &prep!("F") + 42 + 3.14;
         assert_eq!(sql.simulate(), "AB'C''D''E'F423.14");
-        let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
+        let sql = prep!() + a + b + c + d;
         assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
         assert_eq!(sql.simulate(), "'A''B''C''D'");
@@ -343,8 +356,8 @@ mod tests {
         } else {
             assert_eq!(sql.simulate(), "'\\x414243''\\x000102'");
         }
-        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
-        assert_eq!(sql.simulate(), "'A''B''C''D'");
+        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string());
+        assert_eq!(sql.simulate(), "'A''B''C'");
         let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
         assert_eq!(sql.simulate(), "A'B''C'03.1442NULLNULL");
     }

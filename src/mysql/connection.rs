@@ -39,7 +39,7 @@ macro_rules! to_mysql_value {
             Value::I128(value)  => mysql::Value::from(value),
             Value::F32(value)   => mysql::Value::from(value),
             Value::F64(value)   => mysql::Value::from(value),
-            Value::Text(value)  => mysql::Value::from(value),
+            Value::Text(value)  => mysql::Value::from(value.as_ref()),
             Value::Bytes(value) => mysql::Value::from(value),
         }
     );
