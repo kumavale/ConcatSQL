@@ -97,8 +97,8 @@ impl<'a> Row<'a> {
     /// Get all the column names.  
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
-        //self.pairs.keys().copied().collect::<Vec<_>>()
-        self.columns.iter().map(AsRef::as_ref).collect::<Vec<_>>()
+        self.pairs.keys().copied().collect::<Vec<_>>()
+        //self.columns.iter().map(AsRef::as_ref).collect::<Vec<_>>()
     }
 }
 
@@ -244,8 +244,7 @@ mod tests {
 
     #[test]
     fn row() {
-        //let mut row = Row::new();
-        let mut row = Row::new(Arc::from(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect::<Vec<_>>()));
+        let mut row = Row::new(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect());
         row.insert("key1", Some("value".to_string()));
         row.insert("key2", None);
         row.insert("key3", Some("42".to_string()));

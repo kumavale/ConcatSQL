@@ -4,7 +4,6 @@ use postgres::{Client, NoTls};
 
 use std::cell::RefCell;
 use std::pin::Pin;
-use std::sync::Arc;
 
 use crate::Result;
 use crate::row::Row;
@@ -96,11 +95,10 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         // First row
         if let Some(first_row) = result.first() {
             let column_len = first_row.columns().len();
-            let mut row = Row::with_capacity(column_len);
-            for (index, col) in first_row.columns().iter().enumerate() {
-                let column: Arc<str> = Arc::from(col.name().to_string());
-                row.push_column(column.clone());
-                unsafe { row.insert(&*Arc::as_ptr(&column), first_row.get_to_string(index)); }
+            let columns = first_row.columns().iter().map(|col|col.name().to_string()).collect();
+            let mut row = Row::new(columns);
+            for index in 0..column_len {
+                unsafe { row.insert(&*(row.column(index) as *const str), first_row.get_to_string(index)); }
             }
             rows.push(row);
         }
@@ -108,9 +106,9 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         // Or later
         for result_row in result.iter().skip(1) {
             let column_len = result_row.columns().len();
-            let mut row = Row::with_capacity(column_len);
+            let mut row = Row::new(rows[0].columns());
             for index in 0..column_len {
-                unsafe { row.insert(&*Arc::as_ptr(&rows[0].column(index)), result_row.get_to_string(index)); }
+                unsafe { row.insert(&*(rows[0].column(index) as *const str), result_row.get_to_string(index)); }
             }
             rows.push(row);
         }
