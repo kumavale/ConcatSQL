@@ -100,6 +100,47 @@ impl<'a> Row<'a> {
         self.pairs.keys().copied().collect::<Vec<_>>()
         //self.columns.iter().map(AsRef::as_ref).collect::<Vec<_>>()
     }
+
+    #[inline]
+    pub fn iter(&self) -> RowIter {
+        RowIter {
+            row: &self,
+            now: 0,
+        }
+    }
+}
+
+impl<'a, T: Get> std::ops::Index<T> for Row<'a> {
+    type Output = str;
+    fn index(&self, key: T) -> &Self::Output {
+        &key.get(&self.pairs).unwrap()
+    }
+}
+
+#[doc(hidden)]
+pub struct RowIter<'a> {
+    row: &'a Row<'a>,
+    now: usize,
+}
+
+impl<'a> Iterator for RowIter<'a> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<&'a str> {
+        if self.now < self.row.column_count() {
+            self.now += 1;
+            self.row.get(self.now-1)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Row<'a> {
+    type Item = &'a str;
+    type IntoIter = RowIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 /// A trait implemented by types that can index into columns of a row.
@@ -341,6 +382,71 @@ mod tests {
         assert_eq!(row.column_name(99),      None);
         assert_eq!(row.column_name("key1"),  Some("key1"));
         assert_eq!(row.column_name("key99"), None);
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn iter() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        let mut cnt = 0;
+        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+            for (index, value) in row.iter().enumerate() {
+                cnt += 1;
+                assert_eq!(value, ["Alice", "42"][index]);
+            }
+        }
+        assert_eq!(cnt, 2);
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn into_iter() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        let mut cnt = 0;
+        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+            for value in &row {
+                assert_eq!(value, ["Alice", "42"][cnt]);
+                cnt += 1;
+            }
+        }
+        assert_eq!(cnt, 2);
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn index() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        let mut cnt = 0;
+        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+            cnt += 1;
+            assert_eq!(&row[0], "Alice");
+            assert_eq!(&row[1], "42");
+            assert_eq!(&row["name"], "Alice");
+            assert_eq!(&row["age"],  "42");
+            assert_eq!(row[0], *"Alice");
+            assert_eq!(row[1], *"42");
+            assert_eq!(row["name"], *"Alice");
+            assert_eq!(row["age"],  *"42");
+        }
+        assert_eq!(cnt, 1);
     }
 }
 
