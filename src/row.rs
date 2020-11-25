@@ -1,7 +1,5 @@
 use std::str::FromStr;
 use std::sync::Arc;
-use std::ptr::NonNull;
-use std::borrow::Borrow;
 
 use indexmap::map::IndexMap;
 use crate::error::Error;
@@ -22,16 +20,6 @@ impl<'a> Row<'a> {
             pairs: IndexMap::new(),
         }
     }
-
-    //#[inline]
-    //pub(crate) fn column(&mut self, index: usize) -> Arc<str> {
-    //    self.columns[index].clone()
-    //}
-
-    //#[inline]
-    //pub(crate) fn push_column(&mut self, column: Arc<str>) {
-    //    self.columns.push(column);
-    //}
 
     #[inline]
     pub(crate) fn column(&self, index: usize) -> &str {

@@ -6,7 +6,6 @@ use std::path::Path;
 use std::pin::Pin;
 use std::cell::RefCell;
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use crate::Result;
 use crate::row::Row;
@@ -211,7 +210,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                     let columns = pairs.iter().map(|(column, _)|column.to_string()).collect();
                     let mut row = Row::new(columns);
-                    for (index, (column, value)) in pairs.iter().enumerate() {
+                    for (index, (_, value)) in pairs.iter().enumerate() {
                         row.insert(&*(row.column(index) as *const str), value.map(|v| v.to_string()));
                     }
                     rows.push(row);
