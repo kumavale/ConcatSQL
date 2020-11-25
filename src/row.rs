@@ -110,6 +110,13 @@ impl<'a> Row<'a> {
     }
 }
 
+impl<'a, T: Get> std::ops::Index<T> for Row<'a> {
+    type Output = str;
+    fn index(&self, key: T) -> &Self::Output {
+        &key.get(&self.pairs).unwrap()
+    }
+}
+
 #[doc(hidden)]
 pub struct RowIter<'a> {
     row: &'a Row<'a>,
@@ -387,6 +394,31 @@ mod tests {
             }
         }
         assert_eq!(cnt, 2);
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn index() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        let mut cnt = 0;
+        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+            cnt += 1;
+            assert_eq!(&row[0], "Alice");
+            assert_eq!(&row[1], "42");
+            assert_eq!(&row["name"], "Alice");
+            assert_eq!(&row["age"],  "42");
+            assert_eq!(row[0], *"Alice");
+            assert_eq!(row[1], *"42");
+            assert_eq!(row["name"], *"Alice");
+            assert_eq!(row["age"],  *"42");
+        }
+        assert_eq!(cnt, 1);
     }
 }
 
