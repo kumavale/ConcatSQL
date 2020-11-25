@@ -1,5 +1,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use std::ptr::NonNull;
+use std::borrow::Borrow;
 
 use indexmap::map::IndexMap;
 use crate::error::Error;
@@ -7,37 +9,38 @@ use crate::error::Error;
 type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
 /// A single result row of a query.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Row<'a> {
-    columns: Vec<Arc<str>>,
+    columns: Arc<[String]>,
     pairs:   IndexMapPairs<'a>,
 }
 
 impl<'a> Row<'a> {
-    #[cfg(test)]
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(columns: Arc<[String]>) -> Self {
         Self {
-            columns: Vec::new(),
-            pairs:   IndexMap::new(),
+            columns,
+            pairs: IndexMap::new(),
         }
     }
 
+    //#[inline]
+    //pub(crate) fn column(&mut self, index: usize) -> Arc<str> {
+    //    self.columns[index].clone()
+    //}
+
+    //#[inline]
+    //pub(crate) fn push_column(&mut self, column: Arc<str>) {
+    //    self.columns.push(column);
+    //}
+
     #[inline]
-    pub(crate) fn with_capacity(n: usize) -> Self {
-        Self {
-            columns: Vec::with_capacity(n),
-            pairs:   IndexMap::with_capacity(n),
-        }
+    pub(crate) fn column(&self, index: usize) -> &str {
+        &self.columns[index]
     }
 
     #[inline]
-    pub(crate) fn column(&mut self, index: usize) -> Arc<str> {
-        self.columns[index].clone()
-    }
-
-    #[inline]
-    pub(crate) fn push_column(&mut self, column: Arc<str>) {
-        self.columns.push(column);
+    pub(crate) fn columns(&self) -> Arc<[String]> {
+        self.columns.clone()
     }
 
     #[inline]
@@ -106,7 +109,8 @@ impl<'a> Row<'a> {
     /// Get all the column names.  
     #[inline]
     pub fn column_names(&self) -> Vec<&str> {
-        self.pairs.keys().copied().collect::<Vec<_>>()
+        //self.pairs.keys().copied().collect::<Vec<_>>()
+        self.columns.iter().map(AsRef::as_ref).collect::<Vec<_>>()
     }
 }
 
@@ -252,7 +256,8 @@ mod tests {
 
     #[test]
     fn row() {
-        let mut row = Row::new();
+        //let mut row = Row::new();
+        let mut row = Row::new(Arc::from(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect::<Vec<_>>()));
         row.insert("key1", Some("value".to_string()));
         row.insert("key2", None);
         row.insert("key3", Some("42".to_string()));
