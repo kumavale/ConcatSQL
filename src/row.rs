@@ -135,6 +135,14 @@ impl<'a> Iterator for RowIter<'a> {
     }
 }
 
+impl<'a> IntoIterator for &'a Row<'a> {
+    type Item = &'a str;
+    type IntoIter = RowIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 /// A trait implemented by types that can index into columns of a row.
 pub trait Get {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
@@ -391,6 +399,26 @@ mod tests {
             for (index, value) in row.iter().enumerate() {
                 cnt += 1;
                 assert_eq!(value, ["Alice", "42"][index]);
+            }
+        }
+        assert_eq!(cnt, 2);
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn into_iter() {
+        let conn = crate::sqlite::open(":memory:").unwrap();
+        conn.execute(r#"
+                CREATE TABLE users (name TEXT, age INTEGER);
+                INSERT INTO users (name, age) VALUES ('Alice', 42);
+                INSERT INTO users (name, age) VALUES ('Bob',   69);
+        "#).unwrap();
+
+        let mut cnt = 0;
+        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+            for value in &row {
+                assert_eq!(value, ["Alice", "42"][cnt]);
+                cnt += 1;
             }
         }
         assert_eq!(cnt, 2);
