@@ -31,8 +31,8 @@ impl<'a> Row<'a> {
     }
 
     #[inline]
-    pub(crate) fn column(&mut self, index: usize) -> &Arc<str> {
-        &self.columns[index]
+    pub(crate) fn column(&mut self, index: usize) -> Arc<str> {
+        self.columns[index].clone()
     }
 
     #[inline]
@@ -236,6 +236,7 @@ mod tests {
     use crate::error::*;
 
     #[test]
+    #[cfg(feature = "sqlite")]
     fn column_names() {
         let conn = crate::sqlite::open(":memory:").unwrap();
         conn.execute(r#"

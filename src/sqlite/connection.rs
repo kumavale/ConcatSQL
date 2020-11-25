@@ -213,7 +213,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                     for (column, value) in pairs.iter() {
                         let column: Arc<str> = Arc::from(column.to_string());
                         row.push_column(column.clone());
-                        row.insert(&*Arc::as_ptr(&column), value.map(|v| v.to_string()));
+                        row.insert(&*Arc::as_ptr(&column.clone()), value.map(|v| v.to_string()));
                     }
                     rows.push(row);
                 }
@@ -235,7 +235,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
                         let pairs: Vec<(&str, Option<&str>)> = pairs.iter().map(|p| (p.0, p.1.as_deref())).collect();
                         let mut row = Row::with_capacity(column_count as usize);
                         for (index, (_, value)) in pairs.iter().enumerate() {
-                            row.insert(&*Arc::as_ptr(rows[0].column(index)), value.map(|v| v.to_string()));
+                            row.insert(&*Arc::as_ptr(&rows[0].column(index)), value.map(|v| v.to_string()));
                         }
                         rows.push(row);
                     }
