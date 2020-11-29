@@ -239,7 +239,6 @@ from_sql_impl! {
     std::num::NonZeroI16,
     std::num::NonZeroI32,
     std::num::NonZeroI64,
-    std::num::NonZeroI128,
     std::num::NonZeroIsize,
     std::num::NonZeroU8,
     std::num::NonZeroU16,
@@ -250,6 +249,9 @@ from_sql_impl! {
     std::path::PathBuf,
     String,
 }
+
+#[cfg(feature = "uuid")]
+from_sql_impl! { std::num::NonZeroI128 }
 
 impl FromSql for Vec<u8> {
     #[doc(hidden)]

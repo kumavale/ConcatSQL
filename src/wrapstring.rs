@@ -1,6 +1,7 @@
 use std::ops::Add;
 use std::borrow::Cow;
 use crate::parser::{escape_string, to_binary_literal};
+use uuid::Uuid;
 
 /// Values that can be bound as static placeholders.
 #[derive(Clone, Debug, PartialEq)]
@@ -8,11 +9,11 @@ pub enum Value<'a> {
     Null,
     I32(i32),
     I64(i64),
-    I128(i128),
     F32(f32),
     F64(f64),
     Text(Cow<'a, str>),
     Bytes(Vec<u8>),
+    Uuid(Uuid),
 }
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
@@ -66,11 +67,11 @@ impl<'a> WrapString<'a> {
                         Value::Null         => query.push_str("NULL"),
                         Value::I32(value)   => query.push_str(&value.to_string()),
                         Value::I64(value)   => query.push_str(&value.to_string()),
-                        Value::I128(value)  => query.push_str(&value.to_string()),
                         Value::F32(value)   => query.push_str(&value.to_string()),
                         Value::F64(value)   => query.push_str(&value.to_string()),
                         Value::Text(value)  => query.push_str(&escape_string(&value)),
                         Value::Bytes(value) => query.push_str(&to_binary_literal(&value)),
+                        Value::Uuid(value)  => query.push_str(&format!("'{}'", value.to_simple_ref())),
                     }
                     index += 1;
                 }
@@ -208,23 +209,28 @@ macro_rules! impl_add_I64_for_WrapString {
     )*)
 }
 
-macro_rules! impl_add_I128_for_WrapString {
-    ( $($t:ty),* ) => ($(
-        impl<'a> Add<$t> for WrapString<'a> {
-            type Output = WrapString<'a>;
-            #[inline]
-            fn add(mut self, other: $t) -> WrapString<'a> {
-                self.query .push(None);
-                self.params.push(Value::I128(other as i128));
-                self
-            }
-        }
-    )*)
+impl<'a> Add<Uuid> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: Uuid) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Uuid(other));
+        self
+    }
+}
+
+impl<'a> Add<&Uuid> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &Uuid) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Uuid(*other));
+        self
+    }
 }
 
 impl_add_I32_for_WrapString!(u8, u16, u32, i8, i16, i32);
 impl_add_I64_for_WrapString!(u64, i64);
-impl_add_I128_for_WrapString!(u128, i128);
 
 #[cfg(target_pointer_width = "16")]
 #[cfg(target_pointer_width = "32")]
@@ -280,9 +286,10 @@ impl_add_Option_for_WrapString! {
     std::borrow::Cow<'a, str>,
     Vec<u8>,
     &'a Vec<u8>,
-    u8, u16, u32, u64, u128, usize,
-    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, usize,
+    i8, i16, i32, i64, isize,
     f32, f64,
+    Uuid,
 }
 
 impl<'a> Add<()> for WrapString<'a> {
@@ -428,8 +435,8 @@ mod tests {
         assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
         assert_eq!(sql.simulate(), "'A''B''C''D'");
-        let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5u128 + 6isize + 7i8 + 8i16 + 9i32 + 0i64 + 1i128 + 2f32 + 3f64;
-        assert_eq!(sql.simulate(), "01234567890123");
+        let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5isize + 6i8 + 7i16 + 8i32 + 9i64 + 0f32 + 1f64;
+        assert_eq!(sql.simulate(), "012345678901");
         let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
         assert_eq!(sql.simulate(), "340282350000000000000000000000000000000infNaN");
         let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
@@ -462,6 +469,17 @@ mod tests {
         let sli = &[String::from("A"),String::from("B")][..];
         let sql = prep!("(") + sli + prep!(")");
         assert_eq!(sql.simulate(), "('A','B')");
+    }
+
+    #[test]
+    fn uuid() {
+        use uuid::Uuid;
+        let uuid = prep!() + Uuid::nil();
+        assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
+        let uuid = prep!() + &Uuid::nil();
+        assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
+        let uuid = prep!() + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
+        assert_eq!(uuid.simulate(), "'936da01f9abd4d9d80c702af85c822a8'");
     }
 
     mod simulate {

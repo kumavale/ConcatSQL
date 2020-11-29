@@ -374,6 +374,16 @@ mod mysql {
     }
 
     #[test]
+    fn uuid() {
+        use uuid::Uuid;
+        let conn = prepare();
+        let sql = prep!("SELECT ") + Uuid::nil();
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(&row[0], "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+        }
+    }
+
+    #[test]
     fn sql_injection() {
         let conn = prepare();
 

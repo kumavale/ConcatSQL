@@ -1,6 +1,7 @@
 extern crate postgres_sys as postgres;
 
 use postgres::{Client, NoTls};
+use uuid::Uuid;
 
 use std::cell::RefCell;
 use std::pin::Pin;
@@ -30,11 +31,11 @@ macro_rules! to_sql {
             Value::Null         => &"NULL" as &(dyn postgres::types::ToSql + Sync),
             Value::I32(value)   => value,
             Value::I64(value)   => value,
-            Value::I128(_value) => unimplemented!(),  // TODO UUID
             Value::F32(value)   => value,
             Value::F64(value)   => value,
             Value::Text(value)  => value,
             Value::Bytes(value) => value,
+            Value::Uuid(value)  => value,
         }
     );
 }
@@ -163,6 +164,8 @@ impl GetToString for postgres::row::Row {
             Some(value.to_string())
         } else if let Ok(value) = self.try_get::<usize, Vec<u8>>(index) {
             Some(crate::parser::to_hex(&value))
+        } else if let Ok(value) = self.try_get::<usize, Uuid>(index) {
+            Some(value.to_simple_ref().to_string())
         } else {
             None
         }

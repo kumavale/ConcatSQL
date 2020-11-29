@@ -362,6 +362,16 @@ mod postgres {
     }
 
     #[test]
+    fn uuid() {
+        use uuid::Uuid;
+        let conn = prepare();
+        let sql = prep!("SELECT ") + Uuid::nil() + prep!("::UUID");
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(&row[0], "00000000000000000000000000000000");
+        }
+    }
+
+    #[test]
     fn sql_injection() {
         let conn = prepare();
 
