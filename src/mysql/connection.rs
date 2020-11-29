@@ -187,10 +187,13 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 }
 
 fn compile(ws: &WrapString) -> String {
-    let mut query = String::new();
+    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
+        query.as_ref().map_or(acc, |s| acc + s.len())
+    }) + ws.params.len());
+
     for part in &ws.query {
         match part {
-            Some(s) => query.push_str(&s),
+            Some(s) => query.push_str(s),
             None =>    query.push('?'),
         }
     }
