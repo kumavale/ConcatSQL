@@ -31,6 +31,14 @@ impl<'a> WrapString<'a> {
         }
     }
 
+    #[doc(hidden)]
+    pub const fn null() -> Self {
+        Self {
+            query:  Vec::new(),
+            params: Vec::new(),
+        }
+    }
+
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
             query:  vec![ Some(Cow::Owned(s.to_string())) ],
@@ -404,7 +412,7 @@ impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
 
 impl<'a> IntoWrapString<'a> for &'static str {
     fn into_wrapstring(self) -> WrapString<'a> {
-        WrapString::new(self)
+        WrapString::init(self)
     }
 }
 

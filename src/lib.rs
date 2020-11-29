@@ -116,7 +116,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// ```
 #[macro_export]
 macro_rules! prep {
-    ()            => { concatsql::WrapString::init("")     };
+    ()            => { concatsql::WrapString::null()       };
     ($query:expr) => { concatsql::WrapString::init($query) };
 }
 
