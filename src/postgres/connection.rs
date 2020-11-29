@@ -10,7 +10,7 @@ use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::{WrapString, Value, IntoWrapString};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(params: &str) -> Result<Connection> {
@@ -41,7 +41,7 @@ macro_rules! to_sql {
 
 impl ConcatsqlConn for RefCell<postgres::Client> {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
         if ws.params.is_empty() {
             match self.borrow_mut().batch_execute(&query) {
                 Ok(_) => Ok(()),
@@ -59,7 +59,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
     fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
         let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
         let rows = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
@@ -83,7 +83,7 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
     }
 
     fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'a>>> {
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
         let params = ws.params.iter().map(|value| to_sql!(value)).collect::<Vec<_>>();
         let result = match self.borrow_mut().query(&query as &str, &params[..]) {
             Ok(result) => result,
@@ -119,6 +119,25 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
     fn kind(&self) -> ConnKind {
         ConnKind::PostgreSQL
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
+        query.as_ref().map_or(acc, |s| acc + s.len())
+    }) + ws.params.len());
+    let mut index = 1;
+
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(s),
+            None => {
+                query.push('$');
+                query.push_str(&index.to_string());
+                index += 1;
+            }
+        }
+    }
+    query
 }
 
 trait GetToString {

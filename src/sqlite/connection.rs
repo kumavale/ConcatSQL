@@ -11,7 +11,7 @@ use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::{WrapString, Value, IntoWrapString};
+use crate::wrapstring::{WrapString, Value};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a>> {
@@ -48,7 +48,7 @@ pub fn open<'a, T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection<'a
 
 impl ConcatsqlConn for ffi::sqlite3 {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
 
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
@@ -118,7 +118,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query),
@@ -171,7 +171,7 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn rows_inner<'r>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'r>>> {
         let mut rows: Vec<Row> = Vec::new();
 
-        let query = ws.compile(self.kind());
+        let query = compile(ws);
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query).map(|_| Vec::new()),
@@ -254,6 +254,20 @@ impl ConcatsqlConn for ffi::sqlite3 {
     fn kind(&self) -> ConnKind {
         ConnKind::SQLite
     }
+}
+
+fn compile(ws: &WrapString) -> String {
+    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
+        query.as_ref().map_or(acc, |s| acc + s.len())
+    }) + ws.params.len());
+
+    for part in &ws.query {
+        match part {
+            Some(s) => query.push_str(s),
+            None =>    query.push('?'),
+        }
+    }
+    query
 }
 
 trait Storing {
