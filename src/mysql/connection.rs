@@ -36,7 +36,6 @@ macro_rules! to_mysql_value {
             Value::Null         => mysql::Value::from(None as Option<i32>),
             Value::I32(value)   => mysql::Value::from(value),
             Value::I64(value)   => mysql::Value::from(value),
-            Value::I128(value)  => mysql::Value::from(value),
             Value::F32(value)   => mysql::Value::from(value),
             Value::F64(value)   => mysql::Value::from(value),
             Value::Text(value)  => mysql::Value::from(value.as_ref()),

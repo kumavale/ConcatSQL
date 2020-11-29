@@ -24,6 +24,7 @@ postgres = ["postgres-sys"]
 indexmap = "1.6"
 unicode-width = "0.1"
 lazy_static = "1.4"
+uuid = "0.8"
 
 [dependencies.sqlite3-sys]
 version = "0.12"
@@ -39,9 +40,11 @@ optional = true
 package = "postgres"
 version = "0.18"
 optional = true
+features = ["with-uuid-0_8"]
 
 [dev-dependencies]
 temporary = "0.6"
+uuid = { version = "0.8", features = ["v4"] }
 
 [package.metadata.docs.rs]
 all-features = true
