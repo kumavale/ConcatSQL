@@ -35,7 +35,6 @@ macro_rules! to_sql {
             Value::F64(value)   => value,
             Value::Text(value)  => value,
             Value::Bytes(value) => value,
-            Value::Uuid(value)  => value,
         }
     );
 }

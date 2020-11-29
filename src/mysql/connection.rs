@@ -40,7 +40,6 @@ macro_rules! to_mysql_value {
             Value::F64(value)   => mysql::Value::from(value),
             Value::Text(value)  => mysql::Value::from(value.as_ref()),
             Value::Bytes(value) => mysql::Value::from(value),
-            Value::Uuid(value)  => mysql::Value::from(value),
         }
     );
 }

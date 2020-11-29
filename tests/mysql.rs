@@ -379,7 +379,11 @@ mod mysql {
         let conn = prepare();
         let sql = prep!("SELECT ") + Uuid::nil();
         for row in conn.rows(&sql).unwrap() {
-            assert_eq!(&row[0], "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+            assert_eq!(&row[0], "00000000000000000000000000000000");
+        }
+        let sql = prep!("SELECT ") + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(&row[0], "936DA01F9ABD4D9D80C702AF85C822A8");
         }
     }
 

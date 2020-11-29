@@ -343,30 +343,6 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
                     Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }
-            Value::Uuid(value) => {
-                let value = value.as_bytes();
-                ffi::sqlite3_bind_blob(
-                    stmt,
-                    index,
-                    value.as_ptr() as *const _,
-                    value.len() as i32,
-                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-                )
-                //let value = match CString::new(value.as_bytes()) {
-                //    Ok(string) => string,
-                //    _ => {
-                //        ffi::sqlite3_finalize(stmt);
-                //        return Error::new(&error_level, "invalid param", value);
-                //    }
-                //};
-                //ffi::sqlite3_bind_text(
-                //    stmt,
-                //    index,
-                //    value.as_ptr(),
-                //    32i32,
-                //    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
-                //)
-            }
         };
         if result != ffi::SQLITE_OK {
             ffi::sqlite3_finalize(stmt);

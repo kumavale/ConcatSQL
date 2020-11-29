@@ -13,7 +13,6 @@ pub enum Value<'a> {
     F64(f64),
     Text(Cow<'a, str>),
     Bytes(Vec<u8>),
-    Uuid(Uuid),
 }
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
@@ -71,7 +70,6 @@ impl<'a> WrapString<'a> {
                         Value::F64(value)   => query.push_str(&value.to_string()),
                         Value::Text(value)  => query.push_str(&escape_string(&value)),
                         Value::Bytes(value) => query.push_str(&to_binary_literal(&value)),
-                        Value::Uuid(value)  => query.push_str(&format!("'{}'", value.to_simple_ref())),
                     }
                     index += 1;
                 }
@@ -209,22 +207,24 @@ macro_rules! impl_add_I64_for_WrapString {
     )*)
 }
 
+/// Sent as a 32-byte string.
 impl<'a> Add<Uuid> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: Uuid) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Uuid(other));
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple()))));
         self
     }
 }
 
+/// Sent as a 32-byte string.
 impl<'a> Add<&Uuid> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &Uuid) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Uuid(*other));
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple_ref()))));
         self
     }
 }
@@ -472,6 +472,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn uuid() {
         use uuid::Uuid;
         let uuid = prep!() + Uuid::nil();
@@ -479,7 +480,9 @@ mod tests {
         let uuid = prep!() + &Uuid::nil();
         assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
         let uuid = prep!() + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
-        assert_eq!(uuid.simulate(), "'936da01f9abd4d9d80c702af85c822a8'");
+        assert_eq!(uuid.simulate(), "'936DA01F9ABD4D9D80C702AF85C822A8'");
+        let uuid = prep!() + Uuid::new_v4();
+        assert_eq!(uuid.simulate().len(), 32+2);
     }
 
     mod simulate {
