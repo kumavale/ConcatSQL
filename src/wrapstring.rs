@@ -1,6 +1,7 @@
 use std::ops::Add;
 use std::borrow::Cow;
 use crate::parser::{escape_string, to_binary_literal};
+use crate::connection::ConnKind;
 use uuid::Uuid;
 
 /// Values that can be bound as static placeholders.
@@ -395,24 +396,113 @@ impl_add_arrays_borrowed_for_WrapString!{
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 pub trait IntoWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
-    fn into_wrapstring(self) -> WrapString<'a>;
+    fn into_wrapstring(self) -> Cow<'a, WrapString<'a>>;
+
+    #[doc(hidden)]
+    fn compile(&self, conn_kind: ConnKind) -> Cow<'a, str>;
 }
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
-    fn into_wrapstring(self) -> WrapString<'a> {
-        self
+    fn into_wrapstring(self) -> Cow<'a, WrapString<'a>> {
+        Cow::Owned(self)
+    }
+
+    fn compile(&self, conn_kind: ConnKind) -> Cow<'a, str> {
+        let mut query = String::with_capacity(self.query.iter().fold(0, |acc, query| {
+            query.as_ref().map_or(acc, |s| acc + s.len())
+        }) + self.params.len());
+
+        match conn_kind {
+            #[cfg(feature = "sqlite")] ConnKind::SQLite => {
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "mysql")] ConnKind::MySQL  => {
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "postgres")] ConnKind::PostgreSQL => {
+                let mut index = 1;
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None => {
+                            query.push('$');
+                            query.push_str(&index.to_string());
+                            index += 1;
+                        }
+                    }
+                }
+                Cow::Owned(query)
+            }
+        }
     }
 }
 
-impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
-    fn into_wrapstring(self) -> WrapString<'a> {
-        self.clone()
+impl<'a> IntoWrapString<'a> for &'a WrapString<'a> {
+    fn into_wrapstring(self) -> Cow<'a, WrapString<'a>> {
+        Cow::Borrowed(self)
+    }
+
+    fn compile(&self, conn_kind: ConnKind) -> Cow<'a, str> {
+        let mut query = String::with_capacity(self.query.iter().fold(0, |acc, query| {
+            query.as_ref().map_or(acc, |s| acc + s.len())
+        }) + self.params.len());
+
+        match conn_kind {
+            #[cfg(feature = "sqlite")] ConnKind::SQLite => {
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "mysql")] ConnKind::MySQL  => {
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "postgres")] ConnKind::PostgreSQL => {
+                let mut index = 1;
+                for part in &self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None => {
+                            query.push('$');
+                            query.push_str(&index.to_string());
+                            index += 1;
+                        }
+                    }
+                }
+                Cow::Owned(query)
+            }
+        }
     }
 }
 
 impl<'a> IntoWrapString<'a> for &'static str {
-    fn into_wrapstring(self) -> WrapString<'a> {
-        WrapString::init(self)
+    fn into_wrapstring(self) -> Cow<'a, WrapString<'a>> {
+        Cow::Owned(WrapString::init(self))
+    }
+
+    fn compile(&self, _conn_kind: ConnKind) -> Cow<'a, str> {
+        Cow::Borrowed(self)
     }
 }
 

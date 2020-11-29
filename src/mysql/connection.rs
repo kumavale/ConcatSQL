@@ -10,7 +10,7 @@ use crate::parser::to_hex;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::{WrapString, Value};
+use crate::wrapstring::{WrapString, Value, IntoWrapString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
@@ -47,7 +47,7 @@ macro_rules! to_mysql_value {
 impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
+        let query = ws.compile(self.kind());
         if ws.params.is_empty() {
             match conn.query_drop(&query) {
                 Ok(_) => Ok(()),
@@ -95,7 +95,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
+        let query = ws.compile(self.kind());
 
         if ws.params.is_empty() {
             let mut result = match conn.query_iter(&query) {
@@ -117,7 +117,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 
     fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'a>>> {
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
+        let query = ws.compile(self.kind());
 
         macro_rules! run {
             ($result:expr, $rows:expr) => {
@@ -184,20 +184,6 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
     fn kind(&self) -> ConnKind {
         ConnKind::MySQL
     }
-}
-
-fn compile(ws: &WrapString) -> String {
-    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
-        query.as_ref().map_or(acc, |s| acc + s.len())
-    }) + ws.params.len());
-
-    for part in &ws.query {
-        match part {
-            Some(s) => query.push_str(s),
-            None =>    query.push('?'),
-        }
-    }
-    query
 }
 
 trait GetToString {

@@ -15,7 +15,7 @@ pub(crate) trait ConcatsqlConn {
     fn kind(&self) -> ConnKind;
 }
 
-pub(crate) enum ConnKind {
+pub enum ConnKind {
     #[cfg(feature = "sqlite")]   SQLite,
     #[cfg(feature = "mysql")]    MySQL,
     #[cfg(feature = "postgres")] PostgreSQL,
