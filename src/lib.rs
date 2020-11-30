@@ -72,7 +72,7 @@ pub mod prelude {
     pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::{WrapString, IntoWrapString};
+    pub use crate::wrapstring::WrapString;
 }
 
 /// A typedef of the result returned by many methods.

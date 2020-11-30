@@ -22,7 +22,6 @@ postgres = ["postgres-sys"]
 
 [dependencies]
 indexmap = "1.6"
-unicode-width = "0.1"
 lazy_static = "1.4"
 uuid = "0.8"
 

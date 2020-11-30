@@ -395,22 +395,26 @@ impl_add_arrays_borrowed_for_WrapString!{
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 pub trait IntoWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a>;
 }
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
         self
     }
 }
 
 impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
         self.clone()
     }
 }
 
 impl<'a> IntoWrapString<'a> for &'static str {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
         WrapString::init(self)
     }
