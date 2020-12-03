@@ -3,7 +3,7 @@ extern crate postgres_sys as postgres;
 use postgres::{Client, NoTls};
 use uuid::Uuid;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::Result;
 use crate::row::Row;
@@ -20,7 +20,7 @@ pub fn open(params: &str) -> Result<Connection> {
 
     Ok(Connection {
         conn:        Box::new(RefCell::new(conn)),
-        error_level: RefCell::new(ErrorLevel::default()),
+        error_level: Cell::new(ErrorLevel::default()),
     })
 }
 

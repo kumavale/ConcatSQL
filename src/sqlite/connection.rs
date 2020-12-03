@@ -3,7 +3,7 @@ extern crate sqlite3_sys as ffi;
 use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::borrow::Cow;
 
 use crate::Result;
@@ -36,7 +36,7 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
         ffi::SQLITE_OK =>
             Ok(Connection {
                 conn:        Box::new(unsafe { NonNull::new_unchecked(conn_ptr) }),
-                error_level: RefCell::new(ErrorLevel::default()),
+                error_level: Cell::new(ErrorLevel::default()),
             }),
         _ => {
             unsafe { ffi::sqlite3_close(conn_ptr); }

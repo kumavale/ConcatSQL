@@ -2,7 +2,7 @@ extern crate mysql_sys as mysql;
 use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::Result;
 use crate::parser::to_hex;
@@ -25,7 +25,7 @@ pub fn open(url: &str) -> Result<Connection> {
 
     Ok(Connection {
         conn:        Box::new(RefCell::new(conn)),
-        error_level: RefCell::new(ErrorLevel::default()),
+        error_level: Cell::new(ErrorLevel::default()),
     })
 }
 

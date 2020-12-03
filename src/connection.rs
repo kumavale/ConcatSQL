@@ -1,5 +1,5 @@
 use std::fmt;
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use crate::Result;
 use crate::ErrorLevel;
@@ -24,7 +24,7 @@ pub(crate) enum ConnKind {
 /// A database connection.
 pub struct Connection {
     pub(crate) conn:        Box<dyn ConcatsqlConn>,
-    pub(crate) error_level: RefCell<ErrorLevel>,
+    pub(crate) error_level: Cell<ErrorLevel>,
 }
 
 unsafe impl Send for Connection {}
@@ -40,7 +40,7 @@ impl fmt::Debug for Connection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("conn", &(&self.conn as *const _))
-            .field("error_level", &*self.error_level.borrow())
+            .field("error_level", &self.error_level.get())
             .finish()
     }
 }
@@ -62,7 +62,7 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(&query.into_wrapstring(), &*self.error_level.borrow())
+        self.conn.execute_inner(&query.into_wrapstring(), &self.error_level.get())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -92,7 +92,7 @@ impl<'a> Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(&query.into_wrapstring(), &*self.error_level.borrow(), &mut callback)
+        self.conn.iterate_inner(&query.into_wrapstring(), &self.error_level.get(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -113,7 +113,7 @@ impl<'a> Connection {
     /// }
     /// ```
     pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
-        self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
+        self.conn.rows_inner(&query.into_wrapstring(), &self.error_level.get())
     }
 
     /// Sets the error level.  
@@ -127,7 +127,7 @@ impl<'a> Connection {
     /// conn.error_level(ErrorLevel::AlwaysOk);
     /// ```
     pub fn error_level(&self, level: ErrorLevel) {
-        *self.error_level.borrow_mut() = level;
+        self.error_level.set(level);
     }
 }
 
