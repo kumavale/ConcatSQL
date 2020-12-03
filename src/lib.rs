@@ -53,7 +53,7 @@ pub mod postgres;
 pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
-pub use crate::parser::{html_special_chars, _sanitize_like, check_valid_literal, invalid_literal};
+pub use crate::parser::{html_special_chars, _sanitize_like, invalid_literal};
 pub use crate::wrapstring::{WrapString, IntoWrapString};
 
 pub mod prelude {
@@ -72,7 +72,7 @@ pub mod prelude {
     pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::{WrapString, IntoWrapString};
+    pub use crate::wrapstring::WrapString;
 }
 
 /// A typedef of the result returned by many methods.
@@ -116,7 +116,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// ```
 #[macro_export]
 macro_rules! prep {
-    ()            => { concatsql::WrapString::init("")     };
+    ()            => { concatsql::WrapString::null()       };
     ($query:expr) => { concatsql::WrapString::init($query) };
 }
 

@@ -1,9 +1,9 @@
 extern crate postgres_sys as postgres;
 
 use postgres::{Client, NoTls};
+use uuid::Uuid;
 
-use std::cell::RefCell;
-use std::pin::Pin;
+use std::cell::{Cell, RefCell};
 
 use crate::Result;
 use crate::row::Row;
@@ -19,8 +19,8 @@ pub fn open(params: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
-        error_level: RefCell::new(ErrorLevel::default()),
+        conn:        Box::new(RefCell::new(conn)),
+        error_level: Cell::new(ErrorLevel::default()),
     })
 }
 
@@ -30,7 +30,6 @@ macro_rules! to_sql {
             Value::Null         => &"NULL" as &(dyn postgres::types::ToSql + Sync),
             Value::I32(value)   => value,
             Value::I64(value)   => value,
-            Value::I128(_value) => unimplemented!(),  // TODO UUID
             Value::F32(value)   => value,
             Value::F64(value)   => value,
             Value::Text(value)  => value,
@@ -116,19 +115,27 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         Ok(rows)
     }
 
+    fn close(&self) {
+        // Do nothing
+    }
+
     fn kind(&self) -> ConnKind {
         ConnKind::PostgreSQL
     }
 }
 
 fn compile(ws: &WrapString) -> String {
-    let mut query = String::new();
+    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
+        query.as_ref().map_or(acc, |s| acc + s.len())
+    }) + ws.params.len());
     let mut index = 1;
+
     for part in &ws.query {
         match part {
-            Some(s) => query.push_str(&s),
+            Some(s) => query.push_str(s),
             None => {
-                query.push_str(&format!("${}", index));
+                query.push('$');
+                query.push_str(&index.to_string());
                 index += 1;
             }
         }
@@ -163,6 +170,8 @@ impl GetToString for postgres::row::Row {
             Some(value.to_string())
         } else if let Ok(value) = self.try_get::<usize, Vec<u8>>(index) {
             Some(crate::parser::to_hex(&value))
+        } else if let Ok(value) = self.try_get::<usize, Uuid>(index) {
+            Some(value.to_simple_ref().to_string())
         } else {
             None
         }

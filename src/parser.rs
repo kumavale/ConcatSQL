@@ -1,6 +1,3 @@
-use crate::Result;
-use crate::error::{Error, ErrorLevel};
-
 /// Convert special characters to HTML entities.
 ///
 /// # Performed translations
@@ -104,115 +101,6 @@ pub(crate) fn to_binary_literal(bytes: &[u8]) -> String {
     }
 }
 
-pub struct Parser<'a> {
-    input:       &'a str,
-    pos:         usize,
-    error_level: &'a ErrorLevel,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, error_level: &'a ErrorLevel) -> Self {
-        Self {
-            input,
-            pos: 0,
-            error_level,
-        }
-    }
-
-    pub fn eof(&self) -> bool {
-        self.input.len() <= self.pos
-    }
-
-    pub fn next_char(&self) -> Result<char> {
-        self.input[self.pos..].chars().next().ok_or_else(|| match self.error_level {
-            ErrorLevel::AlwaysOk |
-            ErrorLevel::Release  => Error::AnyError,
-            ErrorLevel::Develop  => Error::Message("error: next_char()".to_string()),
-            #[cfg(debug_assertions)]
-            ErrorLevel::Debug    => Error::Message("error: next_char(): None".to_string()),
-        })
-    }
-
-    pub fn consume_string(&mut self, quote: char) -> Result<String> {
-        let mut s = quote.to_string();
-        self.consume_char()?;
-
-        while !self.eof() {
-            if self.next_char()? == quote {
-                s.push(self.consume_char()?);
-                if self.eof() || self.next_char()? != quote {
-                    return Ok(s);
-                }
-            }
-            s.push(self.consume_char()?);
-        }
-
-        Err( match self.error_level {
-            ErrorLevel::AlwaysOk |
-            ErrorLevel::Release  => Error::AnyError,
-            ErrorLevel::Develop  => Error::Message("endless".to_string()),
-            #[cfg(debug_assertions)]
-            ErrorLevel::Debug    => Error::Message(format!("endless: {}", s)),
-        })
-    }
-
-    pub fn consume_while<F>(&mut self, f: F) -> Result<String>
-        where
-            F: Fn(char) -> bool,
-    {
-        let mut s = String::new();
-        while !self.eof() && f(self.next_char()?) {
-            s.push(self.consume_char()?);
-        }
-        Ok(s)
-    }
-
-    pub fn consume_char(&mut self) -> Result<char> {
-        let mut iter = self.input[self.pos..].char_indices();
-        let (_, cur_char) = iter.next().ok_or_else(|| match self.error_level {
-            ErrorLevel::AlwaysOk |
-            ErrorLevel::Release => Error::AnyError,
-            ErrorLevel::Develop => Error::Message("error: consume_char()".to_string()),
-            #[cfg(debug_assertions)]
-            ErrorLevel::Debug   => Error::Message("error: consume_char(): None".to_string()),
-        })?;
-        let (next_pos, _) = iter.next().unwrap_or((1, ' '));
-        self.pos += next_pos;
-        Ok(cur_char)
-    }
-
-    pub fn visible_len(&self) -> usize {
-        use unicode_width::UnicodeWidthStr;
-        UnicodeWidthStr::width(&self.input[..self.pos])
-    }
-}
-
-// I want to write with const fn
-#[doc(hidden)]
-pub fn check_valid_literal(s: &'static str) -> Result<()> {
-    let mut parser = Parser::new(&s, &ErrorLevel::Develop);
-    while !parser.eof() {
-        parser.consume_while(|c| c != '"' && c != '\'')?;
-        match parser.next_char() {
-            Ok(c) => if c == '"' || c == '\'' {
-                let visible_len = parser.visible_len();
-                if parser.consume_string(c).is_err() {
-                    #[cfg(debug_assertions)]
-                    let err_msg = format!("    {}\n{:<width1$}\x1b[31m{:^<width2$}\x1b[0m",
-                        s, "", "^", width1 = visible_len + 4, width2 = parser.visible_len() - visible_len);
-                    #[cfg(not(debug_assertions))]
-                    let err_msg = format!("    {}\n{:<width1$}\x1b[33m{:^<width2$}\x1b[0m",
-                        s, "", "^", width1 = visible_len + 4, width2 = parser.visible_len() - visible_len);
-                    return Err(Error::Message(err_msg));
-                }
-            }
-            _other => (), // Do nothing
-        }
-    }
-
-    Ok(())
-}
-
 #[doc(hidden)]
 pub fn invalid_literal() -> &'static str {
     #[cfg(debug_assertions)]
@@ -230,14 +118,6 @@ mod tests {
             super::html_special_chars(r#"<script type="text/javascript">alert('1')</script>"#),
             r#"&lt;script type=&quot;text/javascript&quot;&gt;alert(&#39;1&#39;)&lt;/script&gt;"#
         );
-    }
-
-    #[test]
-    #[cfg(debug_assertions)]
-    fn consume_char() {
-        use crate::error::*;
-        let mut p = super::Parser::new("", &ErrorLevel::Debug);
-        assert_eq!(p.consume_char(), Err(Error::Message("error: consume_char(): None".into())));
     }
 
     #[test]
@@ -262,53 +142,5 @@ mod tests {
     fn escape_string() {
         assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
-    }
-
-    #[test]
-    fn check_valid_literal() {
-        assert!(super::check_valid_literal("foo").is_ok());
-        assert!(super::check_valid_literal("id=").is_ok());
-        assert!(super::check_valid_literal("''").is_ok());
-        assert!(super::check_valid_literal("'\"'").is_ok());
-        assert!(super::check_valid_literal("'\"\"'").is_ok());
-        assert!(super::check_valid_literal("\"\"").is_ok());
-        assert!(super::check_valid_literal("\"'\"").is_ok());
-        assert!(super::check_valid_literal("\"''\"").is_ok());
-        assert!(super::check_valid_literal("'O''Reilly'").is_ok());
-        assert!(super::check_valid_literal("'foo'+'bar'").is_ok());
-        assert!(super::check_valid_literal("").is_ok());
-        assert!(super::check_valid_literal("'\"'''").is_ok());
-
-        assert!(!super::check_valid_literal("O'Reilly").is_ok());
-        assert!(!super::check_valid_literal("'O'Reilly'").is_ok());
-        assert!(!super::check_valid_literal("id='").is_ok());
-        assert!(!super::check_valid_literal("'").is_ok());
-        assert!(!super::check_valid_literal("\"").is_ok());
-        assert!(!super::check_valid_literal("'''").is_ok());
-        assert!(!super::check_valid_literal("\"\"\"").is_ok());
-        assert!(!super::check_valid_literal("' AND ...").is_ok());
-        assert!(!super::check_valid_literal("\\'").is_ok());
-        assert!(!super::check_valid_literal("\\\"").is_ok());
-
-        #[cfg(debug_assertions)]
-        assert_eq!(
-            super::check_valid_literal("O'Reilly").unwrap_err().to_string(),
-            "    O'Reilly\n     \x1b[31m^^^^^^^\x1b[0m"
-        );
-        #[cfg(debug_assertions)]
-        assert_eq!(
-            super::check_valid_literal("passwd='").unwrap_err().to_string(),
-            "    passwd='\n           \x1b[31m^\x1b[0m"
-        );
-        #[cfg(not(debug_assertions))]
-        assert_eq!(
-            super::check_valid_literal("O'Reilly").unwrap_err().to_string(),
-            "    O'Reilly\n     \x1b[33m^^^^^^^\x1b[0m"
-        );
-        #[cfg(not(debug_assertions))]
-        assert_eq!(
-            super::check_valid_literal("passwd='").unwrap_err().to_string(),
-            "    passwd='\n           \x1b[33m^\x1b[0m"
-        );
     }
 }

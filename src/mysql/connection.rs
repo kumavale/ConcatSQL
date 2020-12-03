@@ -2,8 +2,7 @@ extern crate mysql_sys as mysql;
 use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
-use std::cell::RefCell;
-use std::pin::Pin;
+use std::cell::{Cell, RefCell};
 
 use crate::Result;
 use crate::parser::to_hex;
@@ -25,8 +24,8 @@ pub fn open(url: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
-        error_level: RefCell::new(ErrorLevel::default()),
+        conn:        Box::new(RefCell::new(conn)),
+        error_level: Cell::new(ErrorLevel::default()),
     })
 }
 
@@ -36,10 +35,9 @@ macro_rules! to_mysql_value {
             Value::Null         => mysql::Value::from(None as Option<i32>),
             Value::I32(value)   => mysql::Value::from(value),
             Value::I64(value)   => mysql::Value::from(value),
-            Value::I128(value)  => mysql::Value::from(value),
             Value::F32(value)   => mysql::Value::from(value),
             Value::F64(value)   => mysql::Value::from(value),
-            Value::Text(value)  => mysql::Value::from(value),
+            Value::Text(value)  => mysql::Value::from(value.as_ref()),
             Value::Bytes(value) => mysql::Value::from(value),
         }
     );
@@ -182,16 +180,23 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         Ok(rows)
     }
 
+    fn close(&self) {
+        // Do nothing
+    }
+
     fn kind(&self) -> ConnKind {
         ConnKind::MySQL
     }
 }
 
 fn compile(ws: &WrapString) -> String {
-    let mut query = String::new();
+    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
+        query.as_ref().map_or(acc, |s| acc + s.len())
+    }) + ws.params.len());
+
     for part in &ws.query {
         match part {
-            Some(s) => query.push_str(&s),
+            Some(s) => query.push_str(s),
             None =>    query.push('?'),
         }
     }

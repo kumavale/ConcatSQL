@@ -15,7 +15,7 @@ pub enum Error {
 /// Change the output error message.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ErrorLevel {
-    /// No error message returned, always return Result::Ok(T).
+    /// No error message returned, always return Result::Ok(()).
     AlwaysOk,
     /// This is the level that should be set at release.
     Release,

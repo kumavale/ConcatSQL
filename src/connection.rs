@@ -1,6 +1,5 @@
 use std::fmt;
-use std::pin::Pin;
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use crate::Result;
 use crate::ErrorLevel;
@@ -12,6 +11,7 @@ pub(crate) trait ConcatsqlConn {
     fn iterate_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
     fn rows_inner<'r>(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<Vec<Row<'r>>>;
+    fn close(&self);
     fn kind(&self) -> ConnKind;
 }
 
@@ -22,30 +22,30 @@ pub(crate) enum ConnKind {
 }
 
 /// A database connection.
-pub struct Connection<'a> {
-    pub(crate) conn:        Pin<&'a dyn ConcatsqlConn>,
-    pub(crate) error_level: RefCell<ErrorLevel>,
+pub struct Connection {
+    pub(crate) conn:        Box<dyn ConcatsqlConn>,
+    pub(crate) error_level: Cell<ErrorLevel>,
 }
 
-unsafe impl<'a> Send for Connection<'a> {}
-unsafe impl<'a> Sync for Connection<'a> {}
+unsafe impl Send for Connection {}
+unsafe impl Sync for Connection {}
 
-impl<'a> PartialEq for Connection<'a> {
+impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
         (&self.conn as *const _) == (&other.conn as *const _)
     }
 }
 
-impl<'a> fmt::Debug for Connection<'a> {
+impl fmt::Debug for Connection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("conn", &(&self.conn as *const _))
-            .field("error_level", &*self.error_level.borrow())
+            .field("error_level", &self.error_level.get())
             .finish()
     }
 }
 
-impl<'a, 'b> Connection<'a> {
+impl<'a> Connection {
     /// Execute a statement without processing the resulting rows if any.
     ///
     /// # Examples
@@ -61,8 +61,8 @@ impl<'a, 'b> Connection<'a> {
     /// conn.execute(prep!("SELECT * FROM users;")).unwrap();
     /// ```
     #[inline]
-    pub fn execute<T: IntoWrapString<'b>>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(&query.into_wrapstring(), &*self.error_level.borrow())
+    pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
+        self.conn.execute_inner(&query.into_wrapstring(), &self.error_level.get())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -88,11 +88,11 @@ impl<'a, 'b> Connection<'a> {
     /// }).unwrap();
     /// ```
     #[inline]
-    pub fn iterate<T: IntoWrapString<'b>, F>(&self, query: T, mut callback: F) -> Result<()>
+    pub fn iterate<T: IntoWrapString<'a>, F>(&self, query: T, mut callback: F) -> Result<()>
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(&query.into_wrapstring(), &*self.error_level.borrow(), &mut callback)
+        self.conn.iterate_inner(&query.into_wrapstring(), &self.error_level.get(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -112,8 +112,8 @@ impl<'a, 'b> Connection<'a> {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
-    pub fn rows<'r, T: IntoWrapString<'b>>(&self, query: T) -> Result<Vec<Row<'r>>> {
-        self.conn.rows_inner(&query.into_wrapstring(), &*self.error_level.borrow())
+    pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
+        self.conn.rows_inner(&query.into_wrapstring(), &self.error_level.get())
     }
 
     /// Sets the error level.  
@@ -127,30 +127,13 @@ impl<'a, 'b> Connection<'a> {
     /// conn.error_level(ErrorLevel::AlwaysOk);
     /// ```
     pub fn error_level(&self, level: ErrorLevel) {
-        *self.error_level.borrow_mut() = level;
+        self.error_level.set(level);
     }
 }
 
-impl<'a> Drop for Connection<'a> {
+impl Drop for Connection {
     fn drop(&mut self) {
-        match self.conn.kind() {
-            #[cfg(feature = "sqlite")]
-            ConnKind::SQLite => {
-                unsafe {
-                    extern crate sqlite3_sys as ffi;
-                    ffi::sqlite3_busy_handler(&*self.conn as *const _ as *mut ffi::sqlite3, None, std::ptr::null_mut());
-                    let close_result = ffi::sqlite3_close(&*self.conn as *const _ as *mut ffi::sqlite3);
-                    std::ptr::drop_in_place(&*self.conn as *const _ as *mut ffi::sqlite3);
-                    if close_result != ffi::SQLITE_OK {
-                        eprintln!("error closing SQLite connection: {}", close_result);
-                    }
-                }
-            }
-            #[cfg(feature = "mysql")]
-            ConnKind::MySQL => {}
-            #[cfg(feature = "postgres")]
-            ConnKind::PostgreSQL => {}
-        }
+        self.conn.close();
     }
 }
 

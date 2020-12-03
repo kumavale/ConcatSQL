@@ -1,17 +1,17 @@
 use std::ops::Add;
 use std::borrow::Cow;
 use crate::parser::{escape_string, to_binary_literal};
+use uuid::Uuid;
 
 /// Values that can be bound as static placeholders.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum Value<'a> {
     Null,
     I32(i32),
     I64(i64),
-    I128(i128),
     F32(f32),
     F64(f64),
-    Text(String),
+    Text(Cow<'a, str>),
     Bytes(Vec<u8>),
 }
 
@@ -19,7 +19,7 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WrapString<'a> {
     pub(crate) query:  Vec<Option<Cow<'a, str>>>,
-    pub(crate) params: Vec<Value>,
+    pub(crate) params: Vec<Value<'a>>,
 }
 
 impl<'a> WrapString<'a> {
@@ -27,6 +27,14 @@ impl<'a> WrapString<'a> {
     pub fn init(s: &'static str) -> Self {
         Self {
             query:  vec![ Some(Cow::Borrowed(s)) ],
+            params: Vec::new(),
+        }
+    }
+
+    #[doc(hidden)]
+    pub const fn null() -> Self {
+        Self {
+            query:  Vec::new(),
             params: Vec::new(),
         }
     }
@@ -66,7 +74,6 @@ impl<'a> WrapString<'a> {
                         Value::Null         => query.push_str("NULL"),
                         Value::I32(value)   => query.push_str(&value.to_string()),
                         Value::I64(value)   => query.push_str(&value.to_string()),
-                        Value::I128(value)  => query.push_str(&value.to_string()),
                         Value::F32(value)   => query.push_str(&value.to_string()),
                         Value::F64(value)   => query.push_str(&value.to_string()),
                         Value::Text(value)  => query.push_str(&escape_string(&value)),
@@ -105,57 +112,57 @@ impl<'a> Add<String> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: String) -> WrapString<'a> {
         self.query .push(None);
+        self.params.push(Value::Text(Cow::Owned(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a String> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a String) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a str> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a str) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<&'a &str> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &'a &str) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Borrowed(other)));
+        self
+    }
+}
+
+impl<'a> Add<std::borrow::Cow<'a, str>> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: std::borrow::Cow<'a, str>) -> WrapString<'a> {
+        self.query .push(None);
         self.params.push(Value::Text(other));
         self
     }
 }
 
-impl<'a> Add<&String> for WrapString<'a> {
+impl<'a> Add<&'a std::borrow::Cow<'a, str>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
-    fn add(mut self, other: &String) -> WrapString<'a> {
+    fn add(mut self, other: &'a std::borrow::Cow<'a, str>) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<&str> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &str) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<&&str> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &&str) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
-        self
-    }
-}
-
-impl<'a> Add<std::borrow::Cow<'_, str>> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: std::borrow::Cow<'_, str>) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.into_owned()));
-        self
-    }
-}
-
-impl<'a> Add<&std::borrow::Cow<'_, str>> for WrapString<'a> {
-    type Output = WrapString<'a>;
-    #[inline]
-    fn add(mut self, other: &std::borrow::Cow<'_, str>) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(other.to_string()));
+        self.params.push(Value::Text(Cow::Borrowed(&*other)));
         self
     }
 }
@@ -208,23 +215,30 @@ macro_rules! impl_add_I64_for_WrapString {
     )*)
 }
 
-macro_rules! impl_add_I128_for_WrapString {
-    ( $($t:ty),* ) => ($(
-        impl<'a> Add<$t> for WrapString<'a> {
-            type Output = WrapString<'a>;
-            #[inline]
-            fn add(mut self, other: $t) -> WrapString<'a> {
-                self.query .push(None);
-                self.params.push(Value::I128(other as i128));
-                self
-            }
-        }
-    )*)
+/// Sent as a 32-byte string.
+impl<'a> Add<Uuid> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: Uuid) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple()))));
+        self
+    }
+}
+
+/// Sent as a 32-byte string.
+impl<'a> Add<&Uuid> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &Uuid) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple_ref()))));
+        self
+    }
 }
 
 impl_add_I32_for_WrapString!(u8, u16, u32, i8, i16, i32);
 impl_add_I64_for_WrapString!(u64, i64);
-impl_add_I128_for_WrapString!(u128, i128);
 
 #[cfg(target_pointer_width = "16")]
 #[cfg(target_pointer_width = "32")]
@@ -275,12 +289,15 @@ macro_rules! impl_add_Option_for_WrapString {
 
 impl_add_Option_for_WrapString! {
     String,
-    &str,
-    std::borrow::Cow<'_, str>,
+    &'a String,
+    &'a str,
+    std::borrow::Cow<'a, str>,
     Vec<u8>,
-    u8, u16, u32, u64, u128, usize,
-    i8, i16, i32, i64, i128, isize,
+    &'a Vec<u8>,
+    u8, u16, u32, u64, usize,
+    i8, i16, i32, i64, isize,
     f32, f64,
+    Uuid,
 }
 
 impl<'a> Add<()> for WrapString<'a> {
@@ -293,27 +310,113 @@ impl<'a> Add<()> for WrapString<'a> {
     }
 }
 
+/// In operator with string arrays.  
+/// If the array is empty, it will be ignored.
+///
+/// # Examples
+///
+/// ```
+/// # use concatsql::prelude::*;
+/// let names: Vec<&str> = vec![];
+/// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
+/// let names: Vec<&str> = vec!["foo","bar"];
+/// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "('foo','bar')");
+/// ```
+impl<'a> Add<Vec<String>> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: Vec<String>) -> WrapString<'a> {
+        if other.is_empty() {
+            self.query .push(None);
+            self.params.push(Value::Null);
+            return self;
+        }
+        if let Some(first) = other.first() {
+            self.query.push(None);
+            self.params.push(Value::Text(Cow::Owned(first.to_string())));
+        }
+        for param in other.into_iter().skip(1) {
+            self.query.push(Some(Cow::Borrowed(",")));
+            self.query.push(None);
+            self.params.push(Value::Text(Cow::Owned(param)));
+        }
+        self
+    }
+}
+
+macro_rules! impl_add_arrays_borrowed_for_WrapString {
+    ( $($t:ty),* ) => {$(
+        /// In operator with string arrays.  
+        /// If the array is empty, it will be ignored.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use concatsql::prelude::*;
+        /// let names: Vec<&str> = vec![];
+        /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
+        /// let names: Vec<&str> = vec!["foo","bar"];
+        /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "('foo','bar')");
+        /// ```
+        impl<'a> Add<$t> for WrapString<'a> {
+            type Output = WrapString<'a>;
+            #[inline]
+            fn add(mut self, other: $t) -> WrapString<'a> {
+                if other.is_empty() {
+                    self.query .push(None);
+                    self.params.push(Value::Null);
+                    return self;
+                }
+                if let Some(first) = other.first() {
+                    self.query.push(None);
+                    self.params.push(Value::Text(Cow::Borrowed(first)));
+                }
+                for param in other.iter().skip(1) {
+                    self.query.push(Some(Cow::Borrowed(",")));
+                    self.query.push(None);
+                    self.params.push(Value::Text(Cow::Borrowed(param)));
+                }
+                self
+            }
+        }
+    )*};
+    ( $($t:ty,)* ) => { impl_add_arrays_borrowed_for_WrapString!{ $( $t ),* } }
+}
+
+impl_add_arrays_borrowed_for_WrapString!{
+    Vec<&'a str>,
+    &'a Vec<String>,
+    &'a Vec<&'a str>,
+    &'a [&'a str],
+    &'a [String],
+}
+
+
 /// A trait for converting a value to a [WrapString](./struct.WrapString.html).
 pub trait IntoWrapString<'a> {
     /// Converts the given value to a [WrapString](./struct.WrapString.html).
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a>;
 }
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
         self
     }
 }
 
 impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
         self.clone()
     }
 }
 
 impl<'a> IntoWrapString<'a> for &'static str {
+    #[doc(hidden)]
     fn into_wrapstring(self) -> WrapString<'a> {
-        WrapString::new(self)
+        WrapString::init(self)
     }
 }
 
@@ -324,17 +427,28 @@ mod tests {
     use concatsql::prelude::*;
 
     #[test]
-    #[allow(clippy::op_ref, clippy::deref_addrof, clippy::identity_op, clippy::approx_constant)]
+    #[allow(
+        clippy::op_ref,
+        clippy::deref_addrof,
+        clippy::identity_op,
+        clippy::approx_constant,
+        clippy::many_single_char_names,
+    )]
     fn concat_anything_type() {
         use std::borrow::Cow;
-        let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &String::from("E") + &prep!("F") + 42 + 3.14;
+        let a = String::from("A");
+        let b = &String::from("B");
+        let c = &**&&String::from("C");
+        let d = &***&&&String::from("D");
+        let e = String::from("E");
+        let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &e + &prep!("F") + 42 + 3.14;
         assert_eq!(sql.simulate(), "AB'C''D''E'F423.14");
-        let sql = prep!() + String::from("A") + &String::from("B") + *&&String::from("C") + **&&&String::from("D");
+        let sql = prep!() + a + b + c + d;
         assert_eq!(sql.simulate(), "'A''B''C''D'");
         let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
         assert_eq!(sql.simulate(), "'A''B''C''D'");
-        let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5u128 + 6isize + 7i8 + 8i16 + 9i32 + 0i64 + 1i128 + 2f32 + 3f64;
-        assert_eq!(sql.simulate(), "01234567890123");
+        let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5isize + 6i8 + 7i16 + 8i32 + 9i64 + 0f32 + 1f64;
+        assert_eq!(sql.simulate(), "012345678901");
         let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
         assert_eq!(sql.simulate(), "340282350000000000000000000000000000000infNaN");
         let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
@@ -343,10 +457,44 @@ mod tests {
         } else {
             assert_eq!(sql.simulate(), "'\\x414243''\\x000102'");
         }
-        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string()) + &Cow::Owned("D".to_string());
-        assert_eq!(sql.simulate(), "'A''B''C''D'");
+        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string());
+        assert_eq!(sql.simulate(), "'A''B''C'");
         let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
         assert_eq!(sql.simulate(), "A'B''C'03.1442NULLNULL");
+        let vec: Vec<String> = Vec::new();
+        let sql = prep!("(") + vec + prep!(")");
+        assert_eq!(sql.simulate(), "(NULL)");
+        let sql = prep!("(") + vec!["A"] + prep!(")");
+        assert_eq!(sql.simulate(), "('A')");
+        let sql = prep!("(") + vec!["A","B"] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!("(") + vec![String::from("A"),String::from("B")] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let vec = vec!["A","B"];
+        let sql = prep!("(") + &vec + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let vec = vec![String::from("A"),String::from("B")];
+        let sql = prep!("(") + &vec + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!("(") + &["A","B"][..] + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+        let sli = &[String::from("A"),String::from("B")][..];
+        let sql = prep!("(") + sli + prep!(")");
+        assert_eq!(sql.simulate(), "('A','B')");
+    }
+
+    #[test]
+    #[allow(clippy::op_ref)]
+    fn uuid() {
+        use uuid::Uuid;
+        let uuid = prep!() + Uuid::nil();
+        assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
+        let uuid = prep!() + &Uuid::nil();
+        assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
+        let uuid = prep!() + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
+        assert_eq!(uuid.simulate(), "'936DA01F9ABD4D9D80C702AF85C822A8'");
+        let uuid = prep!() + Uuid::new_v4();
+        assert_eq!(uuid.simulate().len(), 32+2);
     }
 
     mod simulate {

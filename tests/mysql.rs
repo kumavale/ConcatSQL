@@ -9,7 +9,7 @@ mod mysql {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    pub fn prepare<'a>() -> concatsql::Connection<'a> {
+    pub fn prepare() -> concatsql::Connection {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
@@ -363,6 +363,31 @@ mod mysql {
     }
 
     #[test]
+    fn in_array() {
+        let conn = prepare();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec![] as Vec<&str> + prep!(")");
+        conn.rows(&sql).unwrap();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec!["Adam"] + prep!(")");
+        conn.rows(&sql).unwrap();
+        let sql = prep!("SELECT * FROM users WHERE name IN (") + vec!["Adam","Eve"] + prep!(")");
+        conn.rows(&sql).unwrap();
+    }
+
+    #[test]
+    fn uuid() {
+        use uuid::Uuid;
+        let conn = prepare();
+        let sql = prep!("SELECT ") + Uuid::nil();
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(&row[0], "00000000000000000000000000000000");
+        }
+        let sql = prep!("SELECT ") + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
+        for row in conn.rows(&sql).unwrap() {
+            assert_eq!(&row[0], "936DA01F9ABD4D9D80C702AF85C822A8");
+        }
+    }
+
+    #[test]
     fn sql_injection() {
         let conn = prepare();
 
@@ -465,7 +490,7 @@ mod anti_patterns {
     #[test]
     fn string_to_static_str() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
+        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());  // Leak!
         conn.execute(sql).unwrap();
     }
 
