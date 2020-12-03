@@ -10,7 +10,7 @@ mod sqlite {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    pub fn prepare<'a>() -> concatsql::Connection<'a> {
+    pub fn prepare() -> concatsql::Connection {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());

@@ -9,7 +9,7 @@ mod mysql {
         ($msg:expr) => { Err(Error::Message($msg.to_string())) };
     }
 
-    pub fn prepare<'a>() -> concatsql::Connection<'a> {
+    pub fn prepare() -> concatsql::Connection {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
@@ -490,7 +490,7 @@ mod anti_patterns {
     #[test]
     fn string_to_static_str() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
+        let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());  // Leak!
         conn.execute(sql).unwrap();
     }
 
