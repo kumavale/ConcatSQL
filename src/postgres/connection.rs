@@ -4,7 +4,6 @@ use postgres::{Client, NoTls};
 use uuid::Uuid;
 
 use std::cell::RefCell;
-use std::pin::Pin;
 
 use crate::Result;
 use crate::row::Row;
@@ -20,7 +19,7 @@ pub fn open(params: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
+        conn:        Box::new(RefCell::new(conn)),
         error_level: RefCell::new(ErrorLevel::default()),
     })
 }
@@ -114,6 +113,10 @@ impl ConcatsqlConn for RefCell<postgres::Client> {
         }
 
         Ok(rows)
+    }
+
+    fn close(&self) {
+        // Do nothing
     }
 
     fn kind(&self) -> ConnKind {

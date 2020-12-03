@@ -3,7 +3,6 @@ use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
 use std::cell::RefCell;
-use std::pin::Pin;
 
 use crate::Result;
 use crate::parser::to_hex;
@@ -25,7 +24,7 @@ pub fn open(url: &str) -> Result<Connection> {
     };
 
     Ok(Connection {
-        conn:        unsafe { Pin::new_unchecked(&*Box::leak(Box::new(RefCell::new(conn)))) },
+        conn:        Box::new(RefCell::new(conn)),
         error_level: RefCell::new(ErrorLevel::default()),
     })
 }
@@ -179,6 +178,10 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         Ok(rows)
+    }
+
+    fn close(&self) {
+        // Do nothing
     }
 
     fn kind(&self) -> ConnKind {

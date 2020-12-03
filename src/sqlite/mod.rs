@@ -28,13 +28,13 @@ pub(crate) mod connection;
 /// # }
 /// ```
 #[inline]
-pub fn open<'a, T: AsRef<Path>>(path: T) -> Result<Connection<'a>> {
+pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
     connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
 }
 
 /// Open a readonly connection to a new or existing database.
 #[inline]
-pub fn open_readonly<'a, T: AsRef<Path>>(path: T) -> Result<Connection<'a>> {
+pub fn open_readonly<T: AsRef<Path>>(path: T) -> Result<Connection> {
     connection::open(path, sqlite3_sys::SQLITE_OPEN_READONLY)
 }
 
