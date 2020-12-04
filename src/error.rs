@@ -1,3 +1,4 @@
+use std::fmt;
 
 /// Enum listing possible errors from concatsql.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,14 +56,22 @@ impl Error {
     }
 }
 
-impl ToString for Error {
-    fn to_string(&self) -> String {
-        match self {
-            Error::Message(s) =>     s.to_string(),
-            Error::AnyError =>       String::from("AnyError"),
-            Error::ParseError =>     String::from("ParseError"),
-            Error::ColumnNotFound => String::from("ColumnNotFound"),
-        }
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}",
+            match self {
+                Error::Message(s) =>     s.to_string(),
+                Error::AnyError =>       String::from("AnyError"),
+                Error::ParseError =>     String::from("ParseError"),
+                Error::ColumnNotFound => String::from("ColumnNotFound"),
+            }
+        )
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self)
     }
 }
 
