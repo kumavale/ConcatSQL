@@ -15,7 +15,7 @@
 //!     "#).unwrap();
 //!
 //!     let age = String::from("42");  // user input
-//!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
+//!     let sql = prep("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
 //!     for row in conn.rows(&sql).unwrap() {
@@ -24,7 +24,7 @@
 //!     }
 //!
 //!     let age = String::from("42 OR 1=1; --");  // user input
-//!     let sql = prep!("SELECT name FROM users WHERE age = ") + &age;
+//!     let sql = prep("SELECT name FROM users WHERE age = ") + &age;
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
@@ -118,5 +118,46 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 macro_rules! prep {
     ()            => { concatsql::WrapString::null()       };
     ($query:expr) => { concatsql::WrapString::init($query) };
+}
+
+/// Prepare a SQL statement for execution.
+///
+/// # Examples
+///
+/// ```
+/// use concatsql::prep;
+/// # let conn = concatsql::sqlite::open(":memory:").unwrap();
+/// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+/// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
+/// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
+/// # conn.execute(stmt).unwrap();
+/// for name in ["Alice", "Bob"].iter() {
+///     let stmt = prep("INSERT INTO users (name) VALUES (") + name + prep(")");
+///     conn.execute(stmt).unwrap();
+/// }
+/// ```
+///
+/// # Failure
+///
+/// If you take a value other than `&'static str` as an argument, it will fail.
+///
+/// ```compile_fail
+/// # use concatsql::prelude::*;
+/// let passwd = String::from("'' or 1=1; --");
+/// prep("SELECT * FROM users WHERE passwd=") + prep(&passwd); // shouldn't compile!
+/// ```
+///
+/// # Safety
+///
+/// ```
+/// # use concatsql::prelude::*;
+/// prep("SELECT * FROM users WHERE id=") + 42;
+/// prep("INSERT INTO msg VALUES ('I''m cat.')");
+/// prep("INSERT INTO msg VALUES (\"I'm cat.\")");
+/// prep("INSERT INTO msg VALUES (") + "I'm cat." + prep(")");
+/// ```
+#[inline]
+pub fn prep(query: &'static str) -> WrapString {
+    WrapString::init(query)
 }
 
