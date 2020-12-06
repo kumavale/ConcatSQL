@@ -24,6 +24,7 @@ pub struct WrapString<'a> {
 
 impl<'a> WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     pub fn init(s: &'static str) -> Self {
         Self {
             query:  vec![ Some(Cow::Borrowed(s)) ],
@@ -32,6 +33,7 @@ impl<'a> WrapString<'a> {
     }
 
     #[doc(hidden)]
+    #[inline]
     pub const fn null() -> Self {
         Self {
             query:  Vec::new(),
@@ -39,6 +41,7 @@ impl<'a> WrapString<'a> {
         }
     }
 
+    #[inline]
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
             query:  vec![ Some(Cow::Owned(s.to_string())) ],
@@ -401,6 +404,7 @@ pub trait IntoWrapString<'a> {
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         self
     }
@@ -408,6 +412,7 @@ impl<'a> IntoWrapString<'a> for WrapString<'a> {
 
 impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         self.clone()
     }
@@ -415,6 +420,7 @@ impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
 
 impl<'a> IntoWrapString<'a> for &'static str {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         WrapString::init(self)
     }
