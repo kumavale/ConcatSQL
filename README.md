@@ -81,7 +81,21 @@ The `prep` function returns the library's own type(`WrapString`).
 For example, if you combine this `WrapString` type with a `String` type, the escaped `String` type will be combined and a new `WrapString` will be returned.  
 
 ```rust
-let foobar: WrapString = prep("foo") + String::from("bar");
+struct WrapString<'a> {
+    query:  Vec<Option<Cow<'a, str>>>,
+    params: Vec<Value>,
+}
+
+let foobar42: WrapString = prep("foo") + String::from("bar") + 42;
+
+foobar42 {
+    query:  [Some("foo"), None, None],
+    params: [Value::Text("bar"), Value::I32(42)],
+}
+
+ffi::sqlite3_prepare_v2(..., "foo??", ...);
+ffi::sqlite3_bind_text(..., "bar", ...);
+ffi::sqlite3_bind_int(..., 42);
 ```
 
 ## Is it impossible to implement in other languages?
@@ -98,4 +112,8 @@ That is, it can be implemented in any language that can distinguish between hard
 ## License
 
 MIT
+
+## Feedback
+
+Please give me [feedback](https://github.com/kumavale/ConcatSQL/discussions?discussions_q=category%3AFeedback)!
 
