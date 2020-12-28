@@ -211,36 +211,35 @@ impl GetToString for mysql::Row {
         match self[index] {
             mysql::Value::NULL      => None,
             mysql::Value::Int(v)    => Some(v.to_string()),
-            //mysql::Value::UInt(v)   => Some(v.to_string()),
-            //mysql::Value::Float(v)  => Some(v.to_string()),
-            //mysql::Value::Double(v) => Some(v.to_string()),
+            mysql::Value::UInt(v)   => Some(v.to_string()),  // unreachable ?
+            mysql::Value::Float(v)  => Some(v.to_string()),  // unreachable ?
+            mysql::Value::Double(v) => Some(v.to_string()),  // unreachable ?
             mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(string) => Some(string),
                 Err(_) => Some(to_hex(&bytes)),
             }
-            //mysql::Value::Date(year, month, day, hour, minute, second, micros) => Some(format!(
-            //    "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}", year, month, day, hour, minute, second, micros
-            //)),
-            //mysql::Value::Time(neg, days, hours, minutes, seconds, micros) => {
-            //    Some(if neg {
-            //        format!(
-            //            "-{:03}:{:02}:{:02}.{:06}",
-            //            days * 24 + u32::from(hours),
-            //            minutes,
-            //            seconds,
-            //            micros
-            //        )
-            //    } else {
-            //        format!(
-            //            "{:03}:{:02}:{:02}.{:06}",
-            //            days * 24 + u32::from(hours),
-            //            minutes,
-            //            seconds,
-            //            micros
-            //        )
-            //    })
-            //}
-            _ => unreachable!(),  // unstable
+            mysql::Value::Date(year, month, day, hour, minute, second, micros) => Some(format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}", year, month, day, hour, minute, second, micros
+            )),  // unreachable ?
+            mysql::Value::Time(neg, days, hours, minutes, seconds, micros) => {
+                Some(if neg {
+                    format!(
+                        "-{:03}:{:02}:{:02}.{:06}",
+                        days * 24 + u32::from(hours),
+                        minutes,
+                        seconds,
+                        micros
+                    )
+                } else {
+                    format!(
+                        "{:03}:{:02}:{:02}.{:06}",
+                        days * 24 + u32::from(hours),
+                        minutes,
+                        seconds,
+                        micros
+                    )
+                })
+            }  // unreachable ?
         }
     }
 }
