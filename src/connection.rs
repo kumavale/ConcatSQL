@@ -32,7 +32,7 @@ unsafe impl Sync for Connection {}
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
-        (&self.conn as *const _) == (&other.conn as *const _)
+        std::ptr::eq(&self.conn, &other.conn)
     }
 }
 

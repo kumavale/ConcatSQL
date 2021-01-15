@@ -88,6 +88,72 @@ impl<'a> WrapString<'a> {
         }
         query
     }
+
+    /// Returns the length of a string other than a placeholders.
+    pub fn len(&self) -> usize {
+        let mut len = 0;
+        for part in &self.query {
+            if let Some(s) = part {
+                len += s.len();
+            }
+        }
+        len
+    }
+
+    /// Returns the query's vector length.
+    pub fn query_len(&self) -> usize {
+        self.query.len()
+    }
+
+    /// Returns the params's vector length.
+    pub fn params_len(&self) -> usize {
+        self.params.len()
+    }
+
+    /// Truncates this WrapString, removing all contents.
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.params.clear();
+    }
+
+    /// Returns true if this WrapString has a length of zero, and false otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.query.is_empty() && self.params.is_empty()
+    }
+
+    /// Organize the query field of WrapString.
+    ///
+    /// # Likes
+    ///
+    /// ```ignore
+    /// // Before squash
+    /// WrapString {
+    ///     query: [Some("a"),Some("b"),Some("c"),None,Some("1"),Some("2")],
+    ///     params: [],
+    /// }
+    ///
+    /// // After squash
+    /// WrapString {
+    ///     query: [Some("abc"),None,Some("12")],
+    ///     params: [],
+    /// }
+    /// ```
+    pub fn squash(&mut self) {
+        let mut new_query = Vec::new();
+        let mut new_part  = String::new();
+        for part in &self.query {
+            if let Some(part) = part {
+                new_part.push_str(&part);
+            } else {
+                new_query.push(Some(Cow::Owned(new_part.drain(..).collect())));
+                new_query.push(None);
+            }
+        }
+        if !new_part.is_empty() {
+            new_query.push(Some(Cow::Owned(new_part)));
+        }
+        self.query = new_query;
+    }
 }
 
 impl<'a> Add for WrapString<'a> {
@@ -501,6 +567,55 @@ mod tests {
         assert_eq!(uuid.simulate(), "'936DA01F9ABD4D9D80C702AF85C822A8'");
         let uuid = prep!() + Uuid::new_v4();
         assert_eq!(uuid.simulate().len(), 32+2);
+    }
+
+    #[test]
+    fn len() {
+        assert_eq!((prep!("ABC") + prep!("123")).len(), 6);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.len(), 6);
+        assert_eq!(prep!().len(), 0);
+    }
+
+    #[test]
+    fn query_len() {
+        assert_eq!((prep!("ABC") + prep!("123")).query_len(), 2);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.query_len(), 3);
+        assert_eq!(prep!().query_len(), 0);
+    }
+
+    #[test]
+    fn params_len() {
+        assert_eq!((prep!("ABC") + prep!("123")).params_len(), 0);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.params_len(), 1);
+        assert_eq!(prep!().params_len(), 0);
+    }
+
+    #[test]
+    fn clear() {
+        let mut sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.query_len(),  3);
+        assert_eq!(sql.params_len(), 1);
+        sql.clear();
+        assert_eq!(sql.query_len(),  0);
+        assert_eq!(sql.params_len(), 0);
+    }
+
+    #[test]
+    fn is_empty() {
+        assert!(prep!().is_empty());
+    }
+
+    #[test]
+    fn squash() {
+        let mut sql: WrapString = prep!("A") + prep!("B") + 42 + prep!("1") + prep!("2") + prep!("3");
+        assert_eq!(sql.query_len(),  6);
+        assert_eq!(sql.params_len(), 1);
+        sql.squash();
+        assert_eq!(sql.query_len(),  3);
+        assert_eq!(sql.params_len(), 1);
     }
 
     mod simulate {
