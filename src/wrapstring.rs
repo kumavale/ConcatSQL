@@ -274,7 +274,7 @@ impl<'a> Add<&[&(dyn ToValue<'a>)]> for WrapString<'a> {
             self.query.push(None);
             self.params.push(first.to_value());
         }
-        for param in other.into_iter().skip(1) {
+        for param in other.iter().skip(1) {
             self.query.push(Some(Cow::Borrowed(",")));
             self.query.push(None);
             self.params.push(param.to_value());
