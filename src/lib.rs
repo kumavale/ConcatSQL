@@ -54,7 +54,7 @@ pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, invalid_literal};
-pub use crate::wrapstring::{WrapString, IntoWrapString};
+pub use crate::wrapstring::{WrapString, IntoWrapString, Value, ToValue};
 
 pub mod prelude {
     //! Re-exports important traits and types.
@@ -71,8 +71,8 @@ pub mod prelude {
 
     pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
-    pub use crate::{sanitize_like, prep};
-    pub use crate::wrapstring::WrapString;
+    pub use crate::{sanitize_like, prep, params};
+    pub use crate::wrapstring::{WrapString, Value, ToValue};
 }
 
 /// A typedef of the result returned by many methods.
@@ -159,5 +159,22 @@ macro_rules! prep {
 #[inline]
 pub fn prep(query: &'static str) -> WrapString {
     WrapString::init(query)
+}
+
+/// A macro making it more convenient to pass heterogeneous lists
+/// of parameters as a `&[&dyn ToValue]`.
+///
+/// # Example
+///
+/// ```
+/// # use concatsql::prelude::*;
+/// let sql = prep("VALUES(") + params![42i32,"Alice"] + prep(")");
+/// assert_eq!(sql.simulate(), "VALUES(42,'Alice')");
+/// ```
+#[macro_export]
+macro_rules! params {
+    ( $( $param:expr ),+ ) => {
+        &[ $(&$param as &dyn $crate::ToValue),+ ] as &[&dyn $crate::ToValue]
+    };
 }
 

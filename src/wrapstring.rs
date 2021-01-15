@@ -256,6 +256,33 @@ impl<'a> Add<&Vec<u8>> for WrapString<'a> {
     }
 }
 
+impl<'a> Add<&[u8]> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &[u8]) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Bytes(other.to_vec()));
+        self
+    }
+}
+
+impl<'a> Add<&[&(dyn ToValue<'a>)]> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &[&(dyn ToValue<'a>)]) -> WrapString<'a> {
+        if let Some(first) = other.first() {
+            self.query.push(None);
+            self.params.push(first.to_value());
+        }
+        for param in other.iter().skip(1) {
+            self.query.push(Some(Cow::Borrowed(",")));
+            self.query.push(None);
+            self.params.push(param.to_value());
+        }
+        self
+    }
+}
+
 macro_rules! impl_add_I32_for_WrapString {
     ( $($t:ty),* ) => ($(
         impl<'a> Add<$t> for WrapString<'a> {
@@ -492,6 +519,72 @@ impl<'a> IntoWrapString<'a> for &'static str {
     }
 }
 
+pub trait ToValue<'a> {
+    fn to_value(&self) -> Value<'a>;
+}
+
+impl<'a> ToValue<'a> for () {
+    fn to_value(&self) -> Value<'a> {
+        Value::Null
+    }
+}
+
+macro_rules! impl_to_value_for_i32 {
+    ( $($t:ty),* ) => {$(
+        impl<'a> ToValue<'a> for $t {
+            fn to_value(&self) -> Value<'a> {
+                Value::I32(*self as i32)
+            }
+        }
+    )*};
+    ( $($t:ty,)* ) => { impl_to_value_for_i32!{ $( $t ),* } }
+}
+
+impl_to_value_for_i32! {
+    i8, i16, i32,
+}
+
+impl<'a> ToValue<'a> for i64 {
+    fn to_value(&self) -> Value<'a> {
+        Value::I64(*self)
+    }
+}
+
+impl<'a> ToValue<'a> for f32 {
+    fn to_value(&self) -> Value<'a> {
+        Value::F32(*self)
+    }
+}
+
+impl<'a> ToValue<'a> for f64 {
+    fn to_value(&self) -> Value<'a> {
+        Value::F64(*self)
+    }
+}
+
+impl<'a> ToValue<'a> for String {
+    fn to_value(&self) -> Value<'a> {
+        Value::Text(Cow::Owned(self.to_string()))
+    }
+}
+
+impl<'a> ToValue<'a> for &'a str {
+    fn to_value(&self) -> Value<'a> {
+        Value::Text(Cow::Borrowed(self))
+    }
+}
+
+impl<'a> ToValue<'a> for Vec<u8> {
+    fn to_value(&self) -> Value<'a> {
+        Value::Bytes(self.clone())
+    }
+}
+
+impl<'a> ToValue<'a> for &'a Vec<u8> {
+    fn to_value(&self) -> Value<'a> {
+        Value::Bytes(self.to_vec())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -553,6 +646,12 @@ mod tests {
         let sli = &[String::from("A"),String::from("B")][..];
         let sql = prep!("(") + sli + prep!(")");
         assert_eq!(sql.simulate(), "('A','B')");
+    }
+
+    #[test]
+    fn params() {
+        let sql = prep!() + params![(),42i8,42i16,42i32,0.1f32,2.3f64,String::from("A"),"B"];
+        assert_eq!(sql.simulate(), "NULL,42,42,42,0.1,2.3,'A','B'");
     }
 
     #[test]
