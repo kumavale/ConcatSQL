@@ -11,7 +11,7 @@ use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
-use crate::value::Value;
+use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
@@ -354,6 +354,42 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &
                     index,
                     value.as_ptr() as *const _,
                     value.len() as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                )
+            }
+            Value::IpAddr(value) => {
+                let ipaddr = value.to_string();
+                let len = ipaddr.len();
+                let value = match CString::new(ipaddr.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", ipaddr);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
+                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                )
+            }
+            Value::Time(value) => {
+                let time = value.to_string();
+                let len = time.len();
+                let value = match CString::new(time.as_bytes()) {
+                    Ok(string) => string,
+                    _ => {
+                        ffi::sqlite3_finalize(stmt);
+                        return Error::new(&error_level, "invalid param", time);
+                    }
+                };
+                ffi::sqlite3_bind_text(
+                    stmt,
+                    index,
+                    value.as_ptr(),
+                    len as i32,
                     Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }

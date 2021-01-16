@@ -10,7 +10,7 @@ use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
-use crate::value::Value;
+use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
@@ -33,13 +33,15 @@ pub fn open(url: &str) -> Result<Connection> {
 macro_rules! to_mysql_value {
     ($value:expr) => (
         match $value {
-            Value::Null         => mysql::Value::from(None as Option<i32>),
-            Value::I32(value)   => mysql::Value::from(value),
-            Value::I64(value)   => mysql::Value::from(value),
-            Value::F32(value)   => mysql::Value::from(value),
-            Value::F64(value)   => mysql::Value::from(value),
-            Value::Text(value)  => mysql::Value::from(value.as_ref()),
-            Value::Bytes(value) => mysql::Value::from(value),
+            Value::Null          => mysql::Value::from(None as Option<i32>),
+            Value::I32(value)    => mysql::Value::from(value),
+            Value::I64(value)    => mysql::Value::from(value),
+            Value::F32(value)    => mysql::Value::from(value),
+            Value::F64(value)    => mysql::Value::from(value),
+            Value::Text(value)   => mysql::Value::from(value.as_ref()),
+            Value::Bytes(value)  => mysql::Value::from(value),
+            Value::IpAddr(value) => mysql::Value::from(value.to_string()),
+            Value::Time(value)   => mysql::Value::from(value.to_string()),
         }
     );
 }

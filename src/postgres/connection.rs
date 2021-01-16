@@ -4,13 +4,14 @@ use postgres::{Client, NoTls};
 use uuid::Uuid;
 
 use std::cell::{Cell, RefCell};
+use std::time::SystemTime;
 
 use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
 use crate::wrapstring::WrapString;
-use crate::value::Value;
+use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(params: &str) -> Result<Connection> {
@@ -28,13 +29,15 @@ pub fn open(params: &str) -> Result<Connection> {
 macro_rules! to_sql {
     ($value:expr) => (
         match $value {
-            Value::Null         => &"NULL" as &(dyn postgres::types::ToSql + Sync),
-            Value::I32(value)   => value,
-            Value::I64(value)   => value,
-            Value::F32(value)   => value,
-            Value::F64(value)   => value,
-            Value::Text(value)  => value,
-            Value::Bytes(value) => value,
+            Value::Null          => &"NULL" as &(dyn postgres::types::ToSql + Sync),
+            Value::I32(value)    => value,
+            Value::I64(value)    => value,
+            Value::F32(value)    => value,
+            Value::F64(value)    => value,
+            Value::Text(value)   => value,
+            Value::Bytes(value)  => value,
+            Value::IpAddr(value) => value,
+            Value::Time(value)   => value,
         }
     );
 }
@@ -173,6 +176,8 @@ impl GetToString for postgres::row::Row {
             Some(crate::parser::to_hex(&value))
         } else if let Ok(value) = self.try_get::<usize, Uuid>(index) {
             Some(value.to_simple_ref().to_string())
+        } else if let Ok(value) = self.try_get::<usize, SystemTime>(index) {
+            Some(value.to_string())
         } else {
             None
         }

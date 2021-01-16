@@ -176,7 +176,7 @@ pub fn prep(query: &'static str) -> WrapString {
 /// ```
 #[macro_export]
 macro_rules! params {
-    ( $( $param:expr ),+ ) => {
+    ( $( $param:expr ),+ $(,)? ) => {
         &[ $(&$param as &dyn $crate::ToValue),+ ] as &[&dyn $crate::ToValue]
     };
 }
