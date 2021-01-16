@@ -39,6 +39,7 @@ mod error;
 mod parser;
 mod row;
 mod wrapstring;
+mod value;
 
 #[cfg(feature = "sqlite")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
@@ -54,7 +55,8 @@ pub use crate::connection::{Connection, without_escape};
 pub use crate::error::{Error, ErrorLevel};
 pub use crate::row::{Row, Get, FromSql};
 pub use crate::parser::{html_special_chars, _sanitize_like, invalid_literal};
-pub use crate::wrapstring::{WrapString, IntoWrapString, Value, ToValue};
+pub use crate::wrapstring::{WrapString, IntoWrapString};
+pub use crate::value::{Value, ToValue};
 
 pub mod prelude {
     //! Re-exports important traits and types.
@@ -72,7 +74,8 @@ pub mod prelude {
     pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
     pub use crate::{sanitize_like, prep, params};
-    pub use crate::wrapstring::{WrapString, Value, ToValue};
+    pub use crate::wrapstring::WrapString;
+    pub use crate::value::{Value, ToValue};
 }
 
 /// A typedef of the result returned by many methods.
@@ -116,8 +119,8 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// ```
 #[macro_export]
 macro_rules! prep {
-    ()            => { concatsql::WrapString::null()       };
-    ($query:expr) => { concatsql::WrapString::init($query) };
+    ()            => { $crate::WrapString::null()       };
+    ($query:expr) => { $crate::WrapString::init($query) };
 }
 
 /// Prepare a SQL statement for execution.
