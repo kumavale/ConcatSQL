@@ -1,4 +1,9 @@
 use std::borrow::Cow;
+use std::net::IpAddr;
+use std::time::SystemTime;
+
+use chrono::offset::Utc;
+use chrono::DateTime;
 
 /// Values that can be bound as static placeholders.
 #[derive(Clone, Debug, PartialEq)]
@@ -10,6 +15,8 @@ pub enum Value<'a> {
     F64(f64),
     Text(Cow<'a, str>),
     Bytes(Vec<u8>),
+    IpAddr(IpAddr),
+    Time(SystemTime),
 }
 
 /// A trait for types that can be converted into Database values.
@@ -77,6 +84,48 @@ impl<'a> ToValue<'a> for Vec<u8> {
 impl<'a> ToValue<'a> for &'a Vec<u8> {
     fn to_value(&self) -> Value<'a> {
         Value::Bytes(self.to_vec())
+    }
+}
+
+impl<'a> ToValue<'a> for IpAddr {
+    fn to_value(&self) -> Value<'a> {
+        Value::IpAddr(*self)
+    }
+}
+
+impl<'a> ToValue<'a> for &'a IpAddr {
+    fn to_value(&self) -> Value<'a> {
+        Value::IpAddr(**self)
+    }
+}
+
+impl<'a> ToValue<'a> for SystemTime {
+    fn to_value(&self) -> Value<'a> {
+        Value::Time(*self)
+    }
+}
+
+impl<'a> ToValue<'a> for &'a SystemTime {
+    fn to_value(&self) -> Value<'a> {
+        Value::Time(**self)
+    }
+}
+
+pub trait SystemTimeToString {
+    fn to_string(&self) -> String;
+}
+
+impl SystemTimeToString for SystemTime  {
+    fn to_string(&self) -> String {
+        let datetime: DateTime<Utc> = (*self).into();
+        datetime.format("%Y-%m-%d %H:%M:%S.%f").to_string()
+    }
+}
+
+impl SystemTimeToString for &SystemTime {
+    fn to_string(&self) -> String {
+        let datetime: DateTime<Utc> = (**self).into();
+        datetime.format("%Y-%m-%d %H:%M:%S.%f").to_string()
     }
 }
 

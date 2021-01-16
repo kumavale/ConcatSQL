@@ -1,9 +1,11 @@
 use std::ops::Add;
 use std::borrow::Cow;
+use std::net::IpAddr;
+use std::time::SystemTime;
 use uuid::Uuid;
 
 use crate::parser::{escape_string, to_binary_literal};
-use crate::value::{Value, ToValue};
+use crate::value::{Value, ToValue, SystemTimeToString};
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
@@ -64,13 +66,15 @@ impl<'a> WrapString<'a> {
                 Some(s) => query.push_str(&s),
                 None => {
                     match &self.params[index] {
-                        Value::Null         => query.push_str("NULL"),
-                        Value::I32(value)   => query.push_str(&value.to_string()),
-                        Value::I64(value)   => query.push_str(&value.to_string()),
-                        Value::F32(value)   => query.push_str(&value.to_string()),
-                        Value::F64(value)   => query.push_str(&value.to_string()),
-                        Value::Text(value)  => query.push_str(&escape_string(&value)),
-                        Value::Bytes(value) => query.push_str(&to_binary_literal(&value)),
+                        Value::Null          => query.push_str("NULL"),
+                        Value::I32(value)    => query.push_str(&value.to_string()),
+                        Value::I64(value)    => query.push_str(&value.to_string()),
+                        Value::F32(value)    => query.push_str(&value.to_string()),
+                        Value::F64(value)    => query.push_str(&value.to_string()),
+                        Value::Text(value)   => query.push_str(&escape_string(&value)),
+                        Value::Bytes(value)  => query.push_str(&to_binary_literal(&value)),
+                        Value::IpAddr(value) => query.push_str(&format!("'{}'", value)),
+                        Value::Time(value)   => query.push_str(&format!("'{}'", value.to_string())),
                     }
                     index += 1;
                 }
@@ -323,6 +327,46 @@ impl<'a> Add<&Uuid> for WrapString<'a> {
     }
 }
 
+impl<'a> Add<IpAddr> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: IpAddr) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::IpAddr(other));
+        self
+    }
+}
+
+impl<'a> Add<&IpAddr> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &IpAddr) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::IpAddr(*other));
+        self
+    }
+}
+
+impl<'a> Add<SystemTime> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: SystemTime) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Time(other));
+        self
+    }
+}
+
+impl<'a> Add<&SystemTime> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &SystemTime) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Time(*other));
+        self
+    }
+}
+
 impl_add_I32_for_WrapString!(u8, u16, u32, i8, i16, i32);
 impl_add_I64_for_WrapString!(u64, i64);
 
@@ -513,6 +557,8 @@ impl<'a> IntoWrapString<'a> for &'static str {
 mod tests {
     use crate as concatsql;
     use concatsql::prelude::*;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::time::UNIX_EPOCH;
 
     #[test]
     #[allow(
@@ -569,12 +615,29 @@ mod tests {
         let sli = &[String::from("A"),String::from("B")][..];
         let sql = prep!("(") + sli + prep!(")");
         assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!() + IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+        assert_eq!(sql.simulate(), "'127.0.0.1'");
+        let sql = prep!() + IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
+        assert_eq!(sql.simulate(), "'::1'");
+        let sql = prep!() + UNIX_EPOCH;
+        assert_eq!(sql.simulate(), "'1970-01-01 00:00:00.000000000'");
     }
 
     #[test]
     fn params() {
-        let sql = prep!() + params![(),42i8,42i16,42i32,0.1f32,2.3f64,String::from("A"),"B"];
-        assert_eq!(sql.simulate(), "NULL,42,42,42,0.1,2.3,'A','B'");
+        let sql = prep!() + params![
+            (),
+            42i8,
+            42i16,
+            42i32,
+            0.1f32,
+            2.3f64,
+            String::from("A"),
+            "B",
+            IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+            UNIX_EPOCH,
+        ];
+        assert_eq!(sql.simulate(), "NULL,42,42,42,0.1,2.3,'A','B','::1','1970-01-01 00:00:00.000000000'");
     }
 
     #[test]

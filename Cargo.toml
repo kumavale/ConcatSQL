@@ -24,6 +24,7 @@ postgres = ["postgres-sys"]
 indexmap = "1.6"
 lazy_static = "1.4"
 uuid = "0.8"
+chrono = "0.4"
 
 [dependencies.sqlite3-sys]
 version = "0.12"
