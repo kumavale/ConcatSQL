@@ -9,7 +9,8 @@ use crate::parser::to_hex;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::{WrapString, Value};
+use crate::wrapstring::WrapString;
+use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
@@ -32,13 +33,15 @@ pub fn open(url: &str) -> Result<Connection> {
 macro_rules! to_mysql_value {
     ($value:expr) => (
         match $value {
-            Value::Null         => mysql::Value::from(None as Option<i32>),
-            Value::I32(value)   => mysql::Value::from(value),
-            Value::I64(value)   => mysql::Value::from(value),
-            Value::F32(value)   => mysql::Value::from(value),
-            Value::F64(value)   => mysql::Value::from(value),
-            Value::Text(value)  => mysql::Value::from(value.as_ref()),
-            Value::Bytes(value) => mysql::Value::from(value),
+            Value::Null          => mysql::Value::from(None as Option<i32>),
+            Value::I32(value)    => mysql::Value::from(value),
+            Value::I64(value)    => mysql::Value::from(value),
+            Value::F32(value)    => mysql::Value::from(value),
+            Value::F64(value)    => mysql::Value::from(value),
+            Value::Text(value)   => mysql::Value::from(value.as_ref()),
+            Value::Bytes(value)  => mysql::Value::from(value),
+            Value::IpAddr(value) => mysql::Value::from(value.to_string()),
+            Value::Time(value)   => mysql::Value::from(value.to_string()),
         }
     );
 }
@@ -211,14 +214,35 @@ impl GetToString for mysql::Row {
         match self[index] {
             mysql::Value::NULL      => None,
             mysql::Value::Int(v)    => Some(v.to_string()),
-            mysql::Value::UInt(v)   => Some(v.to_string()),
-            mysql::Value::Float(v)  => Some(v.to_string()),
-            mysql::Value::Double(v) => Some(v.to_string()),
+            mysql::Value::UInt(v)   => Some(v.to_string()),  // unreachable ?
+            mysql::Value::Float(v)  => Some(v.to_string()),  // unreachable ?
+            mysql::Value::Double(v) => Some(v.to_string()),  // unreachable ?
             mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(string) => Some(string),
                 Err(_) => Some(to_hex(&bytes)),
             }
-            _ => unimplemented!(),
+            mysql::Value::Date(year, month, day, hour, minute, second, micros) => Some(format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}", year, month, day, hour, minute, second, micros
+            )),  // unreachable ?
+            mysql::Value::Time(neg, days, hours, minutes, seconds, micros) => {
+                Some(if neg {
+                    format!(
+                        "-{:03}:{:02}:{:02}.{:06}",
+                        days * 24 + u32::from(hours),
+                        minutes,
+                        seconds,
+                        micros
+                    )
+                } else {
+                    format!(
+                        "{:03}:{:02}:{:02}.{:06}",
+                        days * 24 + u32::from(hours),
+                        minutes,
+                        seconds,
+                        micros
+                    )
+                })
+            }  // unreachable ?
         }
     }
 }
@@ -277,5 +301,21 @@ mod tests {
             Err(Error::Message("exec error".into())),
         );
         assert!(conn.iterate("SELECT 1", |_|{true}).is_ok());
+    }
+
+    #[test]
+    fn get_to_string() {
+        let conn = crate::mysql::open("mysql://localhost:3306/test").unwrap();
+        #[cfg(debug_assertions)] conn.error_level(ErrorLevel::Debug);
+        conn.execute("
+            CREATE TEMPORARY TABLE test (bytes BLOB, i32 INT, f32 FLOAT, f64 DOUBLE, date DATE, time TIME, none INT);
+            INSERT INTO test(bytes, i32, f32, f64, date, time) VALUES(X'ABCD', 1, 2, 3, '1900-01-01', '123:00:00');
+        ").unwrap();
+        assert_eq!(conn.rows("SELECT bytes FROM test").unwrap().first().unwrap().get(0).unwrap(), "ABCD");
+        assert_eq!(conn.rows("SELECT   i32 FROM test").unwrap().first().unwrap().get(0).unwrap(), "1");
+        assert_eq!(conn.rows("SELECT   f32 FROM test").unwrap().first().unwrap().get(0).unwrap(), "2");
+        assert_eq!(conn.rows("SELECT   f64 FROM test").unwrap().first().unwrap().get(0).unwrap(), "3");
+        assert_eq!(conn.rows("SELECT  date FROM test").unwrap().first().unwrap().get(0).unwrap(), "1900-01-01");
+        assert_eq!(conn.rows("SELECT  time FROM test").unwrap().first().unwrap().get(0).unwrap(), "123:00:00");
     }
 }

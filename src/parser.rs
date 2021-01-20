@@ -54,8 +54,8 @@ pub fn html_special_chars(input: &str) -> String {
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {
-    ($pattern:tt) =>             { concatsql::_sanitize_like($pattern, '\\') };
-    ($pattern:tt, $escape:tt) => { concatsql::_sanitize_like($pattern, $escape) };
+    ($pattern:tt) =>             { $crate::_sanitize_like($pattern, '\\') };
+    ($pattern:tt, $escape:tt) => { $crate::_sanitize_like($pattern, $escape) };
 }
 #[doc(hidden)]
 pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: char) -> String {

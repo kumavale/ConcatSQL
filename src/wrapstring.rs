@@ -1,19 +1,11 @@
 use std::ops::Add;
 use std::borrow::Cow;
-use crate::parser::{escape_string, to_binary_literal};
+use std::net::IpAddr;
+use std::time::SystemTime;
 use uuid::Uuid;
 
-/// Values that can be bound as static placeholders.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value<'a> {
-    Null,
-    I32(i32),
-    I64(i64),
-    F32(f32),
-    F64(f64),
-    Text(Cow<'a, str>),
-    Bytes(Vec<u8>),
-}
+use crate::parser::{escape_string, to_binary_literal};
+use crate::value::{Value, ToValue, SystemTimeToString};
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
@@ -24,6 +16,7 @@ pub struct WrapString<'a> {
 
 impl<'a> WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     pub fn init(s: &'static str) -> Self {
         Self {
             query:  vec![ Some(Cow::Borrowed(s)) ],
@@ -32,6 +25,7 @@ impl<'a> WrapString<'a> {
     }
 
     #[doc(hidden)]
+    #[inline]
     pub const fn null() -> Self {
         Self {
             query:  Vec::new(),
@@ -39,6 +33,7 @@ impl<'a> WrapString<'a> {
         }
     }
 
+    #[inline]
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
             query:  vec![ Some(Cow::Owned(s.to_string())) ],
@@ -71,19 +66,87 @@ impl<'a> WrapString<'a> {
                 Some(s) => query.push_str(&s),
                 None => {
                     match &self.params[index] {
-                        Value::Null         => query.push_str("NULL"),
-                        Value::I32(value)   => query.push_str(&value.to_string()),
-                        Value::I64(value)   => query.push_str(&value.to_string()),
-                        Value::F32(value)   => query.push_str(&value.to_string()),
-                        Value::F64(value)   => query.push_str(&value.to_string()),
-                        Value::Text(value)  => query.push_str(&escape_string(&value)),
-                        Value::Bytes(value) => query.push_str(&to_binary_literal(&value)),
+                        Value::Null          => query.push_str("NULL"),
+                        Value::I32(value)    => query.push_str(&value.to_string()),
+                        Value::I64(value)    => query.push_str(&value.to_string()),
+                        Value::F32(value)    => query.push_str(&value.to_string()),
+                        Value::F64(value)    => query.push_str(&value.to_string()),
+                        Value::Text(value)   => query.push_str(&escape_string(&value)),
+                        Value::Bytes(value)  => query.push_str(&to_binary_literal(&value)),
+                        Value::IpAddr(value) => query.push_str(&format!("'{}'", value)),
+                        Value::Time(value)   => query.push_str(&format!("'{}'", value.to_string())),
                     }
                     index += 1;
                 }
             }
         }
         query
+    }
+
+    /// Returns the length of a string other than a placeholders.
+    pub fn len(&self) -> usize {
+        let mut len = 0;
+        for part in &self.query {
+            if let Some(s) = part {
+                len += s.len();
+            }
+        }
+        len
+    }
+
+    /// Returns the query's vector length.
+    pub fn query_len(&self) -> usize {
+        self.query.len()
+    }
+
+    /// Returns the params's vector length.
+    pub fn params_len(&self) -> usize {
+        self.params.len()
+    }
+
+    /// Truncates this WrapString, removing all contents.
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.params.clear();
+    }
+
+    /// Returns true if this WrapString has a length of zero, and false otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.query.is_empty() && self.params.is_empty()
+    }
+
+    /// Organize the query field of WrapString.
+    ///
+    /// # Likes
+    ///
+    /// ```ignore
+    /// // Before squash
+    /// WrapString {
+    ///     query: [Some("a"),Some("b"),Some("c"),None,Some("1"),Some("2")],
+    ///     params: [],
+    /// }
+    ///
+    /// // After squash
+    /// WrapString {
+    ///     query: [Some("abc"),None,Some("12")],
+    ///     params: [],
+    /// }
+    /// ```
+    pub fn squash(&mut self) {
+        let mut new_query = Vec::new();
+        let mut new_part  = String::new();
+        for part in &self.query {
+            if let Some(part) = part {
+                new_part.push_str(&part);
+            } else {
+                new_query.push(Some(Cow::Owned(new_part.drain(..).collect())));
+                new_query.push(None);
+            }
+        }
+        if !new_part.is_empty() {
+            new_query.push(Some(Cow::Owned(new_part)));
+        }
+        self.query = new_query;
     }
 }
 
@@ -187,6 +250,33 @@ impl<'a> Add<&Vec<u8>> for WrapString<'a> {
     }
 }
 
+impl<'a> Add<&[u8]> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &[u8]) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Bytes(other.to_vec()));
+        self
+    }
+}
+
+impl<'a> Add<&[&(dyn ToValue<'a>)]> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &[&(dyn ToValue<'a>)]) -> WrapString<'a> {
+        if let Some(first) = other.first() {
+            self.query.push(None);
+            self.params.push(first.to_value());
+        }
+        for param in other.iter().skip(1) {
+            self.query.push(Some(Cow::Borrowed(",")));
+            self.query.push(None);
+            self.params.push(param.to_value());
+        }
+        self
+    }
+}
+
 macro_rules! impl_add_I32_for_WrapString {
     ( $($t:ty),* ) => ($(
         impl<'a> Add<$t> for WrapString<'a> {
@@ -233,6 +323,46 @@ impl<'a> Add<&Uuid> for WrapString<'a> {
     fn add(mut self, other: &Uuid) -> WrapString<'a> {
         self.query .push(None);
         self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple_ref()))));
+        self
+    }
+}
+
+impl<'a> Add<IpAddr> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: IpAddr) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::IpAddr(other));
+        self
+    }
+}
+
+impl<'a> Add<&IpAddr> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &IpAddr) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::IpAddr(*other));
+        self
+    }
+}
+
+impl<'a> Add<SystemTime> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: SystemTime) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Time(other));
+        self
+    }
+}
+
+impl<'a> Add<&SystemTime> for WrapString<'a> {
+    type Output = WrapString<'a>;
+    #[inline]
+    fn add(mut self, other: &SystemTime) -> WrapString<'a> {
+        self.query .push(None);
+        self.params.push(Value::Time(*other));
         self
     }
 }
@@ -401,6 +531,7 @@ pub trait IntoWrapString<'a> {
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         self
     }
@@ -408,6 +539,7 @@ impl<'a> IntoWrapString<'a> for WrapString<'a> {
 
 impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         self.clone()
     }
@@ -415,16 +547,18 @@ impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
 
 impl<'a> IntoWrapString<'a> for &'static str {
     #[doc(hidden)]
+    #[inline]
     fn into_wrapstring(self) -> WrapString<'a> {
         WrapString::init(self)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
     use concatsql::prelude::*;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::time::UNIX_EPOCH;
 
     #[test]
     #[allow(
@@ -481,6 +615,29 @@ mod tests {
         let sli = &[String::from("A"),String::from("B")][..];
         let sql = prep!("(") + sli + prep!(")");
         assert_eq!(sql.simulate(), "('A','B')");
+        let sql = prep!() + IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+        assert_eq!(sql.simulate(), "'127.0.0.1'");
+        let sql = prep!() + IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
+        assert_eq!(sql.simulate(), "'::1'");
+        let sql = prep!() + UNIX_EPOCH;
+        assert_eq!(sql.simulate(), "'1970-01-01 00:00:00.000000000'");
+    }
+
+    #[test]
+    fn params() {
+        let sql = prep!() + params![
+            (),
+            42i8,
+            42i16,
+            42i32,
+            0.1f32,
+            2.3f64,
+            String::from("A"),
+            "B",
+            IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+            UNIX_EPOCH,
+        ];
+        assert_eq!(sql.simulate(), "NULL,42,42,42,0.1,2.3,'A','B','::1','1970-01-01 00:00:00.000000000'");
     }
 
     #[test]
@@ -495,6 +652,55 @@ mod tests {
         assert_eq!(uuid.simulate(), "'936DA01F9ABD4D9D80C702AF85C822A8'");
         let uuid = prep!() + Uuid::new_v4();
         assert_eq!(uuid.simulate().len(), 32+2);
+    }
+
+    #[test]
+    fn len() {
+        assert_eq!((prep!("ABC") + prep!("123")).len(), 6);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.len(), 6);
+        assert_eq!(prep!().len(), 0);
+    }
+
+    #[test]
+    fn query_len() {
+        assert_eq!((prep!("ABC") + prep!("123")).query_len(), 2);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.query_len(), 3);
+        assert_eq!(prep!().query_len(), 0);
+    }
+
+    #[test]
+    fn params_len() {
+        assert_eq!((prep!("ABC") + prep!("123")).params_len(), 0);
+        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.params_len(), 1);
+        assert_eq!(prep!().params_len(), 0);
+    }
+
+    #[test]
+    fn clear() {
+        let mut sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!(sql.query_len(),  3);
+        assert_eq!(sql.params_len(), 1);
+        sql.clear();
+        assert_eq!(sql.query_len(),  0);
+        assert_eq!(sql.params_len(), 0);
+    }
+
+    #[test]
+    fn is_empty() {
+        assert!(prep!().is_empty());
+    }
+
+    #[test]
+    fn squash() {
+        let mut sql: WrapString = prep!("A") + prep!("B") + 42 + prep!("1") + prep!("2") + prep!("3");
+        assert_eq!(sql.query_len(),  6);
+        assert_eq!(sql.params_len(), 1);
+        sql.squash();
+        assert_eq!(sql.query_len(),  3);
+        assert_eq!(sql.params_len(), 1);
     }
 
     mod simulate {

@@ -31,7 +31,7 @@ concatsql = { version = "<version>", features = ["<postgres|mysql|sqlite>"] }
 let id     = String::from("42");    // User supplied input
 let passwd = String::from("pass");  // User supplied input
 
-let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
+let sql = prep("SELECT name FROM users WHERE id=") + &id + prep(" AND passwd=") + &passwd;
 assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 
 for row in conn.rows(&sql).unwrap() {
@@ -46,7 +46,7 @@ for row in conn.rows(&sql).unwrap() {
 let id     = String::from("42");             // User supplied input
 let passwd = String::from("'' or 1=1; --");  // User supplied input
 
-let sql = prep!("SELECT name FROM users WHERE id=") + &id + prep!(" AND passwd=") + &passwd;
+let sql = prep("SELECT name FROM users WHERE id=") + &id + prep(" AND passwd=") + &passwd;
 assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
 for row in conn.rows(&sql).unwrap() {
@@ -54,7 +54,7 @@ for row in conn.rows(&sql).unwrap() {
 }
 ```
 
-### If you did not use the `prep` macro
+### If you did not use the `prep` function
 
 Cannot compile ... secure!
 
@@ -65,23 +65,37 @@ let sql = "SELECT name FROM users WHERE id=".to_string() + &id + " AND passwd='"
 conn.execute(&sql).unwrap();  // error
 ```
 
-### When using `prep!(<String>)`
+### When using `prep(<String>)`
 
 Cannot compile ... secure!
 
 ```rust
 let age = String::from("50 or 1=1; --");
-let sql = prep!("SELECT name FROM users WHERE age < ") + prep!(&age);  // error
+let sql = prep("SELECT name FROM users WHERE age < ") + prep(&age);  // error
 ```
 
 ## Why can this library prevent SQL injection?
 
 This is because it is achieved using [Operator Overloading](https://doc.rust-lang.org/stable/rust-by-example/trait/ops.html) rather than simple string concatenation.  
-The `prep` macro returns the library's own type(`WrapString`).  
+The `prep` function returns the library's own type(`WrapString`).  
 For example, if you combine this `WrapString` type with a `String` type, the escaped `String` type will be combined and a new `WrapString` will be returned.  
 
 ```rust
-let foobar: WrapString = prep!("foo") + String::from("bar");
+struct WrapString<'a> {
+    query:  Vec<Option<Cow<'a, str>>>,
+    params: Vec<Value>,
+}
+
+let foobar42: WrapString = prep("foo") + String::from("bar") + 42;
+
+foobar42 {
+    query:  [Some("foo"), None, None],
+    params: [Value::Text("bar"), Value::I32(42)],
+}
+
+ffi::sqlite3_prepare_v2(..., "foo??", ...);
+ffi::sqlite3_bind_text(..., "bar", ...);
+ffi::sqlite3_bind_int(..., 42);
 ```
 
 ## Is it impossible to implement in other languages?
