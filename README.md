@@ -113,7 +113,3 @@ That is, it can be implemented in any language that can distinguish between hard
 
 MIT
 
-## Feedback
-
-Please give me [feedback](https://github.com/kumavale/ConcatSQL/discussions?discussions_q=category%3AFeedback)!
-
