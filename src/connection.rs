@@ -112,6 +112,7 @@ impl<'a> Connection {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
+    #[inline]
     pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
         self.conn.rows_inner(&query.into_wrapstring(), &self.error_level.get())
     }
