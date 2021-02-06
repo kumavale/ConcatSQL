@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::parser::{escape_string, to_binary_literal};
 use crate::value::{Value, ToValue, SystemTimeToString};
+use crate::connection::ConnKind;
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
@@ -522,34 +523,97 @@ impl_add_arrays_borrowed_for_WrapString!{
 }
 
 
-/// A trait for converting a value to a [WrapString](./struct.WrapString.html).
+/// A trait for converting that can be converted to [`WrapString`].
 pub trait IntoWrapString<'a> {
-    /// Converts the given value to a [WrapString](./struct.WrapString.html).
     #[doc(hidden)]
-    fn into_wrapstring(self) -> WrapString<'a>;
+    fn compile(&self, kind: ConnKind) -> Cow<'a, str>;
+    #[doc(hidden)]
+    fn params(&self) -> &[Value<'a>];
+}
+
+macro_rules! compile {
+    ($self: expr, $kind: expr) => {
+        match $kind {
+            #[cfg(feature = "sqlite")]
+            ConnKind::SQLite => {
+                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(1, |q|q.len())).sum());
+                for part in &$self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "mysql")]
+            ConnKind::MySQL => {
+                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(1, |q|q.len())).sum());
+                for part in &$self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None =>    query.push('?'),
+                    }
+                }
+                Cow::Owned(query)
+            }
+            #[cfg(feature = "postgres")]
+            ConnKind::PostgreSQL => {
+                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(3, |q|q.len())).sum());
+                let mut index = 1;
+                for part in &$self.query {
+                    match part {
+                        Some(s) => query.push_str(s),
+                        None => {
+                            query.push_str(&format!("${}", index));
+                            index += 1;
+                        }
+                    }
+                }
+                Cow::Owned(query)
+            }
+        }
+    }
 }
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
     #[doc(hidden)]
     #[inline]
-    fn into_wrapstring(self) -> WrapString<'a> {
-        self
+    fn compile(&self, kind: ConnKind) -> Cow<'a, str> {
+        compile!(self, kind)
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn params(&self) -> &[Value<'a>] {
+        &self.params
     }
 }
 
 impl<'a, 'b> IntoWrapString<'a> for &'b WrapString<'a> {
     #[doc(hidden)]
     #[inline]
-    fn into_wrapstring(self) -> WrapString<'a> {
-        self.clone()
+    fn compile(&self, kind: ConnKind) -> Cow<'a, str> {
+        compile!(self, kind)
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn params(&self) -> &[Value<'a>] {
+        &self.params
     }
 }
 
 impl<'a> IntoWrapString<'a> for &'static str {
     #[doc(hidden)]
     #[inline]
-    fn into_wrapstring(self) -> WrapString<'a> {
-        WrapString::init(self)
+    fn compile(&self, _kind: ConnKind) -> Cow<'a, str> {
+        Cow::Borrowed(&self)
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn params(&self) -> &[Value<'a>] {
+        &[]
     }
 }
 

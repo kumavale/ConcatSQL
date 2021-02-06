@@ -4,12 +4,12 @@ use std::ffi::{CStr, CString, c_void};
 use std::ptr::{self, NonNull};
 use std::path::Path;
 use std::cell::Cell;
+use std::borrow::Cow;
 
 use crate::Result;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::WrapString;
 use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
@@ -46,9 +46,7 @@ pub fn open<T: AsRef<Path>>(path: T, openflags: i32) -> Result<Connection> {
 }
 
 impl ConcatsqlConn for NonNull<ffi::sqlite3> {
-    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-        let query = compile(ws);
-
+    fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel) -> Result<()> {
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query),
@@ -56,7 +54,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
         let mut stmt = ptr::null_mut();
 
-        if ws.params.is_empty() {
+        if params.is_empty() {
             let mut errmsg = ptr::null_mut();
             unsafe {
                 ffi::sqlite3_exec(
@@ -95,7 +93,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
             }
 
-            bind_all(stmt, ws, error_level)?;
+            bind_all(stmt, &params, error_level)?;
 
             loop {
                 match ffi::sqlite3_step(stmt) {
@@ -114,10 +112,9 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
         }
     }
 
-    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
+    fn iterate_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
-        let query = compile(ws);
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query),
@@ -139,7 +136,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
             }
 
-            bind_all(stmt, ws, error_level)?;
+            bind_all(stmt, &params, error_level)?;
 
             let column_count = ffi::sqlite3_column_count(stmt) as i32;
 
@@ -167,10 +164,10 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
         }
     }
 
-    fn rows_inner<'r>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'r>>> {
+    fn rows_inner<'a, 'r>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel)
+        -> Result<Vec<Row<'r>>>
+    {
         let mut rows: Vec<Row> = Vec::new();
-
-        let query = compile(ws);
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
             _ => return Error::new(&error_level, "invalid query", query).map(|_| Vec::new()),
@@ -193,7 +190,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     .map(|_| Vec::new());
             }
 
-            bind_all(stmt, ws, error_level)?;
+            bind_all(stmt, &params, error_level)?;
 
             let column_count = ffi::sqlite3_column_count(stmt) as i32;
 
@@ -259,21 +256,10 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
         }
     }
 
+    #[inline]
     fn kind(&self) -> ConnKind {
         ConnKind::SQLite
     }
-}
-
-fn compile(ws: &WrapString) -> String {
-    let mut query = String::with_capacity(ws.query.iter().map(|q|q.as_ref().map_or(1, |q|q.len())).sum());
-
-    for part in &ws.query {
-        match part {
-            Some(s) => query.push_str(s),
-            None =>    query.push('?'),
-        }
-    }
-    query
 }
 
 trait Storing {
@@ -308,8 +294,8 @@ impl Storing for Vec<(&str, Option<String>)> {
     }
 }
 
-unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
-    for (index, param) in (1i32..).zip(ws.params.iter()) {
+unsafe fn bind_all<'a>(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'a>], error_level: &ErrorLevel) -> Result<()> {
+    for (index, param) in (1i32..).zip(params.iter()) {
         let result = match param {
             Value::Null => {
                 ffi::sqlite3_bind_null(stmt, index)
