@@ -15,7 +15,7 @@ use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(params: &str) -> Result<Connection> {
-    let conn = match Client::connect(&params, NoTls) {
+    let conn = match Client::connect(params, NoTls) {
         Ok(conn) => conn,
         Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
     };

@@ -17,6 +17,6 @@ use crate::connection::Connection;
 /// ```
 #[inline]
 pub fn open(params: &str) -> Result<Connection> {
-    connection::open(&params)
+    connection::open(params)
 }
 

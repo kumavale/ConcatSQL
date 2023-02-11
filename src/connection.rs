@@ -66,7 +66,7 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(query.compile(self.conn.kind()), &query.params(), &self.error_level.get())
+        self.conn.execute_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -96,7 +96,7 @@ impl<'a> Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(query.compile(self.conn.kind()), &query.params(), &self.error_level.get(), &mut callback)
+        self.conn.iterate_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -118,7 +118,7 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
-        self.conn.rows_inner(query.compile(self.conn.kind()), &query.params(), &self.error_level.get())
+        self.conn.rows_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
     }
 
     /// Sets the error level.  

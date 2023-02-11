@@ -18,6 +18,6 @@ use crate::connection::Connection;
 /// ```
 #[inline]
 pub fn open(url: &str) -> Result<Connection> {
-    connection::open(&url)
+    connection::open(url)
 }
 

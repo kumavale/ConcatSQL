@@ -13,7 +13,7 @@ mod postgres {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
-        conn.execute(&stmt).unwrap();
+        conn.execute(stmt).unwrap();
         conn
     }
 
@@ -34,7 +34,7 @@ mod postgres {
     fn execute() {
         let conn = concatsql::postgres::open("postgresql://postgres:postgres@localhost").unwrap();
         let stmt = prep!(stmt());
-        conn.execute(&stmt).unwrap();
+        conn.execute(stmt).unwrap();
     }
 
     #[test]
@@ -44,7 +44,7 @@ mod postgres {
         let sql = prep!("SELECT name FROM users;");
 
         let mut i = 0;
-        conn.iterate(&sql, |pairs| {
+        conn.iterate(sql, |pairs| {
             for (_, value) in pairs {
                 assert_eq!(*value.as_ref().unwrap(), expects[i]);
                 i += 1;
@@ -59,7 +59,7 @@ mod postgres {
         let conn = prepare();
         let sql = prep!("SELECT name FROM users; SELECT name FROM users;");
 
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.iterate(sql, |_| { unreachable!(); }).unwrap();
     }
 
     #[test]
@@ -71,7 +71,7 @@ mod postgres {
             &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
 
         let mut i = 0;
-        conn.iterate(&sql, |pairs| {
+        conn.iterate(sql, |pairs| {
             for (_, value) in pairs {
                 assert_eq!(*value.as_ref().unwrap(), expects[i]);
                 i += 1;
@@ -127,7 +127,7 @@ mod postgres {
         let conn = prepare();
         let sql = prep!("select\n*\rfrom\nusers;");
 
-        conn.iterate(&sql, |_| { true }).unwrap();
+        conn.iterate(sql, |_| { true }).unwrap();
     }
 
     #[test]
@@ -137,7 +137,7 @@ mod postgres {
         let sql = prep!("select age from users where name =") + name + &prep!(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.iterate(sql, |_| { unreachable!(); }).unwrap();
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod postgres {
         let name = r#"<script>alert("&1");</script>"#;
         let sql = prep!("INSERT INTO users VALUES(") + name + &prep!(", 12345);");
 
-        conn.execute(&sql).unwrap();
+        conn.execute(sql).unwrap();
 
         conn.rows(prep!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
@@ -324,7 +324,7 @@ mod postgres {
         conn.execute("CREATE TEMPORARY TABLE b (data bytea)").unwrap();
         let data = vec![0x1, 0xA, 0xFF, 0x00, 0x7F];
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
-        conn.execute(&sql).unwrap();
+        conn.execute(sql).unwrap();
         for row in conn.rows("SELECT data FROM b").unwrap() {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
@@ -489,15 +489,15 @@ mod anti_patterns {
 
         let name = "' OR 1=2; SELECT 1; --";
         let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
-        conn.execute(&sql).ok();
+        conn.execute(sql).ok();
 
         let name = "' OR 1=1; --";
         let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
-        conn.execute(&sql).ok();
+        conn.execute(sql).ok();
 
         let name = "Alice";
         let sql = prep!("SELECT age FROM users WHERE name = '") + name + &prep!("';"); // '?' is not placeholder
-        conn.execute(&sql).ok();
+        conn.execute(sql).ok();
     }
 }
 

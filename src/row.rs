@@ -104,7 +104,7 @@ impl<'a> Row<'a> {
     #[inline]
     pub fn iter(&self) -> RowIter {
         RowIter {
-            row: &self,
+            row: self,
             now: 0,
         }
     }
@@ -113,7 +113,7 @@ impl<'a> Row<'a> {
 impl<'a, T: Get> std::ops::Index<T> for Row<'a> {
     type Output = str;
     fn index(&self, key: T) -> &Self::Output {
-        &key.get(&self.pairs).unwrap()
+        key.get(&self.pairs).unwrap()
     }
 }
 
@@ -194,15 +194,15 @@ impl Get for usize {
 
 impl<'b, T> Get for &'b T where T: Get + ?Sized {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
-        T::get(self, &pairs)
+        T::get(self, pairs)
     }
 
     fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
-        T::get_into(self, &pairs)
+        T::get_into(self, pairs)
     }
 
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
-        T::get_key(self, &pairs)
+        T::get_key(self, pairs)
     }
 }
 
@@ -256,12 +256,10 @@ from_sql_impl! { std::num::NonZeroI128 }
 impl FromSql for Vec<u8> {
     #[doc(hidden)]
     fn from_sql(s: &str) -> Result<Self, Error> {
-        Ok(
-            (0..s.len())
+        (0..s.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&s[i..i+2], 16).map_err(|_|()))
-            .collect::<Result<Vec<u8>, ()>>().map_err(|_|Error::ParseError)?
-        )
+            .collect::<Result<Vec<u8>, ()>>().map_err(|_|Error::ParseError)
     }
 }
 
@@ -286,6 +284,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_borrow)]
     fn row() {
         let mut row = Row::new(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect());
         row.insert("key1", Some("value".to_string()));

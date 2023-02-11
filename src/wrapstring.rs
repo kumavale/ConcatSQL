@@ -64,7 +64,7 @@ impl<'a> WrapString<'a> {
         let mut index = 0;
         for part in &self.query {
             match part {
-                Some(s) => query.push_str(&s),
+                Some(s) => query.push_str(s),
                 None => {
                     match &self.params[index] {
                         Value::Null          => query.push_str("NULL"),
@@ -72,8 +72,8 @@ impl<'a> WrapString<'a> {
                         Value::I64(value)    => query.push_str(&value.to_string()),
                         Value::F32(value)    => query.push_str(&value.to_string()),
                         Value::F64(value)    => query.push_str(&value.to_string()),
-                        Value::Text(value)   => query.push_str(&escape_string(&value)),
-                        Value::Bytes(value)  => query.push_str(&to_binary_literal(&value)),
+                        Value::Text(value)   => query.push_str(&escape_string(value)),
+                        Value::Bytes(value)  => query.push_str(&to_binary_literal(value)),
                         Value::IpAddr(value) => query.push_str(&format!("'{}'", value)),
                         Value::Time(value)   => query.push_str(&format!("'{}'", value.to_string())),
                     }
@@ -86,13 +86,11 @@ impl<'a> WrapString<'a> {
 
     /// Returns the length of a string other than a placeholders.
     pub fn len(&self) -> usize {
-        let mut len = 0;
-        for part in &self.query {
-            if let Some(s) = part {
-                len += s.len();
-            }
-        }
-        len
+        self.query
+            .iter()
+            .flatten()
+            .map(|part|part.len())
+            .sum()
     }
 
     /// Returns the query's vector length.
@@ -138,7 +136,7 @@ impl<'a> WrapString<'a> {
         let mut new_part  = String::new();
         for part in &self.query {
             if let Some(part) = part {
-                new_part.push_str(&part);
+                new_part.push_str(part);
             } else {
                 new_query.push(Some(Cow::Owned(new_part.drain(..).collect())));
                 new_query.push(None);
@@ -226,7 +224,7 @@ impl<'a> Add<&'a std::borrow::Cow<'a, str>> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: &'a std::borrow::Cow<'a, str>) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Text(Cow::Borrowed(&*other)));
+        self.params.push(Value::Text(Cow::Borrowed(other)));
         self
     }
 }
@@ -607,7 +605,7 @@ impl<'a> IntoWrapString<'a> for &'static str {
     #[doc(hidden)]
     #[inline]
     fn compile(&self, _kind: ConnKind) -> Cow<'a, str> {
-        Cow::Borrowed(&self)
+        Cow::Borrowed(self)
     }
 
     #[doc(hidden)]

@@ -14,7 +14,7 @@ use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
-    let opts = match Opts::from_url(&url) {
+    let opts = match Opts::from_url(url) {
         Ok(opts) => opts,
         Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
     };
@@ -205,7 +205,7 @@ impl GetToString for mysql::Row {
             mysql::Value::Double(v) => Some(v.to_string()),  // unreachable ?
             mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(string) => Some(string),
-                Err(_) => Some(to_hex(&bytes)),
+                Err(_) => Some(to_hex(bytes)),
             }
             mysql::Value::Date(year, month, day, hour, minute, second, micros) => Some(format!(
                 "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}", year, month, day, hour, minute, second, micros

@@ -49,7 +49,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
     fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel) -> Result<()> {
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", query),
+            _ => return Error::new(error_level, "invalid query", query),
         };
 
         let mut stmt = ptr::null_mut();
@@ -72,8 +72,8 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                 unsafe {
                     ffi::sqlite3_finalize(stmt);
                     ffi::sqlite3_free(errmsg as *mut _);
-                    return Error::new(&error_level, "exec error",
-                        &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
+                    return Error::new(error_level, "exec error",
+                        CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
                 }
             }
         }
@@ -89,11 +89,11 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
             if result != ffi::SQLITE_OK {
                 ffi::sqlite3_finalize(stmt);
-                return Error::new(&error_level, "exec error",
-                    &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
+                return Error::new(error_level, "exec error",
+                    CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
             }
 
-            bind_all(stmt, &params, error_level)?;
+            bind_all(stmt, params, error_level)?;
 
             loop {
                 match ffi::sqlite3_step(stmt) {
@@ -101,8 +101,8 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     ffi::SQLITE_ROW => (),  // Do nothing
                     _ => {
                         ffi::sqlite3_finalize(stmt);
-                        return Error::new(&error_level, "exec error",
-                            &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
+                        return Error::new(error_level, "exec error",
+                            CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
                     }
                 }
             }
@@ -117,7 +117,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
     {
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", query),
+            _ => return Error::new(error_level, "invalid query", query),
         };
         let mut stmt = ptr::null_mut();
 
@@ -132,13 +132,13 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
             if result != ffi::SQLITE_OK {
                 ffi::sqlite3_finalize(stmt);
-                return Error::new(&error_level, "exec error",
-                    &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
+                return Error::new(error_level, "exec error",
+                    CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
             }
 
-            bind_all(stmt, &params, error_level)?;
+            bind_all(stmt, params, error_level)?;
 
-            let column_count = ffi::sqlite3_column_count(stmt) as i32;
+            let column_count = ffi::sqlite3_column_count(stmt);
 
             loop {
                 match ffi::sqlite3_step(stmt) {
@@ -153,8 +153,8 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     }
                     _ => {
                         ffi::sqlite3_finalize(stmt);
-                        return Error::new(&error_level, "exec error",
-                            &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
+                        return Error::new(error_level, "exec error",
+                            CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy());
                     }
                 }
             }
@@ -170,7 +170,7 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
         let mut rows: Vec<Row> = Vec::new();
         let query = match CString::new(query.as_bytes()) {
             Ok(string) => string,
-            _ => return Error::new(&error_level, "invalid query", query).map(|_| Vec::new()),
+            _ => return Error::new(error_level, "invalid query", query).map(|_| Vec::new()),
         };
         let mut stmt = ptr::null_mut();
 
@@ -185,14 +185,14 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
 
             if result != ffi::SQLITE_OK {
                 ffi::sqlite3_finalize(stmt);
-                return Error::new(&error_level, "exec error",
-                    &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
+                return Error::new(error_level, "exec error",
+                    CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
                     .map(|_| Vec::new());
             }
 
-            bind_all(stmt, &params, error_level)?;
+            bind_all(stmt, params, error_level)?;
 
-            let column_count = ffi::sqlite3_column_count(stmt) as i32;
+            let column_count = ffi::sqlite3_column_count(stmt);
 
             // First row
             match ffi::sqlite3_step(stmt) {
@@ -212,8 +212,8 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                 }
                 _ => {
                     ffi::sqlite3_finalize(stmt);
-                    return Error::new(&error_level, "exec error",
-                        &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
+                    return Error::new(error_level, "exec error",
+                        CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
                         .map(|_| Vec::new());
                 }
             }
@@ -233,8 +233,8 @@ impl ConcatsqlConn for NonNull<ffi::sqlite3> {
                     }
                     _ => {
                         ffi::sqlite3_finalize(stmt);
-                        return Error::new(&error_level, "exec error",
-                            &CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
+                        return Error::new(error_level, "exec error",
+                            CStr::from_ptr(ffi::sqlite3_errmsg(self.as_ptr())).to_string_lossy())
                             .map(|_| Vec::new());
                     }
                 }
@@ -278,7 +278,7 @@ impl Storing for Vec<(&str, Option<String>)> {
                         let ptr = ffi::sqlite3_column_blob(stmt, i);
                         let count = ffi::sqlite3_column_bytes(stmt, i) as usize;
                         let bytes = std::slice::from_raw_parts::<u8>(ptr as *const u8, count);
-                        Some(crate::parser::to_hex(&bytes))
+                        Some(crate::parser::to_hex(bytes))
                     },
                     ffi::SQLITE_INTEGER |
                     ffi::SQLITE_FLOAT   |
@@ -353,7 +353,7 @@ unsafe fn bind_all<'a>(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'a>], error
         };
         if result != ffi::SQLITE_OK {
             ffi::sqlite3_finalize(stmt);
-            return Error::new(&error_level, "bind error", &CStr::from_ptr(ffi::sqlite3_errstr(result)).to_string_lossy());
+            return Error::new(error_level, "bind error", CStr::from_ptr(ffi::sqlite3_errstr(result)).to_string_lossy());
         }
     }
 
