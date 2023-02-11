@@ -8,6 +8,7 @@ use crate::row::Row;
 use crate::wrapstring::{WrapString, IntoWrapString};
 use crate::value::Value;
 
+#[allow(clippy::type_complexity)]
 pub(crate) trait ConcatsqlConn {
     fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel) -> Result<()>;
     fn iterate_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel,
