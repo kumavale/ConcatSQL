@@ -14,7 +14,7 @@ mod sqlite {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
         let stmt = prep!(stmt());
-        conn.execute(&stmt).unwrap();
+        conn.execute(stmt).unwrap();
         conn
     }
 
@@ -48,7 +48,7 @@ mod sqlite {
 
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         let stmt = prep!(stmt());
-        conn.execute(&stmt).unwrap();
+        conn.execute(stmt).unwrap();
         static_strings! {
             select = "SELECT ";
             cols   = "name ";
@@ -63,7 +63,7 @@ mod sqlite {
     fn execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         let stmt = prep!(stmt());
-        conn.execute(&stmt).unwrap();
+        conn.execute(stmt).unwrap();
     }
 
     #[test]
@@ -73,7 +73,7 @@ mod sqlite {
         let sql = prep!("SELECT name FROM users;");
 
         let mut i = 0;
-        conn.iterate(&sql, |pairs| {
+        conn.iterate(sql, |pairs| {
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
             }
@@ -89,7 +89,7 @@ mod sqlite {
         let sql = prep!("SELECT name FROM users; SELECT name FROM users;");
 
         let mut i = 0;
-        conn.iterate(&sql, |pairs| {
+        conn.iterate(sql, |pairs| {
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
             }
@@ -107,7 +107,7 @@ mod sqlite {
             &prep!("age < ") + age + &prep!(" OR ") + age + &prep!(" < age");
 
         let mut i = 0;
-        conn.iterate(&sql, |pairs| {
+        conn.iterate(sql, |pairs| {
             for &(_, value) in pairs.iter() {
                 assert_eq!(value.unwrap(), expects[i]);
             }
@@ -163,7 +163,7 @@ mod sqlite {
         let conn = prepare();
         let sql = prep!("select\n*\rfrom\nusers;");
 
-        conn.iterate(&sql, |_| { true }).unwrap();
+        conn.iterate(sql, |_| { true }).unwrap();
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod sqlite {
         let sql = prep!("select age from users where name =") + name + &prep!(";");
         // "select age from users where name = 'Alice'' or ''1''=''1';"
 
-        conn.iterate(&sql, |_| { unreachable!(); }).unwrap();
+        conn.iterate(sql, |_| { unreachable!(); }).unwrap();
     }
 
     #[test]
@@ -182,11 +182,11 @@ mod sqlite {
         let name = r#"<script>alert("&1");</script>"#;
         let sql = prep!("INSERT INTO users VALUES(") + name + &prep!(", 12345);");
 
-        conn.execute(&sql).unwrap();
+        conn.execute(sql).unwrap();
 
         conn.rows(prep!("SELECT name FROM users WHERE age = 12345;")).unwrap().iter() .all(|row| {
             assert_eq!(
-                concatsql::html_special_chars(&row.get("name").unwrap()),
+                concatsql::html_special_chars(row.get("name").unwrap()),
                 "&lt;script&gt;alert(&quot;&amp;1&quot;);&lt;/script&gt;"
             );
             true
@@ -280,7 +280,7 @@ mod sqlite {
 
         let conn = Arc::new(Mutex::new(concatsql::sqlite::open(":memory:").unwrap()));
         let stmt = prep!(stmt());
-        conn.lock().unwrap().execute(&stmt).unwrap();
+        conn.lock().unwrap().execute(stmt).unwrap();
 
         let mut handles = vec![];
 
@@ -289,7 +289,7 @@ mod sqlite {
             let handle = thread::spawn(move || {
                 let conn = &*conn_clone.lock().unwrap();
                 let sql = prep!("INSERT INTO users VALUES ('Thread', ") + i + prep!(");");
-                conn.execute(&sql).unwrap();
+                conn.execute(sql).unwrap();
             });
             handles.push(handle);
         }
@@ -390,7 +390,7 @@ mod sqlite {
         conn.execute("CREATE TABLE b (data blob)").unwrap();
         let data = vec![0x1, 0xA, 0xFF, 0x00, 0x7F];
         let sql = prep!("INSERT INTO b VALUES (") + &data + prep!(")");
-        conn.execute(&sql).unwrap();
+        conn.execute(sql).unwrap();
         for row in conn.rows("SELECT data FROM b").unwrap() {
             assert_eq!(row.get_into::<_, Vec<u8>>(0).unwrap(), data);
         }
@@ -566,7 +566,7 @@ mod anti_patterns {
         let conn = sqlite::open(":memory:").unwrap();
         let sql: &'static str = Box::leak(String::from("SELECT 1").into_boxed_str());
         conn.execute(sql).unwrap();
-        unsafe { Box::from_raw(sql.as_ptr() as *mut u8); }
+        unsafe { drop(Box::from_raw(sql.as_ptr() as *mut u8)); }
     }
 
     #[test]

@@ -1,21 +1,26 @@
 use std::fmt;
 use std::cell::Cell;
+use std::borrow::Cow;
 
 use crate::Result;
 use crate::ErrorLevel;
 use crate::row::Row;
 use crate::wrapstring::{WrapString, IntoWrapString};
+use crate::value::Value;
 
+#[allow(clippy::type_complexity)]
 pub(crate) trait ConcatsqlConn {
-    fn execute_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<()>;
-    fn iterate_inner(&self, ws: &WrapString, error_level: &crate::ErrorLevel,
+    fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel) -> Result<()>;
+    fn iterate_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
-    fn rows_inner<'r>(&self, ws: &WrapString, error_level: &crate::ErrorLevel) -> Result<Vec<Row<'r>>>;
+    fn rows_inner<'a, 'r>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel)
+        -> Result<Vec<Row<'r>>>;
     fn close(&self);
     fn kind(&self) -> ConnKind;
 }
 
-pub(crate) enum ConnKind {
+#[doc(hidden)]
+pub enum ConnKind {
     #[cfg(feature = "sqlite")]   SQLite,
     #[cfg(feature = "mysql")]    MySQL,
     #[cfg(feature = "postgres")] PostgreSQL,
@@ -62,7 +67,7 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(&query.into_wrapstring(), &self.error_level.get())
+        self.conn.execute_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -92,7 +97,7 @@ impl<'a> Connection {
         where
             F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(&query.into_wrapstring(), &self.error_level.get(), &mut callback)
+        self.conn.iterate_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get(), &mut callback)
     }
 
     /// Execute a statement and returns the rows.
@@ -112,8 +117,9 @@ impl<'a> Connection {
     ///     println!("name: {}", row.get("name").unwrap_or("NULL"));
     /// }
     /// ```
+    #[inline]
     pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
-        self.conn.rows_inner(&query.into_wrapstring(), &self.error_level.get())
+        self.conn.rows_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
     }
 
     /// Sets the error level.  

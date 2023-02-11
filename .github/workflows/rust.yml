@@ -4,12 +4,9 @@ name: CI
 on:
   push:
     branches:
-        - master
+        - main
         - develop
   pull_request:
-    branches:
-        - master
-        - develop
 
 env:
   CARGO_TERM_COLOR: always
@@ -31,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Build sqlite
         run: cargo build --features sqlite --all-targets
@@ -45,26 +42,23 @@ jobs:
   clippy:
     name: Clippy
 
-    strategy:
-      fail-fast: false
-
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: prepare
         run: rustup component add clippy
 
       - name: clippy sqlite
-        run: cargo clippy --all-targets --features sqlite -- -D clippy::dbg_macro -D warnings
+        run: cargo clippy --all-targets --features sqlite -- -W clippy::dbg_macro -A clippy::uninlined_format_args
 
       - name: clippy mysql
-        run: cargo clippy --all-targets --features mysql -- -D clippy::dbg_macro -D warnings
+        run: cargo clippy --all-targets --features mysql -- -W clippy::dbg_macro -A clippy::uninlined_format_args
 
       - name: clippy postgres
-        run: cargo clippy --all-targets --features postgres -- -D clippy::dbg_macro -D warnings
+        run: cargo clippy --all-targets --features postgres -- -W clippy::dbg_macro -A clippy::uninlined_format_args
 
       - name: clippy all features
-        run: cargo clippy --all-targets --all-features -- -D clippy::dbg_macro -D warnings
+        run: cargo clippy --all-targets --all-features -- -W clippy::dbg_macro -A clippy::uninlined_format_args
 

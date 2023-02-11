@@ -3,18 +3,18 @@ use mysql::{Opts, Conn};
 use mysql::prelude::*;
 
 use std::cell::{Cell, RefCell};
+use std::borrow::Cow;
 
 use crate::Result;
 use crate::parser::to_hex;
 use crate::row::Row;
 use crate::connection::{Connection, ConcatsqlConn, ConnKind};
 use crate::error::{Error, ErrorLevel};
-use crate::wrapstring::WrapString;
 use crate::value::{Value, SystemTimeToString};
 
 /// Open a read-write connection to a new or existing database.
 pub fn open(url: &str) -> Result<Connection> {
-    let opts = match Opts::from_url(&url) {
+    let opts = match Opts::from_url(url) {
         Ok(opts) => opts,
         Err(e) => return Err(Error::Message(format!("failed to open: {}", e))),
     };
@@ -47,16 +47,15 @@ macro_rules! to_mysql_value {
 }
 
 impl ConcatsqlConn for RefCell<mysql::Conn> {
-    fn execute_inner(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<()> {
+    fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel) -> Result<()> {
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
-        if ws.params.is_empty() {
+        if params.is_empty() {
             match conn.query_drop(&query) {
                 Ok(_) => Ok(()),
                 Err(e) => Error::new(error_level, "exec error", &e),
             }
         } else {
-            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            let params = params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
             match conn.exec_drop(&query, params) {
                 Ok(_) => Ok(()),
                 Err(e) => Error::new(error_level, "exec error", &e),
@@ -64,7 +63,7 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
     }
 
-    fn iterate_inner(&self, ws: &WrapString, error_level: &ErrorLevel,
+    fn iterate_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel,
         callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>
     {
         macro_rules! run {
@@ -97,16 +96,15 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         }
 
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
 
-        if ws.params.is_empty() {
+        if params.is_empty() {
             let mut result = match conn.query_iter(&query) {
                 Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e),
             };
             run!(result);
         } else {
-            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            let params = params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
             let mut result = match conn.exec_iter(&query, params) {
                 Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e),
@@ -117,9 +115,10 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         Ok(())
     }
 
-    fn rows_inner<'a>(&self, ws: &WrapString, error_level: &ErrorLevel) -> Result<Vec<Row<'a>>> {
+    fn rows_inner<'a, 'r>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &ErrorLevel)
+        -> Result<Vec<Row<'r>>>
+    {
         let mut conn = self.borrow_mut();
-        let query = compile(ws);
 
         macro_rules! run {
             ($result:expr, $rows:expr) => {
@@ -165,14 +164,14 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
 
         let mut rows: Vec<Row> = Vec::new();
 
-        if ws.params.is_empty() {
+        if params.is_empty() {
             let mut result = match conn.query_iter(&query) {
                 Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
             };
             run!(result, rows);
         } else {
-            let params = ws.params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
+            let params = params.iter().map(|value| to_mysql_value!(value)).collect::<Vec<_>>();
             let mut result = match conn.exec_iter(&query, params) {
                 Ok(result) => result,
                 Err(e) => return Error::new(error_level, "exec error", &e).map(|_| Vec::new()),
@@ -187,23 +186,10 @@ impl ConcatsqlConn for RefCell<mysql::Conn> {
         // Do nothing
     }
 
+    #[inline]
     fn kind(&self) -> ConnKind {
         ConnKind::MySQL
     }
-}
-
-fn compile(ws: &WrapString) -> String {
-    let mut query = String::with_capacity(ws.query.iter().fold(0, |acc, query| {
-        query.as_ref().map_or(acc, |s| acc + s.len())
-    }) + ws.params.len());
-
-    for part in &ws.query {
-        match part {
-            Some(s) => query.push_str(s),
-            None =>    query.push('?'),
-        }
-    }
-    query
 }
 
 trait GetToString {
@@ -219,7 +205,7 @@ impl GetToString for mysql::Row {
             mysql::Value::Double(v) => Some(v.to_string()),  // unreachable ?
             mysql::Value::Bytes(ref bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(string) => Some(string),
-                Err(_) => Some(to_hex(&bytes)),
+                Err(_) => Some(to_hex(bytes)),
             }
             mysql::Value::Date(year, month, day, hour, minute, second, micros) => Some(format!(
                 "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}", year, month, day, hour, minute, second, micros
