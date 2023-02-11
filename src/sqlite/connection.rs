@@ -294,7 +294,7 @@ impl Storing for Vec<(&str, Option<String>)> {
     }
 }
 
-unsafe fn bind_all<'a>(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'a>], error_level: &ErrorLevel) -> Result<()> {
+unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_level: &ErrorLevel) -> Result<()> {
     for (index, param) in (1i32..).zip(params.iter()) {
         let result = match param {
             Value::Null => {

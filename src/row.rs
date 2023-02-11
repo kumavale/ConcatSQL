@@ -146,7 +146,7 @@ impl<'a> IntoIterator for &'a Row<'a> {
 /// A trait implemented by types that can index into columns of a row.
 pub trait Get {
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
-    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error>;
+    fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error>;
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str>;
 }
 
@@ -155,7 +155,7 @@ impl Get for str {
         pairs.get(self)?.as_deref()
     }
 
-    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+    fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
     }
 
@@ -169,7 +169,7 @@ impl Get for String {
         pairs.get(&**self)?.as_deref()
     }
 
-    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+    fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get(&**self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
     }
 
@@ -183,7 +183,7 @@ impl Get for usize {
         pairs.get_index(*self)?.1.as_deref()
     }
 
-    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+    fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
         U::from_sql(pairs.get_index(*self).ok_or(Error::ColumnNotFound)?.1.as_deref().unwrap_or(""))
     }
 
@@ -197,7 +197,7 @@ impl<'b, T> Get for &'b T where T: Get + ?Sized {
         T::get(self, pairs)
     }
 
-    fn get_into<'a, U: FromSql>(&self, pairs: &'a IndexMapPairs) -> Result<U, Error> {
+    fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
         T::get_into(self, pairs)
     }
 
