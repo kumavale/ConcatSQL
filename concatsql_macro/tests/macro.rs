@@ -13,5 +13,7 @@ mod macros {
         let name = "foo";
         let sql = query!(r#"{name}{name};"#);
         assert_eq!(sql.simulate(), "'foo''foo';");
+        let sql = query!(r#"{{name}}"#);
+        assert_eq!(sql.simulate(), "{name}");
     }
 }

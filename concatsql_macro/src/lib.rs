@@ -7,6 +7,7 @@ use syn::LitStr;
 use nom::{
     IResult,
     branch::alt,
+    bytes::complete::tag,
     character::complete::{char, none_of},
     multi::{many0, many1},
 };
@@ -23,14 +24,14 @@ struct FormatParser {
 
 impl FormatParser {
     /// EBNF
-    /// format      = ( lit | param )*
+    /// format      = ( brace_open | brace_close | param | lit )*
     /// lit         = char+
-    /// param       = brace_open char+ brace_close
-    /// brace_open  = '{'
-    /// brace_close = '}'
+    /// param       = '{' char+ '}'
+    /// brace_open  = '{{'
+    /// brace_close = '}}'
     /// char        = std::Char
-    fn parse(&mut self) -> Result<TokenStream, syn::parse::Error> {
-        let query = FormatParser::format(&self.input).unwrap().1;
+    fn parse(&mut self) -> Result<TokenStream, nom::Err<nom::error::Error<&str>>> {
+        let (_, query) = FormatParser::format(&self.input)?;
         let mut lits = vec![];
         let mut params = vec![];
         for q in query.into_iter() {
@@ -53,27 +54,29 @@ impl FormatParser {
     }
 
     fn format(input: &str) -> IResult<&str, Vec<Query>> {
-        many0(alt((FormatParser::param, FormatParser::lit)))(input)
+        many0(alt((FormatParser::brace_open, FormatParser::brace_close, FormatParser::param, FormatParser::lit)))(input)
     }
 
     fn lit(input: &str) -> IResult<&str, Query> {
-        let (input, lit) = many1(none_of("{"))(input)?;
+        let (input, lit) = many1(none_of("{}"))(input)?;
         Ok((input, Query::Lit(lit.into_iter().collect())))
     }
 
     fn param(input: &str) -> IResult<&str, Query> {
-        let (input, _) = FormatParser::brace_open(input)?;
+        let (input, _) = char('{')(input)?;
         let (input, param) = many1(none_of("}"))(input)?;
-        let (input, _) = FormatParser::brace_close(input)?;
+        let (input, _) = char('}')(input)?;
         Ok((input, Query::Param(param.into_iter().collect())))
     }
 
-    fn brace_open(input: &str) -> IResult<&str, char> {
-        char('{')(input)
+    fn brace_open(input: &str) -> IResult<&str, Query> {
+        let (input, _) = tag("{{")(input)?;
+        Ok((input, Query::Lit("{".to_string())))
     }
 
-    fn brace_close(input: &str) -> IResult<&str, char> {
-        char('}')(input)
+    fn brace_close(input: &str) -> IResult<&str, Query> {
+        let (input, _) = tag("}}")(input)?;
+        Ok((input, Query::Lit("}".to_string())))
     }
 }
 
