@@ -1,0 +1,51 @@
+[package]
+name = "concatsql"
+version = "0.4.0"
+authors = ["kumavale"]
+edition = "2018"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/kumavale/ConcatSQL"
+description = "A secure library for SQLite, MySQL and PostgreSQL."
+categories = ["database"]
+keywords = ["database", "sql", "sqlite", "mysql", "postgres"]
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[features]
+sqlite = ["sqlite3-sys/linkage"]
+mysql = ["mysql-sys"]
+postgres = ["postgres-sys"]
+
+
+[dependencies]
+indexmap = "1.6"
+lazy_static = "1.4"
+uuid = "0.8"
+chrono = "0.4"
+
+[dependencies.sqlite3-sys]
+version = "0.12"
+default-features = false
+optional = true
+
+[dependencies.mysql-sys]
+package = "mysql"
+version = "20.0"
+optional = true
+
+[dependencies.postgres-sys]
+package = "postgres"
+version = "0.18"
+optional = true
+features = ["with-uuid-0_8"]
+
+[dev-dependencies]
+temporary = "0.6"
+uuid = { version = "0.8", features = ["v4"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
