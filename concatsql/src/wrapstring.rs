@@ -18,9 +18,11 @@ pub struct WrapString<'a> {
 impl<'a> WrapString<'a> {
     #[doc(hidden)]
     #[inline]
-    pub fn _init(query: Vec<Option<Cow<'a, str>>>, params: Vec<Value<'a>>) -> Self {
+    pub fn _init(query: Vec<Option<&'static str>>, params: Vec<Value<'a>>) -> Self {
         Self {
-            query,
+            query: query.iter()
+                .map(|q| q.map(Cow::from))
+                .collect(),
             params,
         }
     }

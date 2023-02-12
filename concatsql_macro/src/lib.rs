@@ -36,7 +36,7 @@ impl FormatParser {
         for q in query.into_iter() {
             match q {
                 Query::Lit(s) => {
-                    lits.push(quote!{ Some(std::borrow::Cow::from(#s)) });
+                    lits.push(quote!{ Some( #s ) });
                 }
                 Query::Param(p) => {
                     lits.push(quote!{ None });
