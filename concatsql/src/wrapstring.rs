@@ -18,6 +18,17 @@ pub struct WrapString<'a> {
 impl<'a> WrapString<'a> {
     #[doc(hidden)]
     #[inline]
+    pub fn _init(query: Vec<Option<&'static str>>, params: Vec<Value<'a>>) -> Self {
+        Self {
+            query: query.iter()
+                .map(|q| q.map(Cow::from))
+                .collect(),
+            params,
+        }
+    }
+
+    #[doc(hidden)]
+    #[inline]
     pub fn init(s: &'static str) -> Self {
         Self {
             query:  vec![ Some(Cow::Borrowed(s)) ],
