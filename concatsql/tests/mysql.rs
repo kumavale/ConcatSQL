@@ -484,7 +484,7 @@ mod mysql {
 
 #[cfg(feature = "mysql")]
 mod anti_patterns {
-    use concatsql::prelude::*;
+    use concatsql::prep;
 
     // Although it becomes possible, I do not believe it is less useful
     // because its real advantage is that it still makes it harder to do the wrong thing.

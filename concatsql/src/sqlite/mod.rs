@@ -50,7 +50,7 @@ pub fn version() -> usize {
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
-    use concatsql::prelude::*;
+    use concatsql::prep;
     use temporary::Directory;
 
     #[test]

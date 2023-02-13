@@ -121,6 +121,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// prep!("INSERT INTO msg VALUES (") + "I'm cat." + prep!(")");
 /// ```
 #[deprecated(note="please use `query!` instead")]
+#[allow(deprecated)]
 #[macro_export]
 macro_rules! prep {
     ()            => { $crate::WrapString::null()       };
@@ -165,6 +166,7 @@ macro_rules! prep {
 /// ```
 #[inline]
 #[deprecated(note="please use `query!` instead")]
+#[allow(deprecated)]
 pub fn prep(query: &'static str) -> WrapString {
     WrapString::init(query)
 }

@@ -630,6 +630,7 @@ impl<'a> IntoWrapString<'a> for &'static str {
 mod tests {
     use crate as concatsql;
     use concatsql::prelude::*;
+    use concatsql::prep;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
     use std::time::UNIX_EPOCH;
 
@@ -778,7 +779,7 @@ mod tests {
 
     mod simulate {
         use crate as concatsql;
-        use concatsql::prelude::*;
+        use concatsql::prep;
 
         #[test]
         fn double_quotaion_inside_double_quote() {
