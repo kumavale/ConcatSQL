@@ -15,7 +15,7 @@
 //!     "#).unwrap();
 //!
 //!     let age = String::from("42");  // user input
-//!     let sql = prep("SELECT name FROM users WHERE age = ") + &age;
+//!     let sql = query!("SELECT name FROM users WHERE age = {age}");
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42'");
 //!     for row in conn.rows(&sql).unwrap() {
@@ -24,7 +24,7 @@
 //!     }
 //!
 //!     let age = String::from("42 OR 1=1; --");  // user input
-//!     let sql = prep("SELECT name FROM users WHERE age = ") + &age;
+//!     let sql = query!("SELECT name FROM users WHERE age = {age}");
 //!     // At runtime it will be transformed into a query like
 //!     assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
 //!     conn.iterate(&sql, |_| { unreachable!() }).unwrap();
@@ -58,6 +58,8 @@ pub use crate::parser::{html_special_chars, _sanitize_like, invalid_literal};
 pub use crate::wrapstring::{WrapString, IntoWrapString};
 pub use crate::value::{Value, ToValue};
 
+pub use concatsql_macro::query;
+
 pub mod prelude {
     //! Re-exports important traits and types.
 
@@ -73,9 +75,10 @@ pub mod prelude {
 
     pub use crate::connection::{Connection, without_escape};
     pub use crate::row::{Row, Get, FromSql};
-    pub use crate::{sanitize_like, prep, params};
+    pub use crate::{sanitize_like, params};
     pub use crate::wrapstring::WrapString;
     pub use crate::value::{Value, ToValue};
+    pub use concatsql_macro::query;
 }
 
 /// A typedef of the result returned by many methods.
@@ -117,6 +120,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// prep!("INSERT INTO msg VALUES (\"I'm cat.\")");
 /// prep!("INSERT INTO msg VALUES (") + "I'm cat." + prep!(")");
 /// ```
+#[deprecated(note="please use `query!` instead")]
 #[macro_export]
 macro_rules! prep {
     ()            => { $crate::WrapString::null()       };
@@ -160,6 +164,7 @@ macro_rules! prep {
 /// prep("INSERT INTO msg VALUES (") + "I'm cat." + prep(")");
 /// ```
 #[inline]
+#[deprecated(note="please use `query!` instead")]
 pub fn prep(query: &'static str) -> WrapString {
     WrapString::init(query)
 }
