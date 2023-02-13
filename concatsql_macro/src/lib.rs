@@ -66,7 +66,8 @@ impl FormatParser {
         let (input, _) = char('{')(input)?;
         let (input, param) = many1(none_of("}"))(input)?;
         let (input, _) = char('}')(input)?;
-        Ok((input, Query::Param(param.into_iter().collect())))
+        let param = param.into_iter().collect::<String>();
+        Ok((input, Query::Param(param.trim().to_string())))
     }
 
     fn brace_open(input: &str) -> IResult<&str, Query> {
