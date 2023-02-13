@@ -106,7 +106,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// If you take a value other than `&'static str` as an argument, it will fail.
 ///
 /// ```compile_fail
-/// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// let passwd = String::from("'' or 1=1; --");
 /// prep!("SELECT * FROM users WHERE passwd=") + prep!(&passwd); // shouldn't compile!
 /// ```
@@ -114,7 +114,7 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// # Safety
 ///
 /// ```
-/// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// prep!("SELECT * FROM users WHERE id=") + 42;
 /// prep!("INSERT INTO msg VALUES ('I''m cat.')");
 /// prep!("INSERT INTO msg VALUES (\"I'm cat.\")");
@@ -150,7 +150,7 @@ macro_rules! prep {
 /// If you take a value other than `&'static str` as an argument, it will fail.
 ///
 /// ```compile_fail
-/// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// let passwd = String::from("'' or 1=1; --");
 /// prep("SELECT * FROM users WHERE passwd=") + prep(&passwd); // shouldn't compile!
 /// ```
@@ -158,7 +158,7 @@ macro_rules! prep {
 /// # Safety
 ///
 /// ```
-/// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// prep("SELECT * FROM users WHERE id=") + 42;
 /// prep("INSERT INTO msg VALUES ('I''m cat.')");
 /// prep("INSERT INTO msg VALUES (\"I'm cat.\")");
@@ -178,6 +178,7 @@ pub fn prep(query: &'static str) -> WrapString {
 ///
 /// ```
 /// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// let sql = prep("VALUES(") + params![42i32,"Alice"] + prep(")");
 /// assert_eq!(sql.simulate(), "VALUES(42,'Alice')");
 /// ```

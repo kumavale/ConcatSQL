@@ -90,7 +90,7 @@ impl FormatParser {
 /// ```
 /// use concatsql::prelude::*;
 /// # let conn = concatsql::sqlite::open(":memory:").unwrap();
-/// # let stmt = prep!(r#"CREATE TABLE users (name TEXT, id INTEGER);
+/// # let stmt = query!(r#"CREATE TABLE users (name TEXT, id INTEGER);
 /// #               INSERT INTO users (name, id) VALUES ('Alice', 42);
 /// #               INSERT INTO users (name, id) VALUES ('Bob', 69);"#);
 /// # conn.execute(stmt).unwrap();

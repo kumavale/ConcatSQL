@@ -44,6 +44,7 @@ pub fn html_special_chars(input: &str) -> String {
 /// ```
 /// ```
 /// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// let name = "Ali";
 /// let sql = prep!("SELECT * FROM users WHERE name LIKE ") + ("%".to_owned() + name + "%");
 /// assert_eq!(sql.simulate(), "SELECT * FROM users WHERE name LIKE '%Ali%'");
