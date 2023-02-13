@@ -2,6 +2,10 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
+use proc_macro_error::{
+    proc_macro_error,
+    abort_call_site,
+};
 use quote::quote;
 use syn::LitStr;
 use nom::{
@@ -30,8 +34,15 @@ impl FormatParser {
     /// brace_open  = '{{'
     /// brace_close = '}}'
     /// char        = std::Char
-    fn parse(&mut self) -> Result<TokenStream, nom::Err<nom::error::Error<&str>>> {
-        let (_, query) = FormatParser::format(&self.input)?;
+    fn parse(&mut self) -> Result<TokenStream, &str> {
+        let (input, query) = if let Ok(f) = FormatParser::format(&self.input) {
+            f
+        } else {
+            return Err("parse error");
+        };
+        if input != "" {
+            return Err("invalid format");
+        }
         let mut lits = vec![];
         let mut params = vec![];
         for q in query.into_iter() {
@@ -111,10 +122,14 @@ impl FormatParser {
 /// query!("SELECT * FROM users WHERE passwd=".to_string() + &passwd);  // cannot compile!
 /// ```
 #[proc_macro]
+#[proc_macro_error]
 pub fn query(item: TokenStream) -> TokenStream {
     let item_lit: LitStr = syn::parse2(item.into()).unwrap();
     let mut parser = FormatParser {
         input: item_lit.value(),
     };
-    parser.parse().unwrap()
+    match parser.parse() {
+        Ok(token_stream) => token_stream,
+        Err(e) => abort_call_site!("{}", e),
+    }
 }
