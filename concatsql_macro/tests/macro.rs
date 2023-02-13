@@ -31,6 +31,15 @@ mod macros {
     }
 
     //#[test]
+    //fn query_compile_error_invalid_format_test() {
+    //    let foo = 1;
+    //    _ = query!(r#"{foo"#);
+    //    _ = query!(r#"foo}"#);
+    //    _ = query!(r#"{foo}{"#);
+    //    _ = query!(r#"}{foo}"#);
+    //}
+
+    //#[test]
     //fn query_compile_error_not_found_test() {
     //    _ = query!(r#"{var}"#);
     //}
