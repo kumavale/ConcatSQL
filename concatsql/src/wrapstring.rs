@@ -61,7 +61,7 @@ impl<'a> WrapString<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use concatsql::prelude::*;
+    /// # use concatsql::prep;
     /// assert_eq!(prep!("SELECT").simulate(),       "SELECT");
     /// assert_eq!(prep!("O''Reilly").simulate(),    "O''Reilly");
     /// assert_eq!(prep!("\"O'Reilly\"").simulate(), "\"O'Reilly\"");
@@ -456,7 +456,7 @@ impl<'a> Add<()> for WrapString<'a> {
 /// # Examples
 ///
 /// ```
-/// # use concatsql::prelude::*;
+/// # use concatsql::prep;
 /// let names: Vec<&str> = vec![];
 /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
 /// let names: Vec<&str> = vec!["foo","bar"];
@@ -492,7 +492,7 @@ macro_rules! impl_add_arrays_borrowed_for_WrapString {
         /// # Examples
         ///
         /// ```
-        /// # use concatsql::prelude::*;
+        /// # use concatsql::prep;
         /// let names: Vec<&str> = vec![];
         /// assert_eq!((prep!("(")+names+prep!(")")).simulate(), "(NULL)");
         /// let names: Vec<&str> = vec!["foo","bar"];
@@ -630,6 +630,7 @@ impl<'a> IntoWrapString<'a> for &'static str {
 mod tests {
     use crate as concatsql;
     use concatsql::prelude::*;
+    use concatsql::prep;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
     use std::time::UNIX_EPOCH;
 
@@ -778,7 +779,7 @@ mod tests {
 
     mod simulate {
         use crate as concatsql;
-        use concatsql::prelude::*;
+        use concatsql::prep;
 
         #[test]
         fn double_quotaion_inside_double_quote() {

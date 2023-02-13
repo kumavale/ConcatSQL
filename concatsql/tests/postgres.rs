@@ -2,6 +2,7 @@
 #[cfg(debug_assertions)]
 mod postgres {
     use concatsql::prelude::*;
+    use concatsql::prep;
     use concatsql::{Error, ErrorLevel};
 
     macro_rules! err {
@@ -430,7 +431,7 @@ mod postgres {
 
 #[cfg(feature = "postgres")]
 mod anti_patterns {
-    use concatsql::prelude::*;
+    use concatsql::prep;
 
     // Although it becomes possible, I do not believe it is less useful
     // because its real advantage is that it still makes it harder to do the wrong thing.

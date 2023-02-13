@@ -31,53 +31,53 @@ concatsql = { version = "<version>", features = ["<postgres|mysql|sqlite>"] }
 let id     = String::from("42");    // User supplied input
 let passwd = String::from("pass");  // User supplied input
 
-let sql = prep("SELECT name FROM users WHERE id=") + &id + prep(" AND passwd=") + &passwd;
-assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
+let query = query!("SELECT name FROM users WHERE id={id} AND passwd={passwd}");
+assert_eq!(query.simulate(), "SELECT name FROM users WHERE id='42' AND passwd='pass'");
 
-for row in conn.rows(&sql).unwrap() {
+for row in conn.rows(&query).unwrap() {
     assert_eq!(row.get(0).unwrap(),      "Alice");
     assert_eq!(row.get("name").unwrap(), "Alice");
 }
 ```
 
-### Illegal value
+### Dangerous value
 
 ```rust
 let id     = String::from("42");             // User supplied input
 let passwd = String::from("'' or 1=1; --");  // User supplied input
 
-let sql = prep("SELECT name FROM users WHERE id=") + &id + prep(" AND passwd=") + &passwd;
-assert_eq!(sql.simulate(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
+let query = query!("SELECT name FROM users WHERE id={id} AND passwd={passwd}");
+assert_eq!(query.simulate(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
-for row in conn.rows(&sql).unwrap() {
-    unreachable!();
+for row in conn.rows(&query).unwrap() {
+    assert_eq!(row.get("name").unwrap(), "Alice");
 }
 ```
 
-### If you did not use the `prep` function
+### If you did not use the `query!`
 
 Cannot compile ... secure!
 
 ```rust
 let id     = String::from("42");
 let passwd = String::from("' or 1=1; --");
-let sql = "SELECT name FROM users WHERE id=".to_string() + &id + " AND passwd='" + &passwd + "';";
-conn.execute(&sql).unwrap();  // error
+let query = format!("SELECT name FROM users WHERE id={id} AND passwd={passwd}");
+conn.execute(&query).unwrap();  // error
 ```
 
-### When using `prep(<String>)`
+### When using `query(<String>)`
 
 Cannot compile ... secure!
 
 ```rust
 let age = String::from("50 or 1=1; --");
-let sql = prep("SELECT name FROM users WHERE age < ") + prep(&age);  // error
+let query = query!("SELECT name FROM users WHERE age < ") + query!(age);  // error
 ```
 
 ## Why can this library prevent SQL injection?
 
 This is because it is achieved using [Operator Overloading](https://doc.rust-lang.org/stable/rust-by-example/trait/ops.html) rather than simple string concatenation.  
-The `prep` function returns the library's own type(`WrapString`).  
+The `query!` macro returns the library's own type(`WrapString`).  
 For example, if you combine this `WrapString` type with a `String` type, the escaped `String` type will be combined and a new `WrapString` will be returned.  
 
 ```rust
@@ -86,7 +86,9 @@ struct WrapString<'a> {
     params: Vec<Value>,
 }
 
-let foobar42: WrapString = prep("foo") + String::from("bar") + 42;
+let bar: String = String::from("bar");
+let num: i32 = 42;
+let foobar42: WrapString = query!("foo{bar}{num}");
 
 foobar42 {
     query:  [Some("foo"), None, None],
@@ -97,17 +99,6 @@ ffi::sqlite3_prepare_v2(..., "foo??", ...);
 ffi::sqlite3_bind_text(..., "bar", ...);
 ffi::sqlite3_bind_int(..., 42);
 ```
-
-## Is it impossible to implement in other languages?
-
-It seems that it can be implemented in other languages as long as it supports operator overloading.  
-However, if the developer writes the following, the input from the attacker will not be escaped correctly and the attack will be successful.  
-
-```python
-prep("SELECT * FROM users WHERE id=" + id + " AND PASSWORD=" + password)
-```
-
-That is, it can be implemented in any language that can distinguish between hard-coding(`&'static str`) and user input(`String`) at compile time.  
 
 ## License
 

@@ -48,17 +48,19 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: prepare
-        run: rustup component add clippy
+        run: |
+          rustup component add clippy
+          echo "clippy_flags=-W clippy::dbg_macro -A clippy::uninlined_format_args -A deprecated" >> $GITHUB_ENV
 
       - name: clippy sqlite
-        run: cargo clippy --all-targets --features sqlite -- -W clippy::dbg_macro -A clippy::uninlined_format_args
+        run: cargo clippy --all-targets --features sqlite -- ${{ env.clippy_flags }}
 
       - name: clippy mysql
-        run: cargo clippy --all-targets --features mysql -- -W clippy::dbg_macro -A clippy::uninlined_format_args
+        run: cargo clippy --all-targets --features mysql -- ${{ env.clippy_flags }}
 
       - name: clippy postgres
-        run: cargo clippy --all-targets --features postgres -- -W clippy::dbg_macro -A clippy::uninlined_format_args
+        run: cargo clippy --all-targets --features postgres -- ${{ env.clippy_flags }}
 
       - name: clippy all features
-        run: cargo clippy --all-targets --all-features -- -W clippy::dbg_macro -A clippy::uninlined_format_args
+        run: cargo clippy --all-targets --all-features -- ${{ env.clippy_flags }}
 

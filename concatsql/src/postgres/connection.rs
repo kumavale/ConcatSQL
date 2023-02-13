@@ -170,7 +170,7 @@ mod tests {
     use crate as concatsql;
     use concatsql::error::*;
     #[cfg(debug_assertions)]
-    use concatsql::prelude::*;
+    use concatsql::prep;
 
     #[test]
     fn open() {

@@ -366,7 +366,7 @@ mod tests {
     use concatsql::error::*;
     use temporary::Directory;
     #[cfg(debug_assertions)]
-    use concatsql::prelude::*;
+    use concatsql::prep;
 
     #[test]
     fn open() {
