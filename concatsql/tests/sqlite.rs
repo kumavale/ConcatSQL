@@ -3,6 +3,7 @@
 #[cfg(debug_assertions)]
 mod sqlite {
     use concatsql::prelude::*;
+    use concatsql::prep;
     use concatsql::{Error, ErrorLevel};
 
     macro_rules! err {

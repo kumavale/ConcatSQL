@@ -2,6 +2,7 @@
 #[cfg(debug_assertions)]
 mod postgres {
     use concatsql::prelude::*;
+    use concatsql::prep;
     use concatsql::{Error, ErrorLevel};
 
     macro_rules! err {
