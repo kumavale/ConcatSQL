@@ -3,6 +3,12 @@ name = "concatsql_macro"
 version = "0.1.0"
 authors = ["kumavale"]
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/kumavale/ConcatSQL"
+description = "A secure library for SQLite, MySQL and PostgreSQL."
+categories = ["database"]
+keywords = ["database", "sql", "sqlite", "mysql", "postgres"]
 
 [lib]
 proc-macro = true
