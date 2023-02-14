@@ -50,7 +50,7 @@ let query = query!("SELECT name FROM users WHERE id={id} AND passwd={passwd}");
 assert_eq!(query.simulate(), "SELECT name FROM users WHERE id='42' AND passwd=''''' or 1=1; --'");
 
 for row in conn.rows(&query).unwrap() {
-    assert_eq!(row.get("name").unwrap(), "Alice");
+    assert!(row.get("name").is_none());
 }
 ```
 
