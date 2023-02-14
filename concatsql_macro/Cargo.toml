@@ -1,6 +1,6 @@
 [package]
 name = "concatsql_macro"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["kumavale"]
 edition = "2021"
 license = "MIT"
@@ -21,4 +21,4 @@ quote = "1.0"
 nom = "7"
 
 [dev-dependencies]
-concatsql = { version = "0.4", path = "../concatsql" }
+concatsql = { version = "0.5", path = "../concatsql" }
