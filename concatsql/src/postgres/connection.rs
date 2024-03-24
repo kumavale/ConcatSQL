@@ -155,7 +155,7 @@ impl GetToString for postgres::row::Row {
         } else if let Ok(value) = self.try_get::<usize, Vec<u8>>(index) {
             Some(crate::parser::to_hex(&value))
         } else if let Ok(value) = self.try_get::<usize, Uuid>(index) {
-            Some(value.to_simple_ref().to_string())
+            Some(value.simple().to_string())
         } else if let Ok(value) = self.try_get::<usize, SystemTime>(index) {
             Some(value.to_string())
         } else {

@@ -321,7 +321,7 @@ impl<'a> Add<Uuid> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: Uuid) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple()))));
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.simple()))));
         self
     }
 }
@@ -332,7 +332,7 @@ impl<'a> Add<&Uuid> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: &Uuid) -> WrapString<'a> {
         self.query .push(None);
-        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple_ref()))));
+        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.simple()))));
         self
     }
 }
