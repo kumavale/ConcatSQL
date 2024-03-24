@@ -22,19 +22,19 @@ postgres = ["postgres-sys"]
 
 [dependencies]
 indexmap = "2.2.6"
-lazy_static = "1.4"
-uuid = "1.8"
-chrono = "0.4"
+lazy_static = "1.4.0"
+uuid = "1.8.0"
+chrono = "0.4.35"
 concatsql_macro = { version = "0.1.0", path = "../concatsql_macro" }
 
 [dependencies.sqlite3-sys]
-version = "0.16"
+version = "0.16.0"
 default-features = false
 optional = true
 
 [dependencies.mysql-sys]
 package = "mysql"
-version = "20.1"
+version = "20.1.0"
 optional = true
 
 [dependencies.postgres-sys]
@@ -44,8 +44,8 @@ optional = true
 features = ["with-uuid-1"]
 
 [dev-dependencies]
-temporary = "0.7"
-uuid = { version = "1.8", features = ["v4"] }
+temporary = "0.7.0"
+uuid = { version = "1.8.0", features = ["v4"] }
 
 [package.metadata.docs.rs]
 all-features = true

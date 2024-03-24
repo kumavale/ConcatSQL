@@ -40,7 +40,7 @@ impl FormatParser {
         } else {
             return Err("parse error");
         };
-        if input != "" {
+        if !input.is_empty() {
             return Err("invalid format");
         }
         let mut lits = vec![];

@@ -149,7 +149,7 @@ impl<'a> WrapString<'a> {
             if let Some(part) = part {
                 new_part.push_str(part);
             } else {
-                new_query.push(Some(Cow::Owned(new_part.drain(..).collect())));
+                new_query.push(Some(Cow::Owned(std::mem::take(&mut new_part))));
                 new_query.push(None);
             }
         }
