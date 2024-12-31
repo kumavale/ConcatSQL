@@ -1,8 +1,8 @@
 //! Interface to [SQLite](https://www.sqlite.org) of ConcatSQL.
 
-use std::path::Path;
-use crate::Result;
 use crate::connection::Connection;
+use crate::Result;
+use std::path::Path;
 
 pub(crate) mod connection;
 
@@ -29,7 +29,10 @@ pub(crate) mod connection;
 /// ```
 #[inline]
 pub fn open<T: AsRef<Path>>(path: T) -> Result<Connection> {
-    connection::open(path, sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE)
+    connection::open(
+        path,
+        sqlite3_sys::SQLITE_OPEN_CREATE | sqlite3_sys::SQLITE_OPEN_READWRITE,
+    )
 }
 
 /// Open a readonly connection to a new or existing database.
@@ -46,16 +49,15 @@ pub fn version() -> usize {
     unsafe { sqlite3_sys::sqlite3_libversion_number() as usize }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate as concatsql;
-    use concatsql::prep;
-    use temporary::Directory;
+    use concatsql::prelude::*;
+    use temporary::Folder;
 
     #[test]
     fn sqlite_open() {
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         crate::sqlite::open(":memory:").unwrap();
         crate::sqlite::open(path).unwrap();
@@ -65,11 +67,12 @@ mod tests {
     fn sqlite_open_readonly() {
         crate::sqlite::open_readonly(":memory:").unwrap();
 
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(prep!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(query!("CREATE TABLE users(id INTEGER, name TEXT);"))
+                .unwrap();
         }
         crate::sqlite::open_readonly(path).unwrap();
     }
@@ -78,17 +81,20 @@ mod tests {
     #[cfg(debug_assertions)]
     fn should_readonly() {
         use crate::error::*;
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
-            conn.execute(prep!("CREATE TABLE users(id INTEGER, name TEXT);")).unwrap();
+            conn.execute(query!("CREATE TABLE users(id INTEGER, name TEXT);"))
+                .unwrap();
         }
         let conn = crate::sqlite::open_readonly(path).unwrap();
         conn.error_level(ErrorLevel::Debug);
         assert_eq!(
-            conn.execute(prep!("INSERT INTO users VALUES(42, 'Alice');")),
-            Err(Error::Message("exec error: attempt to write a readonly database".to_string()))
+            conn.execute(query!("INSERT INTO users VALUES(42, 'Alice');")),
+            Err(Error::Message(
+                "exec error: attempt to write a readonly database".to_string()
+            ))
         );
     }
 

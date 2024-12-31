@@ -1,17 +1,17 @@
-use std::ops::Add;
 use std::borrow::Cow;
 use std::net::IpAddr;
+use std::ops::Add;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use crate::parser::{escape_string, to_binary_literal};
-use crate::value::{Value, ToValue, SystemTimeToString};
 use crate::connection::ConnKind;
+use crate::parser::{escape_string, to_binary_literal};
+use crate::value::{SystemTimeToString, ToValue, Value};
 
 /// Wraps a [String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WrapString<'a> {
-    pub(crate) query:  Vec<Option<Cow<'a, str>>>,
+    pub(crate) query: Vec<Option<Cow<'a, str>>>,
     pub(crate) params: Vec<Value<'a>>,
 }
 
@@ -20,9 +20,7 @@ impl<'a> WrapString<'a> {
     #[inline]
     pub fn _init(query: Vec<Option<&'static str>>, params: Vec<Value<'a>>) -> Self {
         Self {
-            query: query.iter()
-                .map(|q| q.map(Cow::from))
-                .collect(),
+            query: query.iter().map(|q| q.map(Cow::from)).collect(),
             params,
         }
     }
@@ -31,7 +29,7 @@ impl<'a> WrapString<'a> {
     #[inline]
     pub fn init(s: &'static str) -> Self {
         Self {
-            query:  vec![ Some(Cow::Borrowed(s)) ],
+            query: vec![Some(Cow::Borrowed(s))],
             params: Vec::new(),
         }
     }
@@ -40,7 +38,7 @@ impl<'a> WrapString<'a> {
     #[inline]
     pub const fn null() -> Self {
         Self {
-            query:  Vec::new(),
+            query: Vec::new(),
             params: Vec::new(),
         }
     }
@@ -48,7 +46,7 @@ impl<'a> WrapString<'a> {
     #[inline]
     pub(crate) fn new<T: ?Sized + ToString>(s: &T) -> Self {
         Self {
-            query:  vec![ Some(Cow::Owned(s.to_string())) ],
+            query: vec![Some(Cow::Owned(s.to_string()))],
             params: Vec::new(),
         }
     }
@@ -78,15 +76,15 @@ impl<'a> WrapString<'a> {
                 Some(s) => query.push_str(s),
                 None => {
                     match &self.params[index] {
-                        Value::Null          => query.push_str("NULL"),
-                        Value::I32(value)    => query.push_str(&value.to_string()),
-                        Value::I64(value)    => query.push_str(&value.to_string()),
-                        Value::F32(value)    => query.push_str(&value.to_string()),
-                        Value::F64(value)    => query.push_str(&value.to_string()),
-                        Value::Text(value)   => query.push_str(&escape_string(value)),
-                        Value::Bytes(value)  => query.push_str(&to_binary_literal(value)),
+                        Value::Null => query.push_str("NULL"),
+                        Value::I32(value) => query.push_str(&value.to_string()),
+                        Value::I64(value) => query.push_str(&value.to_string()),
+                        Value::F32(value) => query.push_str(&value.to_string()),
+                        Value::F64(value) => query.push_str(&value.to_string()),
+                        Value::Text(value) => query.push_str(&escape_string(value)),
+                        Value::Bytes(value) => query.push_str(&to_binary_literal(value)),
                         Value::IpAddr(value) => query.push_str(&format!("'{}'", value)),
-                        Value::Time(value)   => query.push_str(&format!("'{}'", value.to_string())),
+                        Value::Time(value) => query.push_str(&format!("'{}'", value.to_string())),
                     }
                     index += 1;
                 }
@@ -97,11 +95,7 @@ impl<'a> WrapString<'a> {
 
     /// Returns the length of a string other than a placeholders.
     pub fn len(&self) -> usize {
-        self.query
-            .iter()
-            .flatten()
-            .map(|part|part.len())
-            .sum()
+        self.query.iter().flatten().map(|part| part.len()).sum()
     }
 
     /// Returns the query's vector length.
@@ -144,12 +138,12 @@ impl<'a> WrapString<'a> {
     /// ```
     pub fn squash(&mut self) {
         let mut new_query = Vec::new();
-        let mut new_part  = String::new();
+        let mut new_part = String::new();
         for part in &self.query {
             if let Some(part) = part {
                 new_part.push_str(part);
             } else {
-                new_query.push(Some(Cow::Owned(new_part.drain(..).collect())));
+                new_query.push(Some(Cow::Owned(std::mem::take(&mut new_part))));
                 new_query.push(None);
             }
         }
@@ -164,7 +158,7 @@ impl<'a> Add for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: WrapString<'a>) -> WrapString<'a> {
-        self.query .extend_from_slice(&other.query);
+        self.query.extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
         self
     }
@@ -174,7 +168,7 @@ impl<'a, 'b> Add<&'b WrapString<'a>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &'b WrapString<'a>) -> WrapString<'a> {
-        self.query .extend_from_slice(&other.query);
+        self.query.extend_from_slice(&other.query);
         self.params.extend_from_slice(&other.params);
         self
     }
@@ -184,7 +178,7 @@ impl<'a> Add<String> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: String) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(Cow::Owned(other)));
         self
     }
@@ -194,7 +188,7 @@ impl<'a> Add<&'a String> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &'a String) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(Cow::Borrowed(other)));
         self
     }
@@ -204,7 +198,7 @@ impl<'a> Add<&'a str> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &'a str) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(Cow::Borrowed(other)));
         self
     }
@@ -214,7 +208,7 @@ impl<'a> Add<&'a &str> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &'a &str) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(Cow::Borrowed(other)));
         self
     }
@@ -224,7 +218,7 @@ impl<'a> Add<std::borrow::Cow<'a, str>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: std::borrow::Cow<'a, str>) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(other));
         self
     }
@@ -234,7 +228,7 @@ impl<'a> Add<&'a std::borrow::Cow<'a, str>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &'a std::borrow::Cow<'a, str>) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Text(Cow::Borrowed(other)));
         self
     }
@@ -244,7 +238,7 @@ impl<'a> Add<Vec<u8>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: Vec<u8>) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Bytes(other));
         self
     }
@@ -254,7 +248,7 @@ impl<'a> Add<&Vec<u8>> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &Vec<u8>) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Bytes(other.clone()));
         self
     }
@@ -264,7 +258,7 @@ impl<'a> Add<&[u8]> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &[u8]) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Bytes(other.to_vec()));
         self
     }
@@ -320,8 +314,9 @@ impl<'a> Add<Uuid> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: Uuid) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple()))));
+        self.query.push(None);
+        self.params
+            .push(Value::Text(Cow::Owned(format!("{:X}", other.simple()))));
         self
     }
 }
@@ -331,8 +326,9 @@ impl<'a> Add<&Uuid> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &Uuid) -> WrapString<'a> {
-        self.query .push(None);
-        self.params.push(Value::Text(Cow::Owned(format!("{:X}", other.to_simple_ref()))));
+        self.query.push(None);
+        self.params
+            .push(Value::Text(Cow::Owned(format!("{:X}", other.simple()))));
         self
     }
 }
@@ -341,7 +337,7 @@ impl<'a> Add<IpAddr> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: IpAddr) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::IpAddr(other));
         self
     }
@@ -351,7 +347,7 @@ impl<'a> Add<&IpAddr> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &IpAddr) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::IpAddr(*other));
         self
     }
@@ -361,7 +357,7 @@ impl<'a> Add<SystemTime> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: SystemTime) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Time(other));
         self
     }
@@ -371,7 +367,7 @@ impl<'a> Add<&SystemTime> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: &SystemTime) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Time(*other));
         self
     }
@@ -391,7 +387,7 @@ impl<'a> Add<f32> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: f32) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::F32(other));
         self
     }
@@ -401,7 +397,7 @@ impl<'a> Add<f64> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, other: f64) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::F64(other));
         self
     }
@@ -444,7 +440,7 @@ impl<'a> Add<()> for WrapString<'a> {
     type Output = WrapString<'a>;
     #[inline]
     fn add(mut self, _other: ()) -> WrapString<'a> {
-        self.query .push(None);
+        self.query.push(None);
         self.params.push(Value::Null);
         self
     }
@@ -467,7 +463,7 @@ impl<'a> Add<Vec<String>> for WrapString<'a> {
     #[inline]
     fn add(mut self, other: Vec<String>) -> WrapString<'a> {
         if other.is_empty() {
-            self.query .push(None);
+            self.query.push(None);
             self.params.push(Value::Null);
             return self;
         }
@@ -486,7 +482,7 @@ impl<'a> Add<Vec<String>> for WrapString<'a> {
 
 macro_rules! impl_add_arrays_borrowed_for_WrapString {
     ( $($t:ty),* ) => {$(
-        /// In operator with string arrays.  
+        /// In operator with string arrays.
         /// If the array is empty, it will be ignored.
         ///
         /// # Examples
@@ -523,14 +519,13 @@ macro_rules! impl_add_arrays_borrowed_for_WrapString {
     ( $($t:ty,)* ) => { impl_add_arrays_borrowed_for_WrapString!{ $( $t ),* } }
 }
 
-impl_add_arrays_borrowed_for_WrapString!{
+impl_add_arrays_borrowed_for_WrapString! {
     Vec<&'a str>,
     &'a Vec<String>,
     &'a Vec<&'a str>,
     &'a [&'a str],
     &'a [String],
 }
-
 
 /// A trait for converting that can be converted to [`WrapString`].
 pub trait IntoWrapString<'a> {
@@ -545,29 +540,47 @@ macro_rules! compile {
         match $kind {
             #[cfg(feature = "sqlite")]
             ConnKind::SQLite => {
-                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(1, |q|q.len())).sum());
+                let mut query = String::with_capacity(
+                    $self
+                        .query
+                        .iter()
+                        .map(|q| q.as_ref().map_or(1, |q| q.len()))
+                        .sum(),
+                );
                 for part in &$self.query {
                     match part {
                         Some(s) => query.push_str(s),
-                        None =>    query.push('?'),
+                        None => query.push('?'),
                     }
                 }
                 Cow::Owned(query)
             }
             #[cfg(feature = "mysql")]
             ConnKind::MySQL => {
-                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(1, |q|q.len())).sum());
+                let mut query = String::with_capacity(
+                    $self
+                        .query
+                        .iter()
+                        .map(|q| q.as_ref().map_or(1, |q| q.len()))
+                        .sum(),
+                );
                 for part in &$self.query {
                     match part {
                         Some(s) => query.push_str(s),
-                        None =>    query.push('?'),
+                        None => query.push('?'),
                     }
                 }
                 Cow::Owned(query)
             }
             #[cfg(feature = "postgres")]
             ConnKind::PostgreSQL => {
-                let mut query = String::with_capacity($self.query.iter().map(|q|q.as_ref().map_or(3, |q|q.len())).sum());
+                let mut query = String::with_capacity(
+                    $self
+                        .query
+                        .iter()
+                        .map(|q| q.as_ref().map_or(3, |q| q.len()))
+                        .sum(),
+                );
                 let mut index = 1;
                 for part in &$self.query {
                     match part {
@@ -581,7 +594,7 @@ macro_rules! compile {
                 Cow::Owned(query)
             }
         }
-    }
+    };
 }
 
 impl<'a> IntoWrapString<'a> for WrapString<'a> {
@@ -630,7 +643,6 @@ impl<'a> IntoWrapString<'a> for &'static str {
 mod tests {
     use crate as concatsql;
     use concatsql::prelude::*;
-    use concatsql::prep;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
     use std::time::UNIX_EPOCH;
 
@@ -640,7 +652,7 @@ mod tests {
         clippy::deref_addrof,
         clippy::identity_op,
         clippy::approx_constant,
-        clippy::many_single_char_names,
+        clippy::many_single_char_names
     )]
     fn concat_anything_type() {
         use std::borrow::Cow;
@@ -649,146 +661,175 @@ mod tests {
         let c = &**&&String::from("C");
         let d = &***&&&String::from("D");
         let e = String::from("E");
-        let sql: WrapString = prep!("A") + prep!("B") + "C" + String::from("D") + &e + &prep!("F") + 42 + 3.14;
+        let sql: WrapString =
+            query!("A") + query!("B") + "C" + String::from("D") + &e + &query!("F") + 42 + 3.14;
         assert_eq!(sql.simulate(), "AB'C''D''E'F423.14");
-        let sql = prep!() + a + b + c + d;
+        let sql = query!("") + a + b + c + d;
         assert_eq!(sql.simulate(), "'A''B''C''D'");
-        let sql = prep!() + "A" + &"B" + *&&"C" + **&&&"D";
+        let sql = query!("") + "A" + &"B" + *&&"C" + **&&&"D";
         assert_eq!(sql.simulate(), "'A''B''C''D'");
-        let sql = prep!() + 0usize + 1u8 + 2u16 + 3u32 + 4u64 + 5isize + 6i8 + 7i16 + 8i32 + 9i64 + 0f32 + 1f64;
+        let sql = query!("")
+            + 0usize
+            + 1u8
+            + 2u16
+            + 3u32
+            + 4u64
+            + 5isize
+            + 6i8
+            + 7i16
+            + 8i32
+            + 9i64
+            + 0f32
+            + 1f64;
         assert_eq!(sql.simulate(), "012345678901");
-        let sql = prep!() + f32::MAX + f32::INFINITY + f32::NAN;
-        assert_eq!(sql.simulate(), "340282350000000000000000000000000000000infNaN");
-        let sql = prep!() + vec![b'A',b'B',b'C'] + &vec![0,1,2];
+        let sql = query!("") + f32::MAX + f32::INFINITY + f32::NAN;
+        assert_eq!(
+            sql.simulate(),
+            "340282350000000000000000000000000000000infNaN"
+        );
+        let sql = query!("") + vec![b'A', b'B', b'C'] + &vec![0, 1, 2];
         if cfg!(feature = "sqlite") || cfg!(feature = "mysql") {
             assert_eq!(sql.simulate(), "X'414243'X'000102'");
         } else {
             assert_eq!(sql.simulate(), "'\\x414243''\\x000102'");
         }
-        let sql = prep!() + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string());
+        let sql =
+            query!("") + Cow::Borrowed("A") + &Cow::Borrowed("B") + Cow::Owned("C".to_string());
         assert_eq!(sql.simulate(), "'A''B''C'");
-        let sql = prep!("A") + Some("B") + Some(String::from("C")) + Some(0i32) + Some(3.14f32) + Some(42i32) + None as Option<i32> + ();
+        let sql = query!("A")
+            + Some("B")
+            + Some(String::from("C"))
+            + Some(0i32)
+            + Some(3.14f32)
+            + Some(42i32)
+            + None as Option<i32>
+            + ();
         assert_eq!(sql.simulate(), "A'B''C'03.1442NULLNULL");
         let vec: Vec<String> = Vec::new();
-        let sql = prep!("(") + vec + prep!(")");
+        let sql = query!("(") + vec + query!(")");
         assert_eq!(sql.simulate(), "(NULL)");
-        let sql = prep!("(") + vec!["A"] + prep!(")");
+        let sql = query!("(") + vec!["A"] + query!(")");
         assert_eq!(sql.simulate(), "('A')");
-        let sql = prep!("(") + vec!["A","B"] + prep!(")");
+        let sql = query!("(") + vec!["A", "B"] + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let sql = prep!("(") + vec![String::from("A"),String::from("B")] + prep!(")");
+        let sql = query!("(") + vec![String::from("A"), String::from("B")] + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let vec = vec!["A","B"];
-        let sql = prep!("(") + &vec + prep!(")");
+        let vec = vec!["A", "B"];
+        let sql = query!("(") + &vec + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let vec = vec![String::from("A"),String::from("B")];
-        let sql = prep!("(") + &vec + prep!(")");
+        let vec = vec![String::from("A"), String::from("B")];
+        let sql = query!("(") + &vec + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let sql = prep!("(") + &["A","B"][..] + prep!(")");
+        let sql = query!("(") + &["A", "B"][..] + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let sli = &[String::from("A"),String::from("B")][..];
-        let sql = prep!("(") + sli + prep!(")");
+        let sli = &[String::from("A"), String::from("B")][..];
+        let sql = query!("(") + sli + query!(")");
         assert_eq!(sql.simulate(), "('A','B')");
-        let sql = prep!() + IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+        let sql = query!("") + IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
         assert_eq!(sql.simulate(), "'127.0.0.1'");
-        let sql = prep!() + IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
+        let sql = query!("") + IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
         assert_eq!(sql.simulate(), "'::1'");
-        let sql = prep!() + UNIX_EPOCH;
+        let sql = query!("") + UNIX_EPOCH;
         assert_eq!(sql.simulate(), "'1970-01-01 00:00:00.000000000'");
     }
 
     #[test]
     fn params() {
-        let sql = prep!() + params![
-            (),
-            42i8,
-            42i16,
-            42i32,
-            0.1f32,
-            2.3f64,
-            String::from("A"),
-            "B",
-            IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
-            UNIX_EPOCH,
-        ];
-        assert_eq!(sql.simulate(), "NULL,42,42,42,0.1,2.3,'A','B','::1','1970-01-01 00:00:00.000000000'");
+        let sql = query!("")
+            + params![
+                (),
+                42i8,
+                42i16,
+                42i32,
+                0.1f32,
+                2.3f64,
+                String::from("A"),
+                "B",
+                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                UNIX_EPOCH,
+            ];
+        assert_eq!(
+            sql.simulate(),
+            "NULL,42,42,42,0.1,2.3,'A','B','::1','1970-01-01 00:00:00.000000000'"
+        );
     }
 
     #[test]
     #[allow(clippy::op_ref)]
     fn uuid() {
         use uuid::Uuid;
-        let uuid = prep!() + Uuid::nil();
+        let uuid = query!("") + Uuid::nil();
         assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
-        let uuid = prep!() + &Uuid::nil();
+        let uuid = query!("") + &Uuid::nil();
         assert_eq!(uuid.simulate(), "'00000000000000000000000000000000'");
-        let uuid = prep!() + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
+        let uuid = query!("") + Uuid::parse_str("936DA01F-9ABD-4D9D-80C7-02AF85C822A8").unwrap();
         assert_eq!(uuid.simulate(), "'936DA01F9ABD4D9D80C702AF85C822A8'");
-        let uuid = prep!() + Uuid::new_v4();
-        assert_eq!(uuid.simulate().len(), 32+2);
+        let uuid = query!("") + Uuid::new_v4();
+        assert_eq!(uuid.simulate().len(), 32 + 2);
     }
 
     #[test]
     fn len() {
-        assert_eq!((prep!("ABC") + prep!("123")).len(), 6);
-        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!((query!("ABC") + query!("123")).len(), 6);
+        let sql: WrapString = query!("ABC") + 42 + query!("123");
         assert_eq!(sql.len(), 6);
-        assert_eq!(prep!().len(), 0);
+        assert_eq!(query!("").len(), 0);
     }
 
     #[test]
     fn query_len() {
-        assert_eq!((prep!("ABC") + prep!("123")).query_len(), 2);
-        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!((query!("ABC") + query!("123")).query_len(), 2);
+        let sql: WrapString = query!("ABC") + 42 + query!("123");
         assert_eq!(sql.query_len(), 3);
-        assert_eq!(prep!().query_len(), 0);
+        assert_eq!(query!("").query_len(), 0);
     }
 
     #[test]
     fn params_len() {
-        assert_eq!((prep!("ABC") + prep!("123")).params_len(), 0);
-        let sql: WrapString = prep!("ABC") + 42 + prep!("123");
+        assert_eq!((query!("ABC") + query!("123")).params_len(), 0);
+        let sql: WrapString = query!("ABC") + 42 + query!("123");
         assert_eq!(sql.params_len(), 1);
-        assert_eq!(prep!().params_len(), 0);
+        assert_eq!(query!("").params_len(), 0);
     }
 
     #[test]
     fn clear() {
-        let mut sql: WrapString = prep!("ABC") + 42 + prep!("123");
-        assert_eq!(sql.query_len(),  3);
+        let mut sql: WrapString = query!("ABC") + 42 + query!("123");
+        assert_eq!(sql.query_len(), 3);
         assert_eq!(sql.params_len(), 1);
         sql.clear();
-        assert_eq!(sql.query_len(),  0);
+        assert_eq!(sql.query_len(), 0);
         assert_eq!(sql.params_len(), 0);
     }
 
     #[test]
     fn is_empty() {
-        assert!(prep!().is_empty());
+        assert!(query!("").is_empty());
     }
 
     #[test]
     fn squash() {
-        let mut sql: WrapString = prep!("A") + prep!("B") + 42 + prep!("1") + prep!("2") + prep!("3");
-        assert_eq!(sql.query_len(),  6);
+        let mut sql: WrapString =
+            query!("A") + query!("B") + 42 + query!("1") + query!("2") + query!("3");
+        assert_eq!(sql.query_len(), 6);
         assert_eq!(sql.params_len(), 1);
         sql.squash();
-        assert_eq!(sql.query_len(),  3);
+        assert_eq!(sql.query_len(), 3);
         assert_eq!(sql.params_len(), 1);
     }
 
     mod simulate {
         use crate as concatsql;
-        use concatsql::prep;
+        use concatsql::prelude::*;
 
         #[test]
         fn double_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"".ow(""inside str"") -> String""#).simulate(),
+                (query!("") + r#"".ow(""inside str"") -> String""#).simulate(),
                 r#"'".ow(""inside str"") -> String"'"#
             );
             assert_eq!(
-                (prep!() + r#"".ow("inside str") -> String""#).simulate(),
+                (query!("") + r#"".ow("inside str") -> String""#).simulate(),
                 r#"'".ow("inside str") -> String"'"#
             );
         }
@@ -796,11 +837,11 @@ mod tests {
         #[test]
         fn double_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + r#""I'm Alice""#).simulate(),
+                (query!("") + r#""I'm Alice""#).simulate(),
                 r#"'"I''m Alice"'"#
             );
             assert_eq!(
-                (prep!() + r#""I''m Alice""#).simulate(),
+                (query!("") + r#""I''m Alice""#).simulate(),
                 r#"'"I''''m Alice"'"#
             );
         }
@@ -808,7 +849,7 @@ mod tests {
         #[test]
         fn single_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"'.ow("inside str") -> String'"#).simulate(),
+                (query!("") + r#"'.ow("inside str") -> String'"#).simulate(),
                 r#"'''.ow("inside str") -> String'''"#
             );
         }
@@ -816,7 +857,7 @@ mod tests {
         #[test]
         fn single_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + "'I''m Alice'").simulate(),
+                (query!("") + "'I''m Alice'").simulate(),
                 r#"'''I''''m Alice'''"#
             );
         }
@@ -824,7 +865,7 @@ mod tests {
         #[test]
         fn non_quotaion_inside_sigle_quote() {
             assert_eq!(
-                (prep!() + "foo'bar'foo").simulate(),
+                (query!("") + "foo'bar'foo").simulate(),
                 r#"'foo''bar''foo'"#
             );
         }
@@ -832,16 +873,16 @@ mod tests {
         #[test]
         fn non_quotaion_inside_double_quote() {
             assert_eq!(
-                (prep!() + r#"foo"bar"foo"#).simulate(),
+                (query!("") + r#"foo"bar"foo"#).simulate(),
                 r#"'foo"bar"foo'"#
             );
         }
 
         #[test]
         fn empty_string() {
-            assert_eq!(prep!().simulate(), "");
-            assert_eq!(prep!("").simulate(), "");
-            assert_eq!((prep!("") + "").simulate(), "''");
+            assert_eq!(query!("").simulate(), "");
+            assert_eq!(query!("").simulate(), "");
+            assert_eq!((query!("") + "").simulate(), "''");
         }
     }
 }

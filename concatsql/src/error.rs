@@ -41,28 +41,36 @@ impl Default for ErrorLevel {
 
 impl Error {
     #[allow(unused_variables)]
-    pub(crate) fn new<E1, E2>(error_level: &ErrorLevel, err_msg: E1, detail_msg: E2) -> Result<(), Error>
-        where
-            E1: ToString,
-            E2: ToString,
+    pub(crate) fn new<E1, E2>(
+        error_level: &ErrorLevel,
+        err_msg: E1,
+        detail_msg: E2,
+    ) -> Result<(), Error>
+    where
+        E1: ToString,
+        E2: ToString,
     {
         match error_level {
             ErrorLevel::AlwaysOk => Ok(()),
-            ErrorLevel::Release  => Err(Error::AnyError),
-            ErrorLevel::Develop  => Err(Error::Message(err_msg.to_string())),
+            ErrorLevel::Release => Err(Error::AnyError),
+            ErrorLevel::Develop => Err(Error::Message(err_msg.to_string())),
             #[cfg(debug_assertions)]
-            ErrorLevel::Debug    => Err(Error::Message(err_msg.to_string() + ": " + &detail_msg.to_string())),
+            ErrorLevel::Debug => Err(Error::Message(
+                err_msg.to_string() + ": " + &detail_msg.to_string(),
+            )),
         }
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}",
+        write!(
+            f,
+            "{}",
             match self {
-                Error::Message(s) =>     s.to_string(),
-                Error::AnyError =>       String::from("AnyError"),
-                Error::ParseError =>     String::from("ParseError"),
+                Error::Message(s) => s.to_string(),
+                Error::AnyError => String::from("AnyError"),
+                Error::ParseError => String::from("ParseError"),
                 Error::ColumnNotFound => String::from("ColumnNotFound"),
             }
         )
@@ -84,18 +92,19 @@ mod tests {
     fn errors() {
         assert_eq!(ErrorLevel::default(), ErrorLevel::Develop);
         assert_eq!(Error::Message("test".to_string()).to_string(), "test");
+        assert_eq!(Error::new(&ErrorLevel::AlwaysOk, "test", "test"), Ok(()));
         assert_eq!(
-            Error::new(&ErrorLevel::AlwaysOk, "test", "test"),
-            Ok(()));
+            Error::new(&ErrorLevel::Release, "test", "test"),
+            Err(Error::AnyError)
+        );
         assert_eq!(
-            Error::new(&ErrorLevel::Release,  "test", "test"),
-            Err(Error::AnyError));
+            Error::new(&ErrorLevel::Develop, "test", "test"),
+            Err(Error::Message("test".into()))
+        );
         assert_eq!(
-            Error::new(&ErrorLevel::Develop,  "test", "test"),
-            Err(Error::Message("test".into())));
-        assert_eq!(
-            Error::new(&ErrorLevel::Debug,    "test", "test"),
-            Err(Error::Message("test: test".into())));
+            Error::new(&ErrorLevel::Debug, "test", "test"),
+            Err(Error::Message("test: test".into()))
+        );
     }
 
     #[test]
@@ -110,11 +119,11 @@ mod tests {
         conn.execute({
             conn.error_level(ErrorLevel::Develop);
             "SELECT 1"
-        }).unwrap();
+        })
+        .unwrap();
         conn.error_level({
             conn.execute("SELECT 1").unwrap();
             ErrorLevel::Develop
         });
     }
 }
-

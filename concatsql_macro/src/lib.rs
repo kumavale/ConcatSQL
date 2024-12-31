@@ -1,20 +1,17 @@
 extern crate proc_macro;
 
-use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
-use proc_macro_error::{
-    proc_macro_error,
-    abort_call_site,
-};
-use quote::quote;
-use syn::LitStr;
 use nom::{
-    IResult,
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, none_of},
     multi::{many0, many1},
+    IResult,
 };
+use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
+use proc_macro_error::{abort_call_site, proc_macro_error};
+use quote::quote;
+use syn::LitStr;
 
 #[derive(Debug)]
 enum Query {
@@ -40,7 +37,7 @@ impl FormatParser {
         } else {
             return Err("parse error");
         };
-        if input != "" {
+        if !input.is_empty() {
             return Err("invalid format");
         }
         let mut lits = vec![];
@@ -48,10 +45,10 @@ impl FormatParser {
         for q in query.into_iter() {
             match q {
                 Query::Lit(s) => {
-                    lits.push(quote!{ Some( #s ) });
+                    lits.push(quote! { Some( #s ) });
                 }
                 Query::Param(p) => {
-                    lits.push(quote!{ None });
+                    lits.push(quote! { None });
                     params.push(Ident::new(&p, Span::call_site()));
                 }
             }
@@ -61,11 +58,17 @@ impl FormatParser {
                 vec![ #(#lits),* ],
                 vec![ #(#params.to_value()),* ],
             )
-        }.into())
+        }
+        .into())
     }
 
     fn format(input: &str) -> IResult<&str, Vec<Query>> {
-        many0(alt((FormatParser::brace_open, FormatParser::brace_close, FormatParser::param, FormatParser::lit)))(input)
+        many0(alt((
+            FormatParser::brace_open,
+            FormatParser::brace_close,
+            FormatParser::param,
+            FormatParser::lit,
+        )))(input)
     }
 
     fn lit(input: &str) -> IResult<&str, Query> {
