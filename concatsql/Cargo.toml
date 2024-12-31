@@ -28,7 +28,7 @@ chrono = "0.4.35"
 concatsql_macro = { version = "0.1.0", path = "../concatsql_macro" }
 
 [dependencies.sqlite3-sys]
-version = "0.16.0"
+version = "0.17.0"
 default-features = false
 optional = true
 
