@@ -115,7 +115,7 @@ pub trait SystemTimeToString {
     fn to_string(&self) -> String;
 }
 
-impl SystemTimeToString for SystemTime  {
+impl SystemTimeToString for SystemTime {
     fn to_string(&self) -> String {
         let datetime: DateTime<Utc> = (*self).into();
         datetime.format("%Y-%m-%d %H:%M:%S.%f").to_string()
@@ -128,4 +128,3 @@ impl SystemTimeToString for &SystemTime {
         datetime.format("%Y-%m-%d %H:%M:%S.%f").to_string()
     }
 }
-

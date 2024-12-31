@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use indexmap::map::IndexMap;
 use crate::error::Error;
+use indexmap::map::IndexMap;
 
 type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 
@@ -10,7 +10,7 @@ type IndexMapPairs<'a> = IndexMap<&'a str, Option<String>>;
 #[derive(Debug, PartialEq)]
 pub struct Row<'a> {
     columns: Arc<[String]>,
-    pairs:   IndexMapPairs<'a>,
+    pairs: IndexMapPairs<'a>,
 }
 
 impl<'a> Row<'a> {
@@ -90,7 +90,7 @@ impl<'a> Row<'a> {
 
     /// Get the column name.  
     #[inline]
-    pub fn column_name<T: Get>(&self, key: T) ->  Option<&str> {
+    pub fn column_name<T: Get>(&self, key: T) -> Option<&str> {
         key.get_key(&self.pairs)
     }
 
@@ -103,10 +103,7 @@ impl<'a> Row<'a> {
 
     #[inline]
     pub fn iter(&self) -> RowIter {
-        RowIter {
-            row: self,
-            now: 0,
-        }
+        RowIter { row: self, now: 0 }
     }
 }
 
@@ -128,7 +125,7 @@ impl<'a> Iterator for RowIter<'a> {
     fn next(&mut self) -> Option<&'a str> {
         if self.now < self.row.column_count() {
             self.now += 1;
-            self.row.get(self.now-1)
+            self.row.get(self.now - 1)
         } else {
             None
         }
@@ -156,7 +153,13 @@ impl Get for str {
     }
 
     fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get(self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+        U::from_sql(
+            pairs
+                .get(self)
+                .ok_or(Error::ColumnNotFound)?
+                .as_deref()
+                .unwrap_or(""),
+        )
     }
 
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
@@ -170,7 +173,13 @@ impl Get for String {
     }
 
     fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get(&**self).ok_or(Error::ColumnNotFound)?.as_deref().unwrap_or(""))
+        U::from_sql(
+            pairs
+                .get(&**self)
+                .ok_or(Error::ColumnNotFound)?
+                .as_deref()
+                .unwrap_or(""),
+        )
     }
 
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
@@ -184,7 +193,14 @@ impl Get for usize {
     }
 
     fn get_into<U: FromSql>(&self, pairs: &IndexMapPairs) -> Result<U, Error> {
-        U::from_sql(pairs.get_index(*self).ok_or(Error::ColumnNotFound)?.1.as_deref().unwrap_or(""))
+        U::from_sql(
+            pairs
+                .get_index(*self)
+                .ok_or(Error::ColumnNotFound)?
+                .1
+                .as_deref()
+                .unwrap_or(""),
+        )
     }
 
     fn get_key<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
@@ -192,7 +208,10 @@ impl Get for usize {
     }
 }
 
-impl<'b, T> Get for &'b T where T: Get + ?Sized {
+impl<'b, T> Get for &'b T
+where
+    T: Get + ?Sized,
+{
     fn get<'a>(&self, pairs: &'a IndexMapPairs) -> Option<&'a str> {
         T::get(self, pairs)
     }
@@ -256,8 +275,9 @@ impl FromSql for Vec<u8> {
     fn from_sql(s: &str) -> Result<Self, Error> {
         (0..s.len())
             .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i+2], 16).map_err(|_|()))
-            .collect::<Result<Vec<u8>, ()>>().map_err(|_|Error::ParseError)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| ()))
+            .collect::<Result<Vec<u8>, ()>>()
+            .map_err(|_| Error::ParseError)
     }
 }
 
@@ -270,11 +290,14 @@ mod tests {
     #[cfg(feature = "sqlite")]
     fn column_names() {
         let conn = crate::sqlite::open(":memory:").unwrap();
-        conn.execute(r#"
+        conn.execute(
+            r#"
                 CREATE TABLE users (name TEXT, age INTEGER);
                 INSERT INTO users (name, age) VALUES ('Alice', 42);
                 INSERT INTO users (name, age) VALUES ('Bob',   69);
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         for row in conn.rows("SELECT * FROM users").unwrap() {
             assert_eq!(row.column_names(), ["name", "age"]);
@@ -284,7 +307,12 @@ mod tests {
     #[test]
     #[allow(clippy::needless_borrow, clippy::needless_borrows_for_generic_args)]
     fn row() {
-        let mut row = Row::new(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect());
+        let mut row = Row::new(
+            ["key1", "key2", "key3", "ABC"]
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+        );
         row.insert("key1", Some("value".to_string()));
         row.insert("key2", None);
         row.insert("key3", Some("42".to_string()));
@@ -300,7 +328,10 @@ mod tests {
         assert_eq!(row.get(2), Some("42"));
         assert_eq!(row.get(3), None);
 
-        assert_eq!(row.get_into::<&str, String>("key1"), Ok(String::from("value")));
+        assert_eq!(
+            row.get_into::<&str, String>("key1"),
+            Ok(String::from("value"))
+        );
         assert_eq!(row.get_into::<&str, i32>("key3"), Ok(42));
         assert_eq!(row.get_into::<&str, usize>("key3"), Ok(42));
         assert_eq!(row.get_into("key3"), Ok(42));
@@ -362,26 +393,29 @@ mod tests {
         assert_eq!(row.get(&&String::from("key1")), Some("value"));
 
         row.insert("ABC", Some("414243".to_string()));
-        assert_eq!(row.get_into::<_, Vec<u8>>("ABC"), Ok(vec![b'A',b'B',b'C']));
+        assert_eq!(
+            row.get_into::<_, Vec<u8>>("ABC"),
+            Ok(vec![b'A', b'B', b'C'])
+        );
         assert!(row.get_into::<_, i8>("ABC").is_err());
         assert!(row.get_into::<_, u8>("ABC").is_err());
         assert!(row.get_into::<_, i16>("ABC").is_err());
         assert!(row.get_into::<_, u16>("ABC").is_err());
-        assert_eq!(row.get_into::<_, i32>("ABC"),   Ok(414243));
-        assert_eq!(row.get_into::<_, u32>("ABC"),   Ok(414243));
-        assert_eq!(row.get_into::<_, i64>("ABC"),   Ok(414243));
-        assert_eq!(row.get_into::<_, u64>("ABC"),   Ok(414243));
-        assert_eq!(row.get_into::<_, i128>("ABC"),  Ok(414243));
-        assert_eq!(row.get_into::<_, u128>("ABC"),  Ok(414243));
+        assert_eq!(row.get_into::<_, i32>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, u32>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, i64>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, u64>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, i128>("ABC"), Ok(414243));
+        assert_eq!(row.get_into::<_, u128>("ABC"), Ok(414243));
         assert_eq!(row.get_into::<_, isize>("ABC"), Ok(414243));
         assert_eq!(row.get_into::<_, usize>("ABC"), Ok(414243));
 
         assert_eq!(row.get_into::<_, u8>("ABC"), Err(Error::ParseError));
         assert_eq!(row.get_into::<_, u8>("def"), Err(Error::ColumnNotFound));
 
-        assert_eq!(row.column_name(0),       Some("key1"));
-        assert_eq!(row.column_name(99),      None);
-        assert_eq!(row.column_name("key1"),  Some("key1"));
+        assert_eq!(row.column_name(0), Some("key1"));
+        assert_eq!(row.column_name(99), None);
+        assert_eq!(row.column_name("key1"), Some("key1"));
         assert_eq!(row.column_name("key99"), None);
     }
 
@@ -389,14 +423,20 @@ mod tests {
     #[cfg(feature = "sqlite")]
     fn iter() {
         let conn = crate::sqlite::open(":memory:").unwrap();
-        conn.execute(r#"
+        conn.execute(
+            r#"
                 CREATE TABLE users (name TEXT, age INTEGER);
                 INSERT INTO users (name, age) VALUES ('Alice', 42);
                 INSERT INTO users (name, age) VALUES ('Bob',   69);
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let mut cnt = 0;
-        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+        for row in conn
+            .rows("SELECT * FROM users WHERE name = 'Alice'")
+            .unwrap()
+        {
             for (index, value) in row.iter().enumerate() {
                 cnt += 1;
                 assert_eq!(value, ["Alice", "42"][index]);
@@ -409,14 +449,20 @@ mod tests {
     #[cfg(feature = "sqlite")]
     fn into_iter() {
         let conn = crate::sqlite::open(":memory:").unwrap();
-        conn.execute(r#"
+        conn.execute(
+            r#"
                 CREATE TABLE users (name TEXT, age INTEGER);
                 INSERT INTO users (name, age) VALUES ('Alice', 42);
                 INSERT INTO users (name, age) VALUES ('Bob',   69);
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let mut cnt = 0;
-        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+        for row in conn
+            .rows("SELECT * FROM users WHERE name = 'Alice'")
+            .unwrap()
+        {
             for value in &row {
                 assert_eq!(value, ["Alice", "42"][cnt]);
                 cnt += 1;
@@ -429,25 +475,30 @@ mod tests {
     #[cfg(feature = "sqlite")]
     fn index() {
         let conn = crate::sqlite::open(":memory:").unwrap();
-        conn.execute(r#"
+        conn.execute(
+            r#"
                 CREATE TABLE users (name TEXT, age INTEGER);
                 INSERT INTO users (name, age) VALUES ('Alice', 42);
                 INSERT INTO users (name, age) VALUES ('Bob',   69);
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let mut cnt = 0;
-        for row in conn.rows("SELECT * FROM users WHERE name = 'Alice'").unwrap() {
+        for row in conn
+            .rows("SELECT * FROM users WHERE name = 'Alice'")
+            .unwrap()
+        {
             cnt += 1;
             assert_eq!(&row[0], "Alice");
             assert_eq!(&row[1], "42");
             assert_eq!(&row["name"], "Alice");
-            assert_eq!(&row["age"],  "42");
+            assert_eq!(&row["age"], "42");
             assert_eq!(row[0], *"Alice");
             assert_eq!(row[1], *"42");
             assert_eq!(row["name"], *"Alice");
-            assert_eq!(row["age"],  *"42");
+            assert_eq!(row["age"], *"42");
         }
         assert_eq!(cnt, 1);
     }
 }
-

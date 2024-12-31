@@ -38,46 +38,46 @@ mod connection;
 mod error;
 mod parser;
 mod row;
-mod wrapstring;
 mod value;
+mod wrapstring;
 
-#[cfg(feature = "sqlite")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
-pub mod sqlite;
 #[cfg(feature = "mysql")]
 #[cfg_attr(docsrs, doc(cfg(feature = "mysql")))]
 pub mod mysql;
 #[cfg(feature = "postgres")]
 #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres;
+#[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+pub mod sqlite;
 
-pub use crate::connection::{Connection, without_escape};
+pub use crate::connection::{without_escape, Connection};
 pub use crate::error::{Error, ErrorLevel};
-pub use crate::row::{Row, Get, FromSql};
-pub use crate::parser::{html_special_chars, _sanitize_like, invalid_literal};
-pub use crate::wrapstring::{WrapString, IntoWrapString};
-pub use crate::value::{Value, ToValue};
+pub use crate::parser::{_sanitize_like, html_special_chars, invalid_literal};
+pub use crate::row::{FromSql, Get, Row};
+pub use crate::value::{ToValue, Value};
+pub use crate::wrapstring::{IntoWrapString, WrapString};
 
 pub use concatsql_macro::query;
 
 pub mod prelude {
     //! Re-exports important traits and types.
 
-    #[cfg(feature = "sqlite")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
-    pub use crate::sqlite;
     #[cfg(feature = "mysql")]
     #[cfg_attr(docsrs, doc(cfg(feature = "mysql")))]
     pub use crate::mysql;
     #[cfg(feature = "postgres")]
     #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     pub use crate::postgres;
+    #[cfg(feature = "sqlite")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+    pub use crate::sqlite;
 
-    pub use crate::connection::{Connection, without_escape};
-    pub use crate::row::{Row, Get, FromSql};
-    pub use crate::{sanitize_like, params};
+    pub use crate::connection::{without_escape, Connection};
+    pub use crate::row::{FromSql, Get, Row};
+    pub use crate::value::{ToValue, Value};
     pub use crate::wrapstring::WrapString;
-    pub use crate::value::{Value, ToValue};
+    pub use crate::{params, sanitize_like};
     pub use concatsql_macro::query;
 }
 
@@ -120,12 +120,16 @@ pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 /// prep!("INSERT INTO msg VALUES (\"I'm cat.\")");
 /// prep!("INSERT INTO msg VALUES (") + "I'm cat." + prep!(")");
 /// ```
-#[deprecated(note="please use `query!` instead")]
+#[deprecated(note = "please use `query!` instead")]
 #[allow(deprecated)]
 #[macro_export]
 macro_rules! prep {
-    ()            => { $crate::WrapString::null()       };
-    ($query:expr) => { $crate::WrapString::init($query) };
+    () => {
+        $crate::WrapString::null()
+    };
+    ($query:expr) => {
+        $crate::WrapString::init($query)
+    };
 }
 
 /// Prepare a SQL statement for execution.
@@ -165,7 +169,7 @@ macro_rules! prep {
 /// prep("INSERT INTO msg VALUES (") + "I'm cat." + prep(")");
 /// ```
 #[inline]
-#[deprecated(note="please use `query!` instead")]
+#[deprecated(note = "please use `query!` instead")]
 #[allow(deprecated)]
 pub fn prep(query: &'static str) -> WrapString {
     WrapString::init(query)
@@ -188,4 +192,3 @@ macro_rules! params {
         &[ $(&$param as &dyn $crate::ToValue),+ ] as &[&dyn $crate::ToValue]
     };
 }
-

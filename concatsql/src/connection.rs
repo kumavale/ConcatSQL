@@ -1,34 +1,51 @@
-use std::fmt;
-use std::cell::Cell;
 use std::borrow::Cow;
+use std::cell::Cell;
+use std::fmt;
 
-use crate::Result;
-use crate::ErrorLevel;
 use crate::row::Row;
-use crate::wrapstring::{WrapString, IntoWrapString};
 use crate::value::Value;
+use crate::wrapstring::{IntoWrapString, WrapString};
+use crate::ErrorLevel;
+use crate::Result;
 
 #[allow(clippy::type_complexity)]
 pub(crate) trait ConcatsqlConn {
-    fn execute_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel) -> Result<()>;
-    fn iterate_inner<'a>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel,
-        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool) -> Result<()>;
-    fn rows_inner<'a, 'r>(&self, query: Cow<'a, str>, params: &[Value<'a>], error_level: &crate::ErrorLevel)
-        -> Result<Vec<Row<'r>>>;
+    fn execute_inner<'a>(
+        &self,
+        query: Cow<'a, str>,
+        params: &[Value<'a>],
+        error_level: &crate::ErrorLevel,
+    ) -> Result<()>;
+    fn iterate_inner<'a>(
+        &self,
+        query: Cow<'a, str>,
+        params: &[Value<'a>],
+        error_level: &crate::ErrorLevel,
+        callback: &mut dyn FnMut(&[(&str, Option<&str>)]) -> bool,
+    ) -> Result<()>;
+    fn rows_inner<'a, 'r>(
+        &self,
+        query: Cow<'a, str>,
+        params: &[Value<'a>],
+        error_level: &crate::ErrorLevel,
+    ) -> Result<Vec<Row<'r>>>;
     fn close(&self);
     fn kind(&self) -> ConnKind;
 }
 
 #[doc(hidden)]
 pub enum ConnKind {
-    #[cfg(feature = "sqlite")]   SQLite,
-    #[cfg(feature = "mysql")]    MySQL,
-    #[cfg(feature = "postgres")] PostgreSQL,
+    #[cfg(feature = "sqlite")]
+    SQLite,
+    #[cfg(feature = "mysql")]
+    MySQL,
+    #[cfg(feature = "postgres")]
+    PostgreSQL,
 }
 
 /// A database connection.
 pub struct Connection {
-    pub(crate) conn:        Box<dyn ConcatsqlConn>,
+    pub(crate) conn: Box<dyn ConcatsqlConn>,
     pub(crate) error_level: Cell<ErrorLevel>,
 }
 
@@ -67,7 +84,11 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn execute<T: IntoWrapString<'a>>(&self, query: T) -> Result<()> {
-        self.conn.execute_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
+        self.conn.execute_inner(
+            query.compile(self.conn.kind()),
+            query.params(),
+            &self.error_level.get(),
+        )
     }
 
     /// Execute a statement and process the resulting rows as plain text.
@@ -94,10 +115,15 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn iterate<T: IntoWrapString<'a>, F>(&self, query: T, mut callback: F) -> Result<()>
-        where
-            F: FnMut(&[(&str, Option<&str>)]) -> bool,
+    where
+        F: FnMut(&[(&str, Option<&str>)]) -> bool,
     {
-        self.conn.iterate_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get(), &mut callback)
+        self.conn.iterate_inner(
+            query.compile(self.conn.kind()),
+            query.params(),
+            &self.error_level.get(),
+            &mut callback,
+        )
     }
 
     /// Execute a statement and returns the rows.
@@ -119,7 +145,11 @@ impl<'a> Connection {
     /// ```
     #[inline]
     pub fn rows<'r, T: IntoWrapString<'a>>(&self, query: T) -> Result<Vec<Row<'r>>> {
-        self.conn.rows_inner(query.compile(self.conn.kind()), query.params(), &self.error_level.get())
+        self.conn.rows_inner(
+            query.compile(self.conn.kind()),
+            query.params(),
+            &self.error_level.get(),
+        )
     }
 
     /// Sets the error level.  
@@ -170,4 +200,3 @@ impl Drop for Connection {
 pub unsafe fn without_escape<T: ?Sized + ToString>(query: &T) -> WrapString {
     WrapString::new(query)
 }
-

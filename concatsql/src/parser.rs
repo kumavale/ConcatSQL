@@ -21,11 +21,11 @@ pub fn html_special_chars(input: &str) -> String {
     for c in input.chars() {
         match c {
             '\'' => escaped.push_str("&#39;"),
-            '"'  => escaped.push_str("&quot;"),
-            '&'  => escaped.push_str("&amp;"),
-            '<'  => escaped.push_str("&lt;"),
-            '>'  => escaped.push_str("&gt;"),
-             c   => escaped.push(c),
+            '"' => escaped.push_str("&quot;"),
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            c => escaped.push(c),
         }
     }
     escaped
@@ -55,8 +55,12 @@ pub fn html_special_chars(input: &str) -> String {
 /// ```
 #[macro_export]
 macro_rules! sanitize_like {
-    ($pattern:tt) =>             { $crate::_sanitize_like($pattern, '\\') };
-    ($pattern:tt, $escape:tt) => { $crate::_sanitize_like($pattern, $escape) };
+    ($pattern:tt) => {
+        $crate::_sanitize_like($pattern, '\\')
+    };
+    ($pattern:tt, $escape:tt) => {
+        $crate::_sanitize_like($pattern, $escape)
+    };
 }
 #[doc(hidden)]
 pub fn _sanitize_like<T: std::string::ToString>(pattern: T, escape_character: char) -> String {
@@ -74,9 +78,13 @@ pub(crate) fn escape_string(s: &str) -> String {
     let mut escaped = String::new();
     escaped.push('\'');
     for c in s.chars() {
-        if c == '\'' { escaped.push('\''); }
+        if c == '\'' {
+            escaped.push('\'');
+        }
         #[cfg(any(feature = "mysql", feature = "postgres"))]
-        if c == '\\' { escaped.push('\\'); }
+        if c == '\\' {
+            escaped.push('\\');
+        }
         escaped.push(c);
     }
     escaped.push('\'');
@@ -89,7 +97,10 @@ pub(crate) fn to_hex(bytes: &[u8]) -> String {
         static ref LUT: Vec<String> = (0u8..=255).map(|n| format!("{:02X}", n)).collect();
     }
 
-    bytes.iter().map(|&n| LUT.get(n as usize).unwrap().to_owned()).collect::<String>()
+    bytes
+        .iter()
+        .map(|&n| LUT.get(n as usize).unwrap().to_owned())
+        .collect::<String>()
 }
 
 pub(crate) fn to_binary_literal(bytes: &[u8]) -> String {
@@ -125,7 +136,7 @@ mod tests {
     #[cfg(feature = "sqlite")]
     #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
-        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly"), "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\''Reilly'");
     }
 
@@ -133,7 +144,7 @@ mod tests {
     #[cfg(feature = "mysql")]
     #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
-        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly"), "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
     }
 
@@ -141,7 +152,7 @@ mod tests {
     #[cfg(feature = "postgres")]
     #[cfg(not(all(feature = "sqlite", feature = "mysql", feature = "postgres")))]
     fn escape_string() {
-        assert_eq!(super::escape_string("O'Reilly"),   "'O''Reilly'");
+        assert_eq!(super::escape_string("O'Reilly"), "'O''Reilly'");
         assert_eq!(super::escape_string("O\\'Reilly"), "'O\\\\''Reilly'");
     }
 }

@@ -1,6 +1,6 @@
 mod macros {
-    use concatsql_macro::query;
     use concatsql::prelude::*;
+    use concatsql_macro::query;
 
     #[test]
     fn query_test() {
@@ -9,7 +9,10 @@ mod macros {
         assert_eq!(sql.simulate(), "SELECT 'foo'");
         let age = "42 OR 1=1; --";
         let sql = query!(r#"SELECT name FROM users WHERE age = {age}"#);
-        assert_eq!(sql.simulate(), "SELECT name FROM users WHERE age = '42 OR 1=1; --'");
+        assert_eq!(
+            sql.simulate(),
+            "SELECT name FROM users WHERE age = '42 OR 1=1; --'"
+        );
         let sql = query!(r#"{name}{name};"#);
         assert_eq!(sql.simulate(), "'foo''foo';");
         let sql = query!(r#"{{name}}"#);

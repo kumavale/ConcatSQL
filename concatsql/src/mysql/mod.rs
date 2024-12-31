@@ -2,8 +2,8 @@
 
 pub(crate) mod connection;
 
-use crate::Result;
 use crate::connection::Connection;
+use crate::Result;
 
 /// Open a read-write connection to a new or existing database.
 ///
@@ -20,4 +20,3 @@ use crate::connection::Connection;
 pub fn open(url: &str) -> Result<Connection> {
     connection::open(url)
 }
-
