@@ -2,7 +2,7 @@ extern crate sqlite3_sys as ffi;
 
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{c_int, c_void, CStr, CString};
 use std::path::Path;
 use std::ptr::{self, NonNull};
 
@@ -340,6 +340,9 @@ unsafe fn bind_all(
     params: &[Value<'_>],
     error_level: &ErrorLevel,
 ) -> Result<()> {
+    // https://sqlite.org/c3ref/c_static.html
+    const SQLITE_TRANSIENT: c_int = -1;
+
     for (index, param) in (1i32..).zip(params.iter()) {
         let result = match param {
             Value::Null => ffi::sqlite3_bind_null(stmt, index),
@@ -355,7 +358,7 @@ unsafe fn bind_all(
                 Some(std::mem::transmute::<
                     *const c_void,
                     extern "C" fn(*mut c_void),
-                >(ffi::SQLITE_TRANSIENT as *const c_void)),
+                >(SQLITE_TRANSIENT as *const c_void)),
             ),
             Value::Bytes(value) => ffi::sqlite3_bind_blob(
                 stmt,
@@ -365,7 +368,7 @@ unsafe fn bind_all(
                 Some(std::mem::transmute::<
                     *const c_void,
                     extern "C" fn(*mut c_void),
-                >(ffi::SQLITE_TRANSIENT as *const c_void)),
+                >(SQLITE_TRANSIENT as *const c_void)),
             ),
             Value::IpAddr(value) => {
                 let value = value.to_string();
@@ -377,7 +380,7 @@ unsafe fn bind_all(
                     Some(std::mem::transmute::<
                         *const c_void,
                         extern "C" fn(*mut c_void),
-                    >(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    >(SQLITE_TRANSIENT as *const c_void)),
                 )
             }
             Value::Time(value) => {
@@ -390,7 +393,7 @@ unsafe fn bind_all(
                     Some(std::mem::transmute::<
                         *const c_void,
                         extern "C" fn(*mut c_void),
-                    >(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    >(SQLITE_TRANSIENT as *const c_void)),
                 )
             }
         };
