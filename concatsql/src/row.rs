@@ -239,6 +239,7 @@ from_sql_impl! {
     std::num::NonZeroI16,
     std::num::NonZeroI32,
     std::num::NonZeroI64,
+    std::num::NonZeroI128,
     std::num::NonZeroIsize,
     std::num::NonZeroU8,
     std::num::NonZeroU16,
@@ -249,9 +250,6 @@ from_sql_impl! {
     std::path::PathBuf,
     String,
 }
-
-#[cfg(feature = "uuid")]
-from_sql_impl! { std::num::NonZeroI128 }
 
 impl FromSql for Vec<u8> {
     #[doc(hidden)]
@@ -284,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::needless_borrow)]
+    #[allow(clippy::needless_borrow, clippy::needless_borrows_for_generic_args)]
     fn row() {
         let mut row = Row::new(["key1","key2","key3","ABC"].iter().map(ToString::to_string).collect());
         row.insert("key1", Some("value".to_string()));
@@ -353,9 +351,11 @@ mod tests {
 
         assert!(!row.is_empty());
 
+        assert_eq!(row.get("key1"), Some("value"));
         assert_eq!(row.get(&"key1"), Some("value"));
         assert_eq!(row.get(&&&&&&&&"key1"), Some("value"));
         assert_eq!(row.get(&*String::from("key1")), Some("value"));
+        assert_eq!(row.get(0), Some("value"));
         assert_eq!(row.get(&0), Some("value"));
         assert_eq!(row.get(String::from("key1")), Some("value"));
         assert_eq!(row.get(&String::from("key1")), Some("value"));

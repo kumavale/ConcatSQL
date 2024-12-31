@@ -318,7 +318,7 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_lev
                     index,
                     value.as_ptr() as *const _,
                     value.len() as i32,
-                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    Some(std::mem::transmute::<*const c_void, extern "C" fn(*mut c_void)>(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }
             Value::Bytes(value) => {
@@ -327,7 +327,7 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_lev
                     index,
                     value.as_ptr() as *const _,
                     value.len() as i32,
-                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    Some(std::mem::transmute::<*const c_void, extern "C" fn(*mut c_void)>(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }
             Value::IpAddr(value) => {
@@ -337,7 +337,7 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_lev
                     index,
                     value.as_ptr() as *const _,
                     value.len() as i32,
-                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    Some(std::mem::transmute::<*const c_void, extern "C" fn(*mut c_void)>(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }
             Value::Time(value) => {
@@ -347,7 +347,7 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_lev
                     index,
                     value.as_ptr() as *const _,
                     value.len() as i32,
-                    Some(std::mem::transmute(ffi::SQLITE_TRANSIENT as *const c_void)),
+                    Some(std::mem::transmute::<*const c_void, extern "C" fn(*mut c_void)>(ffi::SQLITE_TRANSIENT as *const c_void)),
                 )
             }
         };

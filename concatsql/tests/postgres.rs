@@ -1,3 +1,5 @@
+#![allow(clippy::never_loop)]
+
 #[cfg(feature = "postgres")]
 #[cfg(debug_assertions)]
 mod postgres {

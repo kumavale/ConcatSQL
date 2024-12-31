@@ -1,3 +1,5 @@
+#![allow(clippy::never_loop)]
+
 #[cfg(feature = "mysql")]
 #[cfg(debug_assertions)]
 mod mysql {

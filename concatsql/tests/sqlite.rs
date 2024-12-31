@@ -1,3 +1,4 @@
+#![allow(clippy::never_loop)]
 
 #[cfg(feature = "sqlite")]
 #[cfg(debug_assertions)]
@@ -628,6 +629,7 @@ mod anti_patterns {
         }
 
         let sql = prep!("SELECT age FROM users WHERE name < ") + u32::MIN;
+        #[allow(clippy::never_loop)]
         for _ in conn.rows(&sql).unwrap() {
             unreachable!();
         }
