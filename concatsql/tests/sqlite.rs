@@ -15,15 +15,19 @@ mod sqlite {
         };
     }
 
-    const STMT: &str = r#"CREATE TABLE users (name TEXT, age INTEGER);
-           INSERT INTO users (name, age) VALUES ('Alice', 42);
-           INSERT INTO users (name, age) VALUES ('Bob', 69);
-           INSERT INTO users (name, age) VALUES ('Carol', 50);"#;
+    fn init_table() -> WrapString<'static> {
+        query!(
+            r#"CREATE TABLE users (name TEXT, age INTEGER);
+               INSERT INTO users (name, age) VALUES ('Alice', 42);
+               INSERT INTO users (name, age) VALUES ('Bob', 69);
+               INSERT INTO users (name, age) VALUES ('Carol', 50);"#
+        )
+    }
 
     pub fn prepare() -> concatsql::Connection {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
         conn.error_level(ErrorLevel::Debug);
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.execute(query).unwrap();
         conn
     }
@@ -34,7 +38,10 @@ mod sqlite {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn static_strings() {
+        use concatsql::prep;
+
         macro_rules! static_strings {(
             $(
                 $var:ident = $($expr:expr),* $(,)? ;
@@ -50,7 +57,7 @@ mod sqlite {
         )}
 
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.execute(query).unwrap();
         static_strings! {
             select = "SELECT ";
@@ -59,13 +66,13 @@ mod sqlite {
             table  = "users";
             sql = select!(), cols!(), from!(), table!();
         }
-        assert_eq!(query!("{sql}").simulate(), "SELECT name FROM users");
+        assert_eq!(prep!(sql).simulate(), "SELECT name FROM users");
     }
 
     #[test]
     fn execute() {
         let conn = concatsql::sqlite::open(":memory:").unwrap();
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.execute(query).unwrap();
     }
 
@@ -311,7 +318,7 @@ mod sqlite {
         use std::thread;
 
         let conn = Arc::new(Mutex::new(concatsql::sqlite::open(":memory:").unwrap()));
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.lock().unwrap().execute(query).unwrap();
 
         let mut handles = vec![];

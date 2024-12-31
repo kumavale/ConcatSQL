@@ -15,15 +15,19 @@ mod mysql {
         };
     }
 
-    const STMT: &str = r#"CREATE TEMPORARY TABLE users (name TEXT, age INTEGER);
+    fn init_table() -> WrapString<'static> {
+        query!(
+            r#"CREATE TEMPORARY TABLE users (name TEXT, age INTEGER);
            INSERT INTO users (name, age) VALUES ('Alice', 42);
            INSERT INTO users (name, age) VALUES ('Bob', 69);
-           INSERT INTO users (name, age) VALUES ('Carol', 50);"#;
+           INSERT INTO users (name, age) VALUES ('Carol', 50);"#
+        )
+    }
 
     pub fn prepare() -> concatsql::Connection {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
         conn.error_level(ErrorLevel::Debug);
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.execute(query).unwrap();
         conn
     }
@@ -36,7 +40,7 @@ mod mysql {
     #[test]
     fn execute() {
         let conn = concatsql::mysql::open("mysql://localhost:3306/test").unwrap();
-        let query = query!("{STMT}");
+        let query = init_table();
         conn.execute(query).unwrap();
     }
 
