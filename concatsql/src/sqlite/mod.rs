@@ -51,11 +51,11 @@ pub fn version() -> usize {
 mod tests {
     use crate as concatsql;
     use concatsql::prep;
-    use temporary::Directory;
+    use temporary::Folder;
 
     #[test]
     fn sqlite_open() {
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         crate::sqlite::open(":memory:").unwrap();
         crate::sqlite::open(path).unwrap();
@@ -65,7 +65,7 @@ mod tests {
     fn sqlite_open_readonly() {
         crate::sqlite::open_readonly(":memory:").unwrap();
 
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();
@@ -78,7 +78,7 @@ mod tests {
     #[cfg(debug_assertions)]
     fn should_readonly() {
         use crate::error::*;
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         {
             let conn = crate::sqlite::open(&path).unwrap();

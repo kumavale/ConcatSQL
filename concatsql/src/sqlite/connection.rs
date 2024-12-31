@@ -364,13 +364,13 @@ unsafe fn bind_all(stmt: *mut ffi::sqlite3_stmt, params: &[Value<'_>], error_lev
 mod tests {
     use crate as concatsql;
     use concatsql::error::*;
-    use temporary::Directory;
+    use temporary::Folder;
     #[cfg(debug_assertions)]
     use concatsql::prep;
 
     #[test]
     fn open() {
-        let dir = Directory::new("sqlite").unwrap();
+        let dir = Folder::new("sqlite").unwrap();
         let path = dir.path().join("test.db");
         assert_ne!(crate::sqlite::open(""), crate::sqlite::open(""));
         assert_ne!(crate::sqlite::open(":memory:"), crate::sqlite::open(":memory:"));
