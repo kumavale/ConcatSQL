@@ -5,7 +5,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{char, none_of},
     multi::{many0, many1},
-    IResult,
+    IResult, Parser,
 };
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
@@ -68,17 +68,18 @@ impl FormatParser {
             FormatParser::brace_close,
             FormatParser::param,
             FormatParser::lit,
-        )))(input)
+        )))
+        .parse(input)
     }
 
     fn lit(input: &str) -> IResult<&str, Query> {
-        let (input, lit) = many1(none_of("{}"))(input)?;
+        let (input, lit) = many1(none_of("{}")).parse(input)?;
         Ok((input, Query::Lit(lit.into_iter().collect())))
     }
 
     fn param(input: &str) -> IResult<&str, Query> {
         let (input, _) = char('{')(input)?;
-        let (input, param) = many1(none_of("}"))(input)?;
+        let (input, param) = many1(none_of("}")).parse(input)?;
         let (input, _) = char('}')(input)?;
         let param = param.into_iter().collect::<String>();
         Ok((input, Query::Param(param.trim().to_string())))
